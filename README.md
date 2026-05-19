@@ -3,7 +3,7 @@
 **A browser-based floor plan sketching tool for residential property appraisal.**
 Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
 
-**Version:** 0.10.0 (2026-05-19)
+**Version:** 0.11.0 (2026-05-19)
 **License:** [AGPL-3.0](./LICENSE)
 **Repo:** https://github.com/CAA-EBV-CO-OP/CValRSketch
 
@@ -25,15 +25,24 @@ Developed for the CAA-EBV-CO-OP community.
 1. Clone or download this repo.
 2. Open `index.html` in any modern browser (Chrome, Edge, Firefox, Safari).
 
-### Install on iPhone / iPad / Android (PWA)
+### Mobile (iPhone / Android) — touch-first version
 
-CValRSketch is a Progressive Web App. To install it as a home-screen icon that opens full-screen and runs offline:
+A dedicated mobile-first page lives at **`m/index.html`**, optimised for one-thumb operation: direction pad + numeric keypad, pinch-zoom canvas, share-sheet exports. Use it on your phone instead of the desktop page.
 
-1. Host the repo over HTTPS — the simplest path is enabling **GitHub Pages** on this repo (Settings → Pages → Deploy from `main` / root). Any static host works.
-2. Open the hosted URL on your phone in **Chrome (Android)** or **Safari (iOS)**.
-3. **Android:** Chrome surfaces an "Install" / "Add to Home screen" prompt automatically.
-4. **iOS:** tap the Share button → **Add to Home Screen**.
-5. Launch from the home-screen icon. It opens full-screen, no browser chrome, and works offline after the first load.
+Live URL: **https://caa-ebv-co-op.github.io/CValRSketch/m/**
+
+To install it as a home-screen icon:
+
+1. Open the URL above on your phone in **Chrome (Android)** or **Safari (iOS)**.
+2. **Android:** Chrome surfaces an "Install" / "Add to Home screen" prompt automatically.
+3. **iOS:** tap the Share button → **Add to Home Screen**.
+4. Launch from the home-screen icon — opens full-screen, no browser chrome.
+
+Sketches save and load as JSON and are interchangeable between the desktop and mobile pages.
+
+### Install the desktop version on a phone (PWA, advanced)
+
+If you specifically want the desktop UI on your phone (with its three-column layout — usually not what you want on a small screen), the same install steps work on the root URL **https://caa-ebv-co-op.github.io/CValRSketch/**.
 
 Service workers do not run on `file://`, so PWA install requires hosting. For local testing, run any static server (e.g. `python -m http.server` in the repo folder) and open `http://localhost:8000/`.
 

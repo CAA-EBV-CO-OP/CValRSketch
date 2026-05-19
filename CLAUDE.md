@@ -20,10 +20,11 @@ Any architectural change beyond editing that single file (e.g. splitting into mu
 
 ```
 .
-├── index.html           ← desktop UI (canonical entry)
-├── core.js              ← shared pure logic (parsing, geometry, edit ops)
-├── m/index.html         ← mobile-first UI (upcoming, v0.11.0)
-├── sketch_walker.html   ← redirect stub for legacy URL
+├── index.html             ← desktop UI (canonical entry)
+├── core.js                ← shared pure logic (parsing, geometry, edit ops)
+├── m/index.html           ← mobile-first touch UI
+├── m/manifest.webmanifest ← mobile PWA manifest
+├── sketch_walker.html     ← redirect stub for legacy URL
 ├── README.md
 ├── CHANGELOG.md
 ├── VERSION.md

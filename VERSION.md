@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.10.0`
+**Current version:** `0.11.0`
 **Released:** 2026-05-19
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.0  | 2026-05-19 | minor  | Mobile-first page at `m/index.html` with touch direction pad + numeric keypad. Shares `core.js` with desktop. Installable PWA at `/CValRSketch/m/`. |
 | 0.10.0  | 2026-05-19 | minor  | Refactor: extract pure parser + geometry + edit ops into `core.js` shared by desktop and (upcoming) mobile pages. Behaviour unchanged. |
 | 0.9.1   | 2026-05-19 | patch  | Rename `sketch_walker.html` → `index.html` so install URL is `/CValRSketch/` (old path kept as redirect) |
 | 0.9.0   | 2026-05-19 | minor  | Progressive Web App: installable on iPhone/Android, runs offline           |

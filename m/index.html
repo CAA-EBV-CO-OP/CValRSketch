@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2b3a4a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CValRSketch">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="../icon.svg">
+<link rel="apple-touch-icon" href="../icon-192.png">
+<title>CValRSketch — Mobile</title>
+<script src="../core.js"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body {
+    font: 14px/1.3 -apple-system, "Segoe UI", system-ui, sans-serif;
+    color: #222;
+    background: #f0f0f0;
+    display: flex; flex-direction: column;
+    -webkit-user-select: none; user-select: none;
+    touch-action: none;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* Header */
+  header {
+    background: #2b3a4a; color: #fff;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    flex: 0 0 auto;
+  }
+  header .title { flex: 1; font-size: 14px; font-weight: bold; }
+  header button {
+    background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 6px; padding: 6px 10px; font-size: 16px; min-width: 44px; min-height: 36px;
+  }
+  /* Canvas wrap */
+  .canvas-wrap { flex: 1 1 auto; position: relative; background: #fff; min-height: 0; }
+  svg { width: 100%; height: 100%; display: block; touch-action: none; }
+  .visible-wall { stroke: #000; stroke-width: 2; fill: none; }
+  .visible-wall.selected { stroke: #2b6cb0; stroke-width: 4; }
+  .ghost { opacity: var(--ghost-opacity, 0.45); }
+  .vertex-dot { fill: #fff; stroke: #444; stroke-width: 1.5; }
+  .vertex-dot.selected { fill: #2b6cb0; stroke: #fff; }
+  /* Status line */
+  .status {
+    flex: 0 0 auto;
+    background: #f7f7f9; color: #444;
+    padding: 4px 12px; font-size: 12px; font-family: ui-monospace, monospace;
+    border-top: 1px solid #d0d8e0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .status.gap { color: #c44; font-weight: bold; }
+  .status.closed { color: #2e8b57; }
+  /* Bottom controls */
+  .controls { flex: 0 0 auto; background: #fafafa; border-top: 1px solid #ccc; }
+  /* Direction pad */
+  .dirpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 4px;
+    padding: 6px;
+    aspect-ratio: 3 / 1.6; /* keep proportions; height computed from width */
+    max-height: 150px;
+  }
+  .dirpad button {
+    background: #fff; border: 1px solid #ccc; border-radius: 8px;
+    font-size: 22px; font-weight: bold; color: #2b3a4a;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.1s, border-color 0.1s;
+    -webkit-touch-callout: none;
+  }
+  .dirpad button.selected { background: #2b6cb0; color: #fff; border-color: #1b4a7a; }
+  .dirpad button.cardinal { font-size: 18px; }
+  .dirpad .center {
+    background: #f4f0e6; border: 1px dashed #999; font-size: 11px;
+    color: #888; font-weight: normal;
+  }
+  .dirpad .center.has-input { background: #fef9e7; }
+  /* Distance display + keypad */
+  .dist-display {
+    background: #fff; padding: 8px 12px;
+    border-top: 1px solid #ddd; border-bottom: 1px solid #ddd;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: ui-monospace, monospace;
+  }
+  .dist-display .label { color: #666; font-size: 11px; }
+  .dist-display .value { font-size: 18px; font-weight: bold; }
+  .dist-display .value.placeholder { color: #aaa; font-weight: normal; }
+  .keypad {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    padding: 6px;
+  }
+  .keypad button {
+    background: #fff; border: 1px solid #ccc; border-radius: 8px;
+    font-size: 18px; font-weight: bold; color: #222;
+    min-height: 44px;
+  }
+  .keypad button.unit { background: #f4f0e6; font-size: 14px; }
+  .keypad button.add { background: #2e8b57; color: #fff; border-color: #1d6a3e; font-size: 16px; }
+  .keypad button.add.disabled { background: #ccc; color: #fff; border-color: #aaa; }
+  .keypad button.back { background: #f8d7da; color: #721c24; }
+  .keypad button:active { transform: scale(0.97); }
+  /* Drawer */
+  .drawer-bg {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100; display: none;
+  }
+  .drawer-bg.open { display: block; }
+  .drawer {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    width: 86%; max-width: 320px;
+    background: #fff;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease-out;
+    z-index: 101;
+    overflow-y: auto;
+    padding: 12px;
+    padding-top: calc(env(safe-area-inset-top) + 12px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .drawer.open { transform: translateX(0); }
+  .drawer h2 { font-size: 13px; color: #666; text-transform: uppercase; margin: 12px 0 4px; }
+  .drawer .row { display: flex; gap: 6px; align-items: center; }
+  .drawer button {
+    padding: 10px 12px; border: 1px solid #ccc; background: #fff; border-radius: 8px;
+    font-size: 14px; min-height: 44px;
+    text-align: left;
+  }
+  .drawer button.primary { background: #2b6cb0; color: #fff; border-color: #1b4a7a; }
+  .drawer button.danger  { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+  .drawer input[type="text"] {
+    flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;
+  }
+  .drawer .floor-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+  .drawer .floor-tabs button {
+    padding: 8px 12px; min-height: 36px; font-size: 13px;
+  }
+  .drawer .floor-tabs button.active { background: #2b6cb0; color: #fff; }
+  .drawer .shape-list { display: flex; flex-direction: column; gap: 4px; }
+  .drawer .shape-list .item {
+    padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px;
+    display: flex; justify-content: space-between; font-size: 13px;
+  }
+  /* Modal */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200;
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 12px; padding: 16px;
+    max-width: 360px; width: 100%;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .modal h3 { margin: 0 0 8px; font-size: 15px; }
+  .modal .modal-buttons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  .modal button {
+    padding: 10px 16px; border: 1px solid #ccc; background: #fff; border-radius: 8px;
+    font-size: 14px; min-height: 44px;
+  }
+  .modal button.primary { background: #2b6cb0; color: #fff; border-color: #1b4a7a; }
+  .modal button.danger  { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+  /* Toast */
+  .toast {
+    position: fixed; bottom: calc(env(safe-area-inset-bottom) + 16px); left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.85); color: #fff;
+    padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; z-index: 300;
+    pointer-events: none;
+    opacity: 0; transition: opacity 0.2s;
+    max-width: 80%;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <button id="btn-menu" aria-label="Menu">☰</button>
+  <div class="title" id="title-text">CValRSketch</div>
+  <button id="btn-undo" aria-label="Undo">↶</button>
+  <button id="btn-close-shape" aria-label="Close Shape">✓</button>
+</header>
+
+<div class="canvas-wrap">
+  <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+
+<div class="status" id="status">Pen at start. Pick a direction and a distance.</div>
+
+<div class="controls">
+  <div class="dirpad" id="dirpad">
+    <button data-dir="ul" aria-label="up-left">↖</button>
+    <button data-dir="u" class="cardinal" aria-label="up">↑ U</button>
+    <button data-dir="ur" aria-label="up-right">↗</button>
+    <button data-dir="l" class="cardinal" aria-label="left">← L</button>
+    <button class="center" id="dir-center">tap a direction</button>
+    <button data-dir="r" class="cardinal" aria-label="right">R →</button>
+    <button data-dir="dl" aria-label="down-left">↙</button>
+    <button data-dir="d" class="cardinal" aria-label="down">↓ D</button>
+    <button data-dir="dr" aria-label="down-right">↘</button>
+  </div>
+  <div class="dist-display">
+    <span class="label" id="dist-label">DISTANCE</span>
+    <span class="value placeholder" id="dist-value">tap numbers</span>
+  </div>
+  <div class="keypad" id="keypad">
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="ft" class="unit">ft</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="in" class="unit">in</button>
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="+" class="unit">+</button>
+    <button data-k="0">0</button><button data-k="."><span style="font-size:22px">·</span></button><button data-k="back" class="back">⌫</button><button data-k="add" id="btn-add" class="add">✓ Add</button>
+  </div>
+</div>
+
+<div class="drawer-bg" id="drawer-bg"></div>
+<aside class="drawer" id="drawer">
+  <h2>Subject</h2>
+  <input type="text" id="subject-input" placeholder="e.g. 113 7th Ave, Nakusp">
+
+  <h2>Floor</h2>
+  <div class="floor-tabs" id="floor-tabs"></div>
+  <div class="row">
+    <button id="btn-add-floor" style="flex:1;">+ Add Floor</button>
+    <button id="btn-rename-floor" style="flex:1;">Rename</button>
+  </div>
+
+  <h2>Areas on this Floor</h2>
+  <div class="shape-list" id="shape-list"></div>
+
+  <h2>Actions</h2>
+  <button id="btn-cancel-walk" class="danger">Cancel current walk</button>
+  <button id="btn-save-json">💾 Save sketch (JSON)</button>
+  <button id="btn-load-json">📂 Load sketch (JSON)</button>
+  <input type="file" id="file-input" accept=".json" style="display:none">
+  <button id="btn-export-png" class="primary">📷 Export PNG</button>
+  <button id="btn-export-svg">📷 Export SVG</button>
+
+  <h2>Display</h2>
+  <label style="display:flex; align-items:center; gap:8px; padding: 4px 0;">
+    <span style="flex:1; font-size:13px;">Other floors opacity</span>
+    <input type="range" id="ghost-slider" min="0.05" max="1" step="0.05" style="width:120px;">
+    <span id="ghost-val" style="font-family:ui-monospace,monospace; min-width:34px; text-align:right; font-size:12px;"></span>
+  </label>
+
+  <h2>About</h2>
+  <p style="font-size:12px; color:#666; margin:4px 0;">
+    CValRSketch — mobile preview.<br>
+    <a href="../" style="color:#2b6cb0;">Open desktop version</a><br>
+    <a href="https://github.com/CAA-EBV-CO-OP/CValRSketch" style="color:#2b6cb0;">Source on GitHub</a>
+  </p>
+</aside>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal" id="modal"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =============================================================================
+// CValRSketch — Mobile UI
+// Uses ../core.js for parsing, geometry, and shape-edit ops.
+// =============================================================================
+
+const $ = (id) => document.getElementById(id);
+const svg = $('canvas');
+
+// ----- State (compatible shape with desktop's state.json) -----
+let state = {
+  segments: [],
+  shapes: [],
+  floors: ['basement', 'main', 'upper'],
+  activeFloor: 'main',
+  selection: null,
+  mode: 'walk',
+  nextShapeId: 1,
+  startPoint: null,
+  undoStack: [],
+  redoStack: [],
+  annotations: [],
+  subject: '',
+  subtitle: '',
+  settings: { ...SETTINGS_DEFAULTS },
+};
+
+// ----- Walk-input state (mobile-specific) -----
+let pickedDir = null;       // 'r' | 'l' | 'u' | 'd' | 'ur' | 'ul' | 'dr' | 'dl'
+let distEntry = '';         // raw entry string before parsing
+let diagonalPhase = null;   // null or { axis1, len1 } during diagonal entry
+
+// ----- View transform (screen ↔ world) -----
+let view = { tx: 0, ty: 0, scale: 1 };
+let userView = null;        // overrides fit when set (after pinch/pan)
+
+// ----- localStorage settings -----
+try {
+  const saved = JSON.parse(localStorage.getItem('cvalrsketchMobileSettings') || '{}');
+  Object.assign(state.settings, saved);
+} catch (e) {}
+function saveSettings() {
+  localStorage.setItem('cvalrsketchMobileSettings', JSON.stringify(state.settings));
+}
+
+// =============================================================================
+// SAVE / LOAD / UNDO
+// =============================================================================
+function snapshotState() {
+  return JSON.stringify({
+    segments: state.segments,
+    shapes: state.shapes,
+    floors: state.floors,
+    activeFloor: state.activeFloor,
+    nextShapeId: state.nextShapeId,
+    startPoint: state.startPoint,
+    annotations: state.annotations,
+  });
+}
+function restoreState(snap) {
+  const d = JSON.parse(snap);
+  state.segments = d.segments || [];
+  state.shapes = d.shapes || [];
+  state.floors = d.floors || ['basement','main','upper'];
+  state.activeFloor = d.activeFloor || 'main';
+  state.nextShapeId = d.nextShapeId || 1;
+  state.startPoint = d.startPoint || null;
+  state.annotations = d.annotations || [];
+  state.selection = null;
+}
+function pushUndo() {
+  state.undoStack.push(snapshotState());
+  if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
+  state.redoStack.length = 0;
+}
+function undoHistory() {
+  if (!state.undoStack.length) return;
+  state.redoStack.push(snapshotState());
+  restoreState(state.undoStack.pop());
+  render();
+}
+
+function getStart() { return state.startPoint || { x: 0, y: 0 }; }
+function shapesOnFloor(f) { return state.shapes.filter(s => s.floor === f); }
+function shapesOnOtherFloors() { return state.shapes.filter(s => s.floor !== state.activeFloor); }
+
+// =============================================================================
+// RENDER
+// =============================================================================
+function addEl(tag, attrs, text) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  if (text !== undefined) el.textContent = text;
+  svg.appendChild(el);
+  return el;
+}
+
+function fitView() {
+  const w = svg.clientWidth || 360, h = svg.clientHeight || 400;
+  const pts = [];
+  for (const sh of state.shapes) if (sh.floor === state.activeFloor) pts.push(...sh.points);
+  if (state.segments.length) pts.push(...pathPoints(state.segments, getStart()));
+  for (const sh of state.shapes) if (sh.floor !== state.activeFloor) pts.push(...sh.points);
+  if (!pts.length) pts.push({x:0,y:0}, {x:10,y:10});
+  const minX = Math.min(...pts.map(p => p.x));
+  const maxX = Math.max(...pts.map(p => p.x));
+  const minY = Math.min(...pts.map(p => p.y));
+  const maxY = Math.max(...pts.map(p => p.y));
+  const pad = 40;
+  const sx = (w - pad*2) / Math.max(0.001, maxX - minX);
+  const sy = (h - pad*2) / Math.max(0.001, maxY - minY);
+  const scale = Math.min(sx, sy);
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  return { tx: w/2 - cx*scale, ty: h/2 - cy*scale, scale };
+}
+
+function render() {
+  const w = svg.clientWidth || 360, h = svg.clientHeight || 400;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  view = userView || fitView();
+  document.documentElement.style.setProperty('--ghost-opacity', state.settings.ghostOpacity);
+  svg.innerHTML = `<defs>
+    <pattern id="porchHatch" patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#9bb3cc" stroke-width="1"/>
+    </pattern>
+    <pattern id="unfinishedHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#888" stroke-width="1"/>
+    </pattern>
+  </defs>`;
+  const W = p => ({ x: view.tx + p.x*view.scale, y: view.ty + p.y*view.scale });
+
+  // Ghosts (other floors)
+  if (state.settings.showFloorGhosts) {
+    shapesOnOtherFloors().forEach(sh => renderShape(sh, W, true));
+  }
+  // Active floor
+  shapesOnFloor(state.activeFloor).forEach(sh => renderShape(sh, W, false));
+  // In-progress walk
+  if (state.segments.length) renderInProgress(W);
+  else {
+    const sp = W(getStart());
+    addEl('circle', { cx: sp.x, cy: sp.y, r: 6, fill: '#2e8b57' });
+    addEl('text', { x: sp.x + 10, y: sp.y + 4, 'font-size': 11, fill: '#666' }, 'start');
+  }
+  renderStatus();
+}
+
+function renderShape(sh, W, isGhost) {
+  const t = TYPES[sh.type] || TYPES.living;
+  const screenPts = sh.points.map(W);
+  const d = screenPts.map((p,i)=> (i===0?'M':'L') + p.x + ' ' + p.y).join(' ') + ' Z';
+  const cls = isGhost ? 'ghost' : '';
+  const fillPoly = addEl('path', { d, fill: t.fill, stroke: 'none', class: cls });
+  if (!isGhost) fillPoly.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    state.selection = { kind: 'shape', shapeId: sh.id };
+    openShapeEditor(sh);
+  });
+  // Walls
+  for (let i = 0; i < sh.segments.length; i++) {
+    const a = screenPts[i], b = screenPts[i+1];
+    const isSel = !isGhost && state.selection && state.selection.kind === 'wall' && state.selection.shapeId === sh.id && state.selection.idx === i;
+    const wallClass = 'visible-wall' + (isSel ? ' selected' : '') + (isGhost ? ' ghost' : '');
+    const line = addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: wallClass });
+    if (t.dashed) line.setAttribute('stroke-dasharray', '8,5');
+    if (!isGhost) {
+      // Wider invisible hit line for touch
+      const hit = addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: 'transparent', 'stroke-width': 30 });
+      hit.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        state.selection = { kind: 'wall', shapeId: sh.id, idx: i };
+        openWallEditor(sh, i);
+      });
+    }
+    // Length label
+    if (state.settings.showSegmentLabels) {
+      const mx = (a.x + b.x)/2, my = (a.y + b.y)/2;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      if (len >= 30) {
+        const nx = -dy/len, ny = dx/len;
+        const c = W(polygonCentroid(sh.points));
+        const sign = ((mx - c.x)*nx + (my - c.y)*ny) > 0 ? 1 : -1;
+        addEl('text', {
+          x: mx + nx*12*sign, y: my + ny*12*sign,
+          'text-anchor':'middle', 'dominant-baseline':'middle',
+          'font-size': 11, 'font-weight': 'bold', fill: '#0066cc', class: cls
+        }, formatLength(sh.segments[i].length));
+      }
+    }
+  }
+  // Centroid label
+  if (state.settings.showCentroidLabels) {
+    const c = W(polygonCentroid(sh.points));
+    const area = polygonArea(sh.points);
+    addEl('text', { x: c.x, y: c.y-6, 'text-anchor':'middle', 'font-size': 13, 'font-weight':'bold', class: cls }, sh.label);
+    addEl('text', { x: c.x, y: c.y+10, 'text-anchor':'middle', 'font-size': 11, fill: '#555', class: cls }, `${Math.round(area)} sq ft`);
+  }
+}
+
+function renderInProgress(W) {
+  const wpts = pathPoints(state.segments, getStart());
+  const pts = wpts.map(W);
+  const d = pts.map((p,i) => (i===0?'M':'L') + p.x + ' ' + p.y).join(' ');
+  addEl('path', { d, fill: 'none', stroke: '#2b6cb0', 'stroke-width': 2.5, 'stroke-dasharray': '5,3' });
+  const start = pts[0], pen = pts[pts.length-1];
+  addEl('circle', { cx: start.x, cy: start.y, r: 5, fill: '#2e8b57' });
+  addEl('circle', { cx: pen.x, cy: pen.y, r: 6, fill: '#c44' });
+  // Length labels on in-progress
+  if (state.settings.showSegmentLabels) {
+    state.segments.forEach((seg, i) => {
+      const a = pts[i], b = pts[i+1];
+      const mx = (a.x + b.x)/2, my = (a.y + b.y)/2;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 30) return;
+      const nx = -dy/len, ny = dx/len;
+      addEl('text', { x: mx + nx*10, y: my + ny*10, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size': 11, fill: '#2b6cb0' }, formatLength(seg.length));
+    });
+  }
+  // Gap indicator
+  const wStart = wpts[0], wPen = wpts[wpts.length - 1];
+  const gapDx = wStart.x - wPen.x, gapDy = wStart.y - wPen.y;
+  const gapLen = Math.hypot(gapDx, gapDy);
+  if (gapLen > state.settings.autoCloseFeet) {
+    addEl('path', {
+      d: `M${pen.x} ${pen.y} L${start.x} ${start.y}`,
+      fill: 'none', stroke: '#e57c00', 'stroke-width': 1.5, 'stroke-dasharray': '4,4'
+    });
+  }
+}
+
+function renderStatus() {
+  const el = $('status');
+  if (!state.segments.length) {
+    el.textContent = pickedDir
+      ? `Direction: ${dirLabel(pickedDir)}. Enter distance and tap ✓ Add.`
+      : 'Pen at start. Pick a direction.';
+    el.className = 'status';
+    return;
+  }
+  const wpts = pathPoints(state.segments, getStart());
+  const start = wpts[0], pen = wpts[wpts.length-1];
+  const gapDx = start.x - pen.x, gapDy = start.y - pen.y;
+  const gap = Math.hypot(gapDx, gapDy);
+  if (gap < state.settings.autoCloseFeet) {
+    el.textContent = `✓ Closed (${state.segments.length} walls). Tap ✓ at top to save shape.`;
+    el.className = 'status closed';
+  } else {
+    el.textContent = `gap ${formatLength(gap)} (${formatGapBreakdown(gapDx, gapDy)})`;
+    el.className = 'status gap';
+  }
+}
+
+// =============================================================================
+// INPUT — direction pad + numeric keypad
+// =============================================================================
+const DIAG_AXES = { ur: ['u','r'], ul: ['u','l'], dr: ['d','r'], dl: ['d','l'] };
+
+function dirLabel(d) {
+  return { r: 'right', l: 'left', u: 'up', d: 'down',
+           ur: 'up-right diagonal', ul: 'up-left diagonal',
+           dr: 'down-right diagonal', dl: 'down-left diagonal' }[d] || d;
+}
+
+function setDir(d) {
+  pickedDir = d;
+  const isDiag = d in DIAG_AXES;
+  diagonalPhase = isDiag ? { axes: DIAG_AXES[d], len1: null, ax1Selected: null } : null;
+  distEntry = '';
+  updateDirHighlight();
+  updateDistDisplay();
+  $('dir-center').textContent = isDiag ? '↳ enter 1st leg' : dirLabel(d);
+  $('dir-center').classList.toggle('has-input', true);
+  renderStatus();
+}
+
+function updateDirHighlight() {
+  document.querySelectorAll('.dirpad button[data-dir]').forEach(b => {
+    b.classList.toggle('selected', b.dataset.dir === pickedDir);
+  });
+}
+
+function updateDistDisplay() {
+  const v = $('dist-value');
+  if (!distEntry) {
+    v.textContent = pickedDir ? 'tap numbers' : 'pick direction first';
+    v.classList.add('placeholder');
+  } else {
+    v.textContent = distEntry;
+    v.classList.remove('placeholder');
+  }
+  $('dist-label').textContent = diagonalPhase
+    ? (diagonalPhase.len1 == null ? `LEG 1 (${dirLabel(diagonalPhase.axes[0])} or ${dirLabel(diagonalPhase.axes[1])})` : `LEG 2 of diagonal`)
+    : 'DISTANCE';
+  $('btn-add').classList.toggle('disabled', !pickedDir || (!distEntry && !diagonalPhase && !canAutoExtend()));
+}
+
+function canAutoExtend() {
+  // Auto-extend works only when picked dir is a cardinal and there's at least one prior segment or shape.
+  if (!pickedDir || pickedDir.length !== 1) return false;
+  return state.segments.length > 0 || state.shapes.some(s => s.floor === state.activeFloor);
+}
+
+function pressKey(k) {
+  if (!pickedDir) { toast('Pick a direction first'); return; }
+  if (k === 'back') {
+    if (distEntry) distEntry = distEntry.slice(0, -1);
+    updateDistDisplay();
+    return;
+  }
+  if (k === 'add') { commitSegment(); return; }
+  if (k === 'ft') { if (distEntry && !distEntry.includes("'")) distEntry += "'"; updateDistDisplay(); return; }
+  if (k === 'in') {
+    if (!distEntry) return;
+    if (!distEntry.includes("'")) distEntry += "'";  // implicit ft=0 → "'4" treated as 4in
+    if (!distEntry.endsWith('"')) distEntry += '"';
+    updateDistDisplay();
+    return;
+  }
+  if (k === '+') {
+    // Sub-measurement add — only allowed within a single leg.
+    if (!distEntry) return;
+    if (!distEntry.endsWith('+')) distEntry += '+';
+    updateDistDisplay();
+    return;
+  }
+  if (k === '.') {
+    // Only allow one decimal point in the active token (between + and end).
+    const active = distEntry.split('+').pop() || '';
+    if (!active.includes('.')) { distEntry += '.'; updateDistDisplay(); }
+    return;
+  }
+  // Digit
+  if (/^\d$/.test(k)) {
+    // Strip trailing inch quote so a digit after "4\"" makes sense as starting a new value (rare)
+    distEntry += k;
+    updateDistDisplay();
+  }
+}
+
+function normalizeDistance(raw) {
+  // Turn "16'4", "16'4\"", "164in", "0.5", etc. into core's parseLength-acceptable form.
+  let s = raw.trim();
+  if (!s) return '';
+  // If no unit characters at all, assume feet
+  if (!/['"]/.test(s) && !s.includes('+')) return s;     // e.g. "10" → "10" ft via parseLength
+  return s;
+}
+
+function commitSegment() {
+  if (!pickedDir) { toast('Pick a direction'); return; }
+  // Diagonal: first leg, then we wait for second
+  if (diagonalPhase && diagonalPhase.len1 == null) {
+    const len = parseLength(normalizeDistance(distEntry));
+    if (!(len > 0)) { toast('Enter a positive distance'); return; }
+    diagonalPhase.len1 = len;
+    // Auto-pick the axis: cardinal direction matching the diagonal's first axis
+    diagonalPhase.ax1Selected = diagonalPhase.axes[0];
+    distEntry = '';
+    $('dir-center').textContent = '↳ enter 2nd leg';
+    updateDistDisplay();
+    return;
+  }
+  if (diagonalPhase && diagonalPhase.len1 != null) {
+    const len2 = parseLength(normalizeDistance(distEntry));
+    if (!(len2 > 0)) { toast('Enter a positive distance'); return; }
+    const text = `${formatLength(diagonalPhase.len1)} ${diagonalPhase.axes[0]} & ${formatLength(len2)} ${diagonalPhase.axes[1]}`;
+    addSegmentText(text);
+    resetEntry();
+    return;
+  }
+  // Cardinal direction
+  if (!distEntry) {
+    // Try auto-extend (bare direction + Add)
+    if (canAutoExtend()) {
+      const cands = findAlignedCandidates(state.segments, pickedDir, getStart(), state.shapes);
+      if (!cands.length) { toast('No aligned vertex to snap to'); return; }
+      pushUndo();
+      state.segments.push(cands[0].segment);
+      resetEntry();
+      render();
+      return;
+    }
+    toast('Enter a distance');
+    return;
+  }
+  const text = `${normalizeDistance(distEntry)} ${pickedDir}`;
+  addSegmentText(text);
+  resetEntry();
+}
+
+function addSegmentText(text) {
+  let priorHeading = null;
+  if (state.segments.length) priorHeading = headingDeg(state.segments[state.segments.length - 1]);
+  try {
+    const seg = parseSegment(text, priorHeading);
+    if (seg.autoExtend) {
+      const cands = findAlignedCandidates(state.segments, seg.dir, getStart(), state.shapes);
+      if (!cands.length) { toast('No aligned vertex'); return; }
+      pushUndo();
+      state.segments.push(cands[0].segment);
+    } else {
+      pushUndo();
+      state.segments.push(seg);
+    }
+    render();
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+function resetEntry() {
+  pickedDir = null;
+  diagonalPhase = null;
+  distEntry = '';
+  updateDirHighlight();
+  updateDistDisplay();
+  $('dir-center').textContent = 'tap a direction';
+  $('dir-center').classList.remove('has-input');
+}
+
+// =============================================================================
+// SHAPE / WALL EDITORS (modal-based)
+// =============================================================================
+function openWallEditor(sh, wallIdx) {
+  const len = wallLength(sh, wallIdx);
+  showModal(`
+    <h3>Wall ${wallIdx + 1} of "${escapeHtml(sh.label)}"</h3>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <label style="font-size:12px; color:#666;">Current length: ${formatLength(len)}</label>
+      <input id="wall-len-input" type="text" inputmode="text" value="${formatLength(len)}"
+        style="padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">
+      <label style="font-size:12px; color:#666;">New length (e.g. 16'4):</label>
+    </div>
+    <div class="modal-buttons">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="danger" id="wall-delete-btn">Delete wall</button>
+      <button class="primary" id="wall-apply-btn">Apply</button>
+    </div>
+  `);
+  $('wall-apply-btn').onclick = () => {
+    const newLen = parseLength($('wall-len-input').value);
+    if (!(newLen > 0)) { toast('Invalid length'); return; }
+    pushUndo();
+    setWallLength(sh, wallIdx, newLen, state.settings.defaultLengthEditMode);
+    closeModal();
+    render();
+  };
+  $('wall-delete-btn').onclick = () => {
+    if (!confirm('Delete this wall (merge adjacent walls)?')) return;
+    pushUndo();
+    if (deleteVertex(sh, wallIdx + 1)) {
+      closeModal();
+      render();
+    } else {
+      toast("Can't delete — shape needs at least 3 walls.");
+      state.undoStack.pop();
+    }
+  };
+}
+
+function openShapeEditor(sh) {
+  const typeOpts = Object.entries(TYPES).map(([k, v]) =>
+    `<option value="${k}"${k === sh.type ? ' selected' : ''}>${v.name}</option>`).join('');
+  const floorOpts = state.floors.map(f =>
+    `<option value="${f}"${f === sh.floor ? ' selected' : ''}>${f}</option>`).join('');
+  showModal(`
+    <h3>Shape "${escapeHtml(sh.label)}"</h3>
+    <label style="font-size:12px; color:#666;">Label</label>
+    <input id="sh-label" type="text" value="${escapeHtml(sh.label)}"
+      style="padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">
+    <label style="font-size:12px; color:#666;">Type</label>
+    <select id="sh-type" style="padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">${typeOpts}</select>
+    <label style="font-size:12px; color:#666;">Floor</label>
+    <select id="sh-floor" style="padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">${floorOpts}</select>
+    <div class="modal-buttons">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="danger" id="sh-delete-btn">Delete shape</button>
+      <button class="primary" id="sh-apply-btn">Apply</button>
+    </div>
+  `);
+  $('sh-apply-btn').onclick = () => {
+    pushUndo();
+    sh.label = $('sh-label').value || sh.label;
+    sh.type = $('sh-type').value;
+    sh.floor = $('sh-floor').value;
+    closeModal();
+    render();
+    renderDrawer();
+  };
+  $('sh-delete-btn').onclick = () => {
+    if (!confirm('Delete this entire shape?')) return;
+    pushUndo();
+    state.shapes = state.shapes.filter(s => s.id !== sh.id);
+    state.selection = null;
+    closeModal();
+    render();
+    renderDrawer();
+  };
+}
+
+// =============================================================================
+// CLOSE SHAPE
+// =============================================================================
+function closeShape() {
+  if (!state.segments.length) { toast('Walk some segments first'); return; }
+  const wpts = pathPoints(state.segments, getStart());
+  const start = wpts[0], pen = wpts[wpts.length-1];
+  const gap = Math.hypot(start.x - pen.x, start.y - pen.y);
+  let pts = wpts;
+  if (gap > state.settings.autoCloseFeet) {
+    if (!confirm(`Path doesn't close (gap ${formatLength(gap)}). Force-close with a straight line back to start?`)) return;
+    pts = [...wpts, { ...start }];
+  } else {
+    pts = wpts.map((p, i) => i === wpts.length-1 ? { ...start } : p);
+  }
+  const label = prompt('Label for this area:', `Area ${state.nextShapeId}`);
+  if (label === null) return;
+  const typeKey = prompt(`Type? (${Object.keys(TYPES).join(', ')})`, 'living');
+  if (!typeKey || !(typeKey in TYPES)) { toast('Cancelled.'); return; }
+  pushUndo();
+  const shape = {
+    id: state.nextShapeId++,
+    label, type: typeKey,
+    floor: state.activeFloor,
+    points: pts,
+    segments: [],
+  };
+  rebuildSegments(shape);
+  state.shapes.push(shape);
+  state.segments = [];
+  state.startPoint = null;
+  resetEntry();
+  render();
+  renderDrawer();
+}
+
+function cancelWalk() {
+  if (!state.segments.length) return;
+  if (!confirm('Discard current segments?')) return;
+  pushUndo();
+  state.segments = [];
+  resetEntry();
+  render();
+}
+
+// =============================================================================
+// DRAWER
+// =============================================================================
+function openDrawer() { $('drawer').classList.add('open'); $('drawer-bg').classList.add('open'); renderDrawer(); }
+function closeDrawer() { $('drawer').classList.remove('open'); $('drawer-bg').classList.remove('open'); }
+
+function renderDrawer() {
+  // Floor tabs
+  $('floor-tabs').innerHTML = state.floors.map(f =>
+    `<button data-floor="${f}" class="${f === state.activeFloor ? 'active' : ''}">${f}</button>`
+  ).join('');
+  document.querySelectorAll('#floor-tabs button').forEach(b => {
+    b.onclick = () => {
+      state.activeFloor = b.dataset.floor;
+      state.selection = null;
+      renderDrawer();
+      render();
+    };
+  });
+  // Shape list
+  const shapes = shapesOnFloor(state.activeFloor);
+  $('shape-list').innerHTML = shapes.length
+    ? shapes.map(sh => {
+        const area = Math.round(polygonArea(sh.points));
+        return `<div class="item" data-id="${sh.id}">
+          <span>${escapeHtml(sh.label)}</span>
+          <span style="color:#666;">${area} sf</span>
+        </div>`;
+      }).join('')
+    : '<div style="color:#999; padding:8px;">No areas yet on this floor.</div>';
+  document.querySelectorAll('#shape-list .item').forEach(el => {
+    el.onclick = () => {
+      const id = parseInt(el.dataset.id);
+      const sh = state.shapes.find(s => s.id === id);
+      if (sh) { closeDrawer(); openShapeEditor(sh); }
+    };
+  });
+  // Subject
+  $('subject-input').value = state.subject || '';
+  // Ghost slider
+  $('ghost-slider').value = state.settings.ghostOpacity;
+  $('ghost-val').textContent = Math.round(state.settings.ghostOpacity * 100) + '%';
+}
+
+// =============================================================================
+// MODAL + TOAST
+// =============================================================================
+function showModal(html) {
+  $('modal').innerHTML = html;
+  $('modal-bg').classList.add('open');
+}
+function closeModal() { $('modal-bg').classList.remove('open'); $('modal').innerHTML = ''; }
+
+let toastTimer = null;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// =============================================================================
+// EXPORT
+// =============================================================================
+function svgForExport() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, text) => {
+    const el = document.createElementNS(ns, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    if (text !== undefined) el.textContent = text;
+    return el;
+  };
+  // Bbox of content
+  const allPts = [];
+  state.shapes.forEach(sh => allPts.push(...sh.points));
+  if (state.segments.length) allPts.push(...pathPoints(state.segments, getStart()));
+  let bbox;
+  if (!allPts.length) bbox = { x: 0, y: 0, w: 100, h: 100 };
+  else {
+    const xs = allPts.map(p => p.x), ys = allPts.map(p => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const pad = Math.max(maxX - minX, maxY - minY) * 0.05 + 1;
+    bbox = { x: minX - pad, y: minY - pad, w: (maxX - minX) + pad*2, h: (maxY - minY) + pad*2 };
+  }
+  const includeTitle = state.settings.exportIncludeTitle && (state.subject || '').trim().length > 0;
+  const usedTypes = [...new Set(state.shapes.map(s => s.type))].filter(k => k in TYPES);
+  const includeLegend = state.settings.exportIncludeLegend && usedTypes.length > 0;
+  const titleH = includeTitle ? 80 : 0;
+  const legendH = includeLegend ? (24 + 28 + usedTypes.length * 26 + 32) : 0;
+  const page = EXPORT_PAGE_SIZES[state.settings.exportPageSize] || { w: 816, h: 1056 };
+  const pageW = page.w, pageH = page.h;
+  const sideMargin = 24;
+  const canvasAvailW = pageW - sideMargin*2;
+  const canvasAvailH = pageH - titleH - legendH - sideMargin*2;
+  // World-coord scale to fit content tight
+  const fitScale = Math.min(canvasAvailW / bbox.w, canvasAvailH / bbox.h);
+  const fittedW = bbox.w * fitScale, fittedH = bbox.h * fitScale;
+  const cx = sideMargin + (canvasAvailW - fittedW)/2;
+  const cy = titleH + sideMargin + (canvasAvailH - fittedH)/2;
+  const out = document.createElementNS(ns, 'svg');
+  out.setAttribute('xmlns', ns);
+  out.setAttribute('width', pageW);
+  out.setAttribute('height', pageH);
+  out.setAttribute('viewBox', `0 0 ${pageW} ${pageH}`);
+  // White bg
+  out.appendChild(mk('rect', { width: pageW, height: pageH, fill: '#fff' }));
+  // Defs (hatches)
+  const defs = mk('defs', {});
+  defs.innerHTML = `
+    <pattern id="porchHatch" patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#9bb3cc" stroke-width="1"/>
+    </pattern>
+    <pattern id="unfinishedHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#888" stroke-width="1"/>
+    </pattern>`;
+  out.appendChild(defs);
+  // Title
+  if (includeTitle) {
+    out.appendChild(mk('text', { x: pageW/2, y: 38, 'text-anchor':'middle', 'font-family':'Arial, sans-serif', 'font-size':22, 'font-weight':'bold', fill:'#222' }, state.subject.trim()));
+    out.appendChild(mk('text', { x: pageW/2, y: 60, 'text-anchor':'middle', 'font-family':'Arial, sans-serif', 'font-size':13, fill:'#555' }, 'Not to scale — dimensions as labeled'));
+  }
+  // Nested SVG for the floor plan
+  const nested = document.createElementNS(ns, 'svg');
+  nested.setAttribute('x', cx); nested.setAttribute('y', cy);
+  nested.setAttribute('width', fittedW); nested.setAttribute('height', fittedH);
+  nested.setAttribute('viewBox', `${bbox.x} ${bbox.y} ${bbox.w} ${bbox.h}`);
+  nested.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  // Render shapes into nested in world coords (no transform needed)
+  state.shapes.forEach(sh => {
+    const t = TYPES[sh.type] || TYPES.living;
+    const d = sh.points.map((p,i) => (i===0?'M':'L') + p.x + ' ' + p.y).join(' ') + ' Z';
+    const poly = mk('path', { d, fill: t.fill, stroke: 'black', 'stroke-width': Math.max(0.1, bbox.w/300) });
+    if (t.dashed) poly.setAttribute('stroke-dasharray', `${bbox.w/100},${bbox.w/170}`);
+    nested.appendChild(poly);
+    // Length labels in world coords
+    const c = polygonCentroid(sh.points);
+    sh.segments.forEach((seg, i) => {
+      const a = sh.points[i], b = sh.points[i+1];
+      const mx = (a.x + b.x)/2, my = (a.y + b.y)/2;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      if (len < bbox.w/30) return;
+      const nx = -dy/len, ny = dx/len;
+      const sign = ((mx - c.x)*nx + (my - c.y)*ny) > 0 ? 1 : -1;
+      const offs = bbox.w/100;
+      nested.appendChild(mk('text', {
+        x: mx + nx*offs*sign, y: my + ny*offs*sign,
+        'text-anchor':'middle', 'dominant-baseline':'middle',
+        'font-family':'Arial, sans-serif',
+        'font-size': bbox.w/60, 'font-weight':'bold', fill: '#0066cc'
+      }, formatLength(seg.length)));
+    });
+    // Centroid
+    nested.appendChild(mk('text', {
+      x: c.x, y: c.y - bbox.h/100, 'text-anchor':'middle',
+      'font-family':'Arial, sans-serif', 'font-size': bbox.w/45, 'font-weight':'bold', fill: '#222'
+    }, sh.label));
+    nested.appendChild(mk('text', {
+      x: c.x, y: c.y + bbox.h/60, 'text-anchor':'middle',
+      'font-family':'Arial, sans-serif', 'font-size': bbox.w/60, fill: '#555'
+    }, `${Math.round(polygonArea(sh.points))} sq ft`));
+  });
+  out.appendChild(nested);
+  // Legend
+  if (includeLegend) {
+    const y0 = pageH - legendH + 14;
+    const x0 = sideMargin;
+    const lw = pageW - sideMargin*2;
+    out.appendChild(mk('rect', { x: x0, y: y0 - 14, width: lw, height: legendH, fill: 'none', stroke: '#999', 'stroke-width': 0.75 }));
+    out.appendChild(mk('text', { x: x0 + 14, y: y0 + 4, 'font-family':'Arial, sans-serif', 'font-size': 16, 'font-weight':'bold', fill:'#222' }, 'Legend'));
+    usedTypes.forEach((key, i) => {
+      const t = TYPES[key];
+      const rowY = y0 + 22 + i * 26;
+      const swatch = mk('rect', { x: x0 + 14, y: rowY, width: 30, height: 18, fill: t.fill, stroke: 'black', 'stroke-width': 1 });
+      if (t.dashed) swatch.setAttribute('stroke-dasharray','5,3');
+      out.appendChild(swatch);
+      out.appendChild(mk('text', { x: x0 + 54, y: rowY + 14, 'font-family':'Arial, sans-serif', 'font-size': 13, fill:'#222' }, t.name));
+      const total = state.shapes.filter(s => s.type === key).reduce((a, s) => a + polygonArea(s.points), 0);
+      out.appendChild(mk('text', { x: x0 + lw - 24, y: rowY + 14, 'text-anchor':'end', 'font-family':'Arial, sans-serif', 'font-size': 13, 'font-weight':'bold', fill:'#444' }, `${Math.round(total)} sq ft`));
+    });
+  }
+  return out;
+}
+
+async function exportPNG() {
+  const out = svgForExport();
+  const w = parseFloat(out.getAttribute('width')), h = parseFloat(out.getAttribute('height'));
+  const xml = new XMLSerializer().serializeToString(out);
+  const blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = async () => {
+    const c = document.createElement('canvas');
+    c.width = w*2; c.height = h*2;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    c.toBlob(async (png) => {
+      const filename = (state.subject || 'sketch').replace(/[^\w\-]/g, '_') + '.png';
+      try {
+        const file = new File([png], filename, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: state.subject || 'Sketch' });
+          return;
+        }
+      } catch (e) { /* fall through */ }
+      triggerDownload(png, filename);
+    }, 'image/png');
+  };
+  img.src = url;
+}
+
+async function exportSVGfile() {
+  const out = svgForExport();
+  const xml = new XMLSerializer().serializeToString(out);
+  const blob = new Blob(['<?xml version="1.0"?>\n', xml], { type: 'image/svg+xml' });
+  const filename = (state.subject || 'sketch').replace(/[^\w\-]/g, '_') + '.svg';
+  try {
+    const file = new File([blob], filename, { type: 'image/svg+xml' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: state.subject || 'Sketch' });
+      return;
+    }
+  } catch (e) {}
+  triggerDownload(blob, filename);
+}
+
+function triggerDownload(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function saveJSON() {
+  const data = { ...state };
+  delete data.undoStack; delete data.redoStack; delete data.selection;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const filename = (state.subject || 'sketch').replace(/[^\w\-]/g, '_') + '.json';
+  triggerDownload(blob, filename);
+}
+
+function loadJSON(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      Object.assign(state, d);
+      state.selection = null;
+      state.undoStack = []; state.redoStack = [];
+      $('subject-input').value = state.subject || '';
+      resetEntry();
+      render();
+      renderDrawer();
+      toast('Sketch loaded');
+    } catch (e) { toast('Load failed: ' + e.message); }
+  };
+  r.readAsText(file);
+}
+
+// =============================================================================
+// CANVAS GESTURES — pinch zoom, two-finger pan
+// =============================================================================
+const activePointers = new Map();
+let gestureStart = null;
+
+svg.addEventListener('pointerdown', (e) => {
+  svg.setPointerCapture(e.pointerId);
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (activePointers.size === 2) {
+    const pts = [...activePointers.values()];
+    gestureStart = {
+      d: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+      cx: (pts[0].x + pts[1].x) / 2,
+      cy: (pts[0].y + pts[1].y) / 2,
+      view: { ...view },
+    };
+  }
+});
+svg.addEventListener('pointermove', (e) => {
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (activePointers.size === 2 && gestureStart) {
+    const pts = [...activePointers.values()];
+    const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    const cx = (pts[0].x + pts[1].x) / 2;
+    const cy = (pts[0].y + pts[1].y) / 2;
+    const factor = d / Math.max(1, gestureStart.d);
+    const newScale = gestureStart.view.scale * factor;
+    // Translate so the gesture's start midpoint stays under the new midpoint
+    const rect = svg.getBoundingClientRect();
+    const sx = gestureStart.cx - rect.left, sy = gestureStart.cy - rect.top;
+    const wx = (sx - gestureStart.view.tx) / gestureStart.view.scale;
+    const wy = (sy - gestureStart.view.ty) / gestureStart.view.scale;
+    const tx = (cx - rect.left) - wx * newScale;
+    const ty = (cy - rect.top) - wy * newScale;
+    userView = { tx, ty, scale: newScale };
+    render();
+  }
+});
+function clearPointer(e) {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) gestureStart = null;
+}
+svg.addEventListener('pointerup', clearPointer);
+svg.addEventListener('pointercancel', clearPointer);
+svg.addEventListener('pointerleave', clearPointer);
+
+// Double-tap to reset view
+let lastTap = 0;
+svg.addEventListener('pointerdown', (e) => {
+  const now = performance.now();
+  if (now - lastTap < 300 && activePointers.size === 1) {
+    userView = null;
+    render();
+  }
+  lastTap = now;
+});
+
+// =============================================================================
+// WIRE UP UI
+// =============================================================================
+document.querySelectorAll('#dirpad button[data-dir]').forEach(b => {
+  b.addEventListener('click', () => setDir(b.dataset.dir));
+});
+document.querySelectorAll('#keypad button').forEach(b => {
+  b.addEventListener('click', () => pressKey(b.dataset.k));
+});
+$('btn-menu').onclick = openDrawer;
+$('drawer-bg').onclick = closeDrawer;
+$('btn-undo').onclick = undoHistory;
+$('btn-close-shape').onclick = closeShape;
+$('btn-cancel-walk').onclick = () => { cancelWalk(); closeDrawer(); };
+$('btn-save-json').onclick = () => { saveJSON(); closeDrawer(); };
+$('btn-load-json').onclick = () => $('file-input').click();
+$('file-input').onchange = (e) => { if (e.target.files[0]) { loadJSON(e.target.files[0]); closeDrawer(); } };
+$('btn-export-png').onclick = () => { exportPNG(); closeDrawer(); };
+$('btn-export-svg').onclick = () => { exportSVGfile(); closeDrawer(); };
+$('btn-add-floor').onclick = () => {
+  const name = prompt('New floor name:', 'floor-' + (state.floors.length + 1));
+  if (!name || state.floors.includes(name)) return;
+  pushUndo();
+  state.floors.push(name);
+  state.activeFloor = name;
+  renderDrawer(); render();
+};
+$('btn-rename-floor').onclick = () => {
+  const old = state.activeFloor;
+  const name = prompt(`Rename floor "${old}" to:`, old);
+  if (!name || name === old || state.floors.includes(name)) return;
+  pushUndo();
+  state.floors[state.floors.indexOf(old)] = name;
+  state.shapes.forEach(s => { if (s.floor === old) s.floor = name; });
+  state.activeFloor = name;
+  renderDrawer(); render();
+};
+$('subject-input').oninput = (e) => { state.subject = e.target.value; };
+$('ghost-slider').oninput = (e) => {
+  state.settings.ghostOpacity = parseFloat(e.target.value);
+  $('ghost-val').textContent = Math.round(state.settings.ghostOpacity * 100) + '%';
+  document.documentElement.style.setProperty('--ghost-opacity', state.settings.ghostOpacity);
+  render();
+};
+$('ghost-slider').onchange = () => saveSettings();
+
+// SVG empty-click clears selection
+svg.addEventListener('click', (e) => {
+  if (e.target === svg) {
+    if (state.selection) { state.selection = null; render(); }
+  }
+});
+
+// Re-render on resize
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(render, 100);
+});
+
+// =============================================================================
+// SERVICE WORKER
+// =============================================================================
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(() => {});
+  });
+}
+
+// =============================================================================
+// INIT
+// =============================================================================
+updateDistDisplay();
+render();
+renderDrawer();
+</script>
+</body>
+</html>
