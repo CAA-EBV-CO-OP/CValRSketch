@@ -6,12 +6,12 @@ Contributions are welcome. This is a small, single-file project, so most changes
 
 ## Setup
 
-There is no install step. Clone the repo and open `sketch_walker.html` in any modern browser:
+There is no install step. Clone the repo and open `index.html` in any modern browser:
 
 ```bash
 git clone https://github.com/CAA-EBV-CO-OP/CValRSketch.git
 cd CValRSketch
-# Open sketch_walker.html in Chrome, Edge, Firefox, or Safari
+# Open index.html in Chrome, Edge, Firefox, or Safari
 ```
 
 No package manager, no build pipeline, no server required.
@@ -20,7 +20,7 @@ No package manager, no build pipeline, no server required.
 
 ## Editing
 
-The entire application lives in `sketch_walker.html`:
+The entire application lives in `index.html`:
 
 - HTML markup at the top
 - Inline `<style>` block
@@ -35,7 +35,7 @@ Any standard text editor or IDE works. VS Code provides useful HTML and JavaScri
 After any non-trivial JavaScript edit, check for syntax errors before testing. A single missing parenthesis will silently prevent all event listeners from registering, making the app appear frozen:
 
 ```bash
-awk 'NR>=145 && NR<=2443' sketch_walker.html > /tmp/sw.js && node --check /tmp/sw.js
+awk 'NR>=145 && NR<=2443' index.html > /tmp/sw.js && node --check /tmp/sw.js
 ```
 
 Adjust the line range if the `<script>`/`</script>` boundaries have moved.

@@ -2,7 +2,7 @@
   "name": "CValRSketch",
   "short_name": "CValRSketch",
   "description": "Single-file browser app for sketching residential floor plans and exporting labeled appraisal sketches.",
-  "start_url": "./sketch_walker.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

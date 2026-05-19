@@ -6,7 +6,7 @@ This file briefs AI assistants and contributors on how to work in this codebase.
 
 ## 1. Project Overview
 
-CValRSketch is a single-file, vanilla-JavaScript web application. The entire app — HTML, CSS, and JavaScript — lives in `sketch_walker.html`. There is no build pipeline, no package manager, no server-side component, and no external runtime dependencies.
+CValRSketch is a single-file, vanilla-JavaScript web application. The entire app — HTML, CSS, and JavaScript — lives in `index.html` (formerly `sketch_walker.html`; a stub at that old path now redirects). There is no build pipeline, no package manager, no server-side component, and no external runtime dependencies.
 
 Any architectural change beyond editing that single file (e.g. splitting into multiple files, adding a build step, introducing a framework or library) requires explicit approval from the project owner before proceeding.
 
@@ -16,7 +16,8 @@ Any architectural change beyond editing that single file (e.g. splitting into mu
 
 ```
 .
-├── sketch_walker.html   ← the entire application
+├── index.html           ← the entire application (canonical entry)
+├── sketch_walker.html   ← redirect stub for legacy URL
 ├── README.md
 ├── CHANGELOG.md
 ├── VERSION.md
@@ -28,7 +29,7 @@ Any architectural change beyond editing that single file (e.g. splitting into mu
 
 ---
 
-## 3. Code Layout Inside sketch_walker.html
+## 3. Code Layout Inside index.html
 
 The single `<script>` block (approximately 2400 lines) is divided by `// ===== banner comments`. Major sections in order:
 
@@ -71,7 +72,7 @@ A single syntax error (missing parenthesis, mismatched brace, stray comma) silen
 Always syntax-check after non-trivial JavaScript edits:
 
 ```bash
-awk 'NR>=145 && NR<=2443' sketch_walker.html > /tmp/sw.js && node --check /tmp/sw.js
+awk 'NR>=145 && NR<=2443' index.html > /tmp/sw.js && node --check /tmp/sw.js
 ```
 
 Adjust the line range if the `<script>`/`</script>` boundaries have moved.

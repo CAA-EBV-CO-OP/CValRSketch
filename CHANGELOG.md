@@ -15,6 +15,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.9.1] — 2026-05-19
+
+### Changed
+- Renamed the app entry from `sketch_walker.html` → `index.html` so the hosted install URL is just `/CValRSketch/` (no filename suffix). The PWA installs cleanly at the repo root path.
+- `manifest.webmanifest` `start_url` updated to `./`.
+- Service worker (`sw.js`) cache bumped to `cvalrsketch-v0.9.1`; cached asset list and offline fallback updated to `./index.html`.
+
+### Added
+- `sketch_walker.html` is now a small redirect stub pointing at `./`, so any bookmarks or shared links to the old path still work.
+
+### Notes
+- The historical filename `sketch_walker.html` remains in `git mv` history; rename, don't re-add as separate files.
+
+---
+
 ## [0.9.0] — 2026-05-19
 
 ### Added

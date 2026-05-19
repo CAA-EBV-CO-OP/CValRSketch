@@ -1,9 +1,9 @@
 // CValRSketch service worker — offline-first cache of the single-file app.
 // Bumping CACHE_NAME forces a fresh fetch + cache rebuild on next install.
-const CACHE_NAME = 'cvalrsketch-v0.9.0';
+const CACHE_NAME = 'cvalrsketch-v0.9.1';
 const CORE_ASSETS = [
   './',
-  './sketch_walker.html',
+  './index.html',
   './manifest.webmanifest',
   './icon.svg',
   './icon-192.png',
@@ -14,8 +14,8 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) =>
       // addAll is atomic — if any asset fails (e.g. icon-192.png not yet present),
-      // the whole install fails. Add icons individually so missing ones don't break SW install.
-      cache.add('./sketch_walker.html')
+      // the whole install fails. Add the entry doc first, then settle the rest individually.
+      cache.add('./index.html')
         .then(() => Promise.allSettled(CORE_ASSETS.map((url) => cache.add(url))))
     )
   );
@@ -46,7 +46,7 @@ self.addEventListener('fetch', (event) => {
           }
           return resp;
         })
-        .catch(() => caches.match('./sketch_walker.html'));
+        .catch(() => caches.match('./index.html'));
     })
   );
 });
