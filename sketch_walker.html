@@ -1,0 +1,2431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sketch Walker</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
+  header { background: #2b3a4a; color: #fff; padding: 8px 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0; }
+  header button, header label.btn { background: #4a6377; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  header button:hover, header label.btn:hover { background: #5a7388; }
+  header button:disabled { background: #3a4554; color: #6a7484; cursor: not-allowed; }
+  header .sep { width: 1px; background: #4a6377; height: 22px; }
+  .mode-tabs { display: flex; gap: 0; border: 1px solid #4a6377; border-radius: 4px; overflow: hidden; }
+  .mode-tabs button { background: #3a4d61; border-radius: 0; padding: 6px 14px; }
+  .mode-tabs button.active { background: #2b6cb0; }
+  main { display: flex; height: calc(100vh - 90px); }
+  #canvas-wrap { flex: 1; background: #fff; position: relative; overflow: hidden; }
+  #canvas { display: block; width: 100%; height: 100%; cursor: default; }
+  #canvas.split-mode { cursor: crosshair; }
+  #floor-bar { background: #eef2f6; border-bottom: 1px solid #d0d8e0; padding: 6px 14px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  #floor-bar .ft-tabs { display: flex; gap: 4px; }
+  #floor-bar .ft-tabs button { background: #fff; border: 1px solid #c0c8d0; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  #floor-bar .ft-tabs button.active { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+  #floor-bar .small-btn { background: #fff; border: 1px solid #c0c8d0; padding: 3px 7px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+  aside { width: 360px; background: #fafafa; border-left: 1px solid #ccc; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  aside h2 { font-size: 11px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.5px; color: #555; }
+  .section { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
+  .input-row { display: flex; gap: 6px; }
+  .input-row input { flex: 1; padding: 6px 8px; border: 1px solid #bbb; border-radius: 4px; font-family: monospace; font-size: 13px; }
+  .input-row button { background: #2b6cb0; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .input-row button:hover { background: #3577c2; }
+  .row-buttons { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .row-buttons button { flex: 1; background: #6c7a8a; color: #fff; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px; min-width: 70px; }
+  .row-buttons button:hover { background: #7d8c9d; }
+  .row-buttons button.primary { background: #2e8b57; }
+  .row-buttons button.primary:hover { background: #379a64; }
+  .row-buttons button.danger { background: #c44; }
+  .help { font-size: 11px; color: #666; line-height: 1.5; }
+  .help code { background: #eef; padding: 1px 4px; border-radius: 3px; color: #224; }
+  .pen-indicator { font-family: monospace; font-size: 11px; color: #555; margin-top: 4px; }
+  .seg-item { display: flex; justify-content: space-between; padding: 4px 7px; background: #f4f7fa; border-radius: 3px; margin-bottom: 3px; font-family: monospace; font-size: 11px; }
+  .seg-item button { background: none; border: none; color: #c44; cursor: pointer; padding: 0 4px; }
+  .shape-item { padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 6px; background: #fff; }
+  .shape-item.selected { border-color: #2b6cb0; box-shadow: 0 0 0 2px rgba(43,108,176,0.15); }
+  .shape-item .hdr { display: flex; justify-content: space-between; font-weight: 500; font-size: 13px; }
+  .shape-item .meta { font-size: 11px; color: #666; margin-top: 2px; }
+  .shape-item .actions { margin-top: 5px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .shape-item .actions button { font-size: 10px; padding: 3px 7px; background: #e0e6ed; border: none; border-radius: 3px; cursor: pointer; }
+  .shape-item .actions button.danger { background: #fee; color: #c44; }
+  #totals .row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+  #totals .row.total { font-weight: bold; border-top: 1px solid #ddd; margin-top: 4px; padding-top: 4px; }
+  .field { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; }
+  .field label { flex: 0 0 80px; color: #444; }
+  .field input, .field select { flex: 1; padding: 5px 7px; border: 1px solid #bbb; border-radius: 4px; font-size: 12px; }
+  .closed-badge { color: #2e8b57; font-weight: bold; font-size: 11px; }
+  .open-badge { color: #c80; font-size: 11px; }
+  /* Modal */
+  .modal-bg { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: #fff; padding: 20px; border-radius: 8px; max-width: 480px; width: 90%; max-height: 80vh; overflow-y: auto; }
+  .modal h3 { margin: 0 0 12px; font-size: 16px; }
+  .modal .radio-group label { display: block; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 6px; cursor: pointer; }
+  .modal .radio-group label:hover { background: #f4f7fa; }
+  .modal .radio-group input { margin-right: 8px; }
+  .modal-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .modal-buttons button { padding: 7px 16px; border-radius: 4px; cursor: pointer; border: 1px solid #bbb; background: #f0f0f0; font-size: 13px; }
+  .modal-buttons button.primary { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+  .modal-buttons button.danger { background: #c44; color: #fff; border-color: #c44; }
+  .settings-grid { display: grid; gap: 8px; }
+  .settings-grid .row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #eee; }
+  .settings-grid .row label { font-size: 12px; }
+  .settings-grid .row .desc { font-size: 10px; color: #888; margin-top: 2px; }
+  /* SVG interactivity */
+  .hit-wall { stroke: rgba(0,0,0,0); stroke-width: 14; fill: none; cursor: pointer; }
+  .hit-vertex { fill: rgba(0,0,0,0); cursor: pointer; }
+  .visible-wall.selected { stroke: #2b6cb0 !important; stroke-width: 4 !important; }
+  .visible-vertex { fill: #fff; stroke: #444; stroke-width: 1.5; }
+  .visible-vertex.selected { fill: #2b6cb0; stroke: #fff; }
+  .visible-vertex.split-hover { fill: #ffa500; stroke: #fff; }
+  .visible-vertex.pickable { fill: #d4edda; stroke: #2e8b57; stroke-width: 2; }
+  .ghost { opacity: var(--ghost-opacity, 0.45); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sketch Walker</h1>
+  <div class="mode-tabs" id="mode-tabs">
+    <button data-mode="walk" class="active">Walk</button>
+    <button data-mode="edit">Edit</button>
+    <button data-mode="split">Split</button>
+    <button data-mode="fence">Fence</button>
+  </div>
+  <div class="sep"></div>
+  <button id="btn-undo" onclick="undoHistory()" title="Undo (Ctrl+Z)">↶ Undo</button>
+  <button id="btn-redo" onclick="redoHistory()" title="Redo (Ctrl+Y)">↷ Redo</button>
+  <div class="sep"></div>
+  <button onclick="openSettings()">⚙ Settings</button>
+  <button onclick="exportSVG()">Export SVG</button>
+  <button onclick="exportPNG()">Export PNG</button>
+  <button onclick="saveJSON()">Save</button>
+  <label class="btn">Load
+    <input type="file" id="load-json" accept=".json" style="display:none">
+  </label>
+</header>
+
+<div id="floor-bar">
+  <span>Floor:</span>
+  <div class="ft-tabs" id="floor-tabs"></div>
+  <button class="small-btn" onclick="addFloor()">+ Floor</button>
+  <button class="small-btn" onclick="renameFloor()">Rename</button>
+  <button class="small-btn" onclick="removeFloor()">Delete Floor</button>
+  <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Opacity of shapes on other floors">
+    Other floors:
+    <input type="range" id="floor-ghost-opacity" min="0.05" max="1" step="0.05" style="width:120px;">
+    <span id="floor-ghost-opacity-val" style="font-family:monospace; min-width:34px; text-align:right;"></span>
+  </label>
+  <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Subject / project name — appears as the title on SVG/PNG exports">
+    Subject:
+    <input type="text" id="subject-input" placeholder="e.g. 113 7th Ave, Nakusp" style="width:240px; font-size:12px; padding:3px 6px;">
+  </label>
+  <span style="margin-left:auto;color:#666;font-size:11px;" id="floor-help"></span>
+</div>
+
+<main>
+  <div id="canvas-wrap">
+    <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <aside id="sidebar"></aside>
+</main>
+
+<!-- Modal containers -->
+<div id="modal-host"></div>
+
+<script>
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+const TYPES = {
+  living:     { name: 'Enclosed living',    fill: '#f4f0e6', dashed: false },
+  finished:   { name: 'Finished basement',  fill: '#eaf4ea', dashed: false },
+  unfinished: { name: 'Unfinished (mech)',  fill: 'url(#unfinishedHatch)', dashed: false },
+  porch:      { name: 'Open covered porch', fill: 'url(#porchHatch)', dashed: true },
+  garage:     { name: 'Garage',             fill: '#efe6dc', dashed: false },
+  deck:       { name: 'Open deck',          fill: '#e8dcc8', dashed: true },
+  upper:      { name: 'Upper floor area',   fill: '#f0e6f4', dashed: false },
+};
+
+const DIR_BASE = { r: 0, d: 90, l: 180, u: -90 };
+
+const SETTINGS_DEFAULTS = {
+  showSegmentLabels: true,
+  showCentroidLabels: true,
+  showVertexDots: true,
+  showFloorGhosts: true,
+  ghostOpacity: 0.45,
+  exportIncludeTitle: true,
+  exportIncludeLegend: true,
+  exportPageSize: 'auto',  // 'auto' | 'letter-portrait' | 'letter-landscape'
+  confirmDelete: true,
+  askOnLengthEdit: true,
+  defaultLengthEditMode: 'stretch-end',
+  snapAngleTo90: false,
+  autoCloseFeet: 0.05,
+};
+
+// =============================================================================
+// STATE
+// =============================================================================
+let state = {
+  segments: [],         // in-progress walking segments
+  shapes: [],           // completed shapes (each: {id, points, segments, label, type, floor})
+  floors: ['basement','main','upper'],
+  activeFloor: 'main',
+  selection: null,      // {kind:'wall'|'vertex'|'shape', shapeId, idx?}
+  splitSelection: null, // {shapeId, idx} for first vertex in split
+  mode: 'walk',         // 'walk' | 'edit' | 'split'
+  nextShapeId: 1,
+  startPoint: null,     // origin of current walk; null = (0,0)
+  preview: null,        // walk-mode auto-extend preview: { dir, candIdx, candidates: [{along, point, segment}] }
+  splitPreview: null,   // split-mode projection preview: { shapeId, originIdx, dir, hit: {wallIdx, point, distance} }
+  undoStack: [],
+  redoStack: [],
+  annotations: [],      // [{ a:{x,y}, b:{x,y} }] — offset measurement labels between two points
+  offsetPick: null,     // null | { first: {x,y}|null } — active picking state for offset tool
+  fenceDraw: null,      // null | { start:{x,y}, end:{x,y} } in WORLD coords while dragging
+  fenceSelection: null, // null | { shapeVerts:[{shapeId,idx}], inProgVerts:[idx], annEnds:[{idx,end}] }
+  subject: '',          // project/property name shown as title on exports
+  subtitle: '',         // optional secondary line under the title
+  settings: { ...SETTINGS_DEFAULTS },
+};
+
+let viewTransform = null; // { tx, ty, scale } from latest fitView, used for screen↔world
+
+const HISTORY_LIMIT = 100;
+
+function snapshotState() {
+  return JSON.stringify({
+    segments: state.segments,
+    shapes: state.shapes,
+    floors: state.floors,
+    activeFloor: state.activeFloor,
+    nextShapeId: state.nextShapeId,
+    startPoint: state.startPoint,
+    annotations: state.annotations,
+  });
+}
+function restoreState(snap) {
+  const d = JSON.parse(snap);
+  state.segments = d.segments;
+  state.shapes = d.shapes;
+  state.floors = d.floors;
+  state.activeFloor = d.activeFloor;
+  state.nextShapeId = d.nextShapeId;
+  state.startPoint = d.startPoint;
+  state.annotations = d.annotations || [];
+  state.selection = null;
+  state.fenceSelection = null;
+  state.fenceDraw = null;
+  state.splitSelection = null;
+}
+function pushUndo() {
+  state.undoStack.push(snapshotState());
+  if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
+  state.redoStack = [];
+}
+function undoHistory() {
+  if (state.undoStack.length === 0) return;
+  state.redoStack.push(snapshotState());
+  restoreState(state.undoStack.pop());
+  render();
+}
+function redoHistory() {
+  if (state.redoStack.length === 0) return;
+  state.undoStack.push(snapshotState());
+  restoreState(state.redoStack.pop());
+  render();
+}
+
+function getStart() { return state.startPoint || { x: 0, y: 0 }; }
+function setStartPoint(p) { pushUndo(); state.startPoint = { x: p.x, y: p.y }; render(); }
+function resetStart() { if (state.startPoint === null) return; pushUndo(); state.startPoint = null; render(); }
+function offsetStart() {
+  const input = document.getElementById('start-offset');
+  if (!input) return;
+  const raw = input.value.trim();
+  if (!raw) return;
+  try {
+    const seg = parseSegment(raw);
+    pushUndo();
+    const cur = getStart();
+    state.startPoint = { x: cur.x + seg.dx, y: cur.y + seg.dy };
+    input.value = '';
+    render();
+  } catch (err) { alert(err.message); }
+}
+
+// Load settings from localStorage
+try {
+  const saved = JSON.parse(localStorage.getItem('sketchWalkerSettings') || '{}');
+  Object.assign(state.settings, saved);
+} catch (e) {}
+
+// =============================================================================
+// PARSING & FORMATTING
+// =============================================================================
+function parseLength(s) {
+  s = String(s).trim();
+  if (s.includes('+')) {
+    const parts = s.split('+').map(p => p.trim()).filter(Boolean);
+    let total = 0;
+    for (const p of parts) {
+      const v = parseLength(p);
+      if (isNaN(v)) return NaN;
+      total += v;
+    }
+    return total;
+  }
+  if (s.includes("'")) {
+    const idx = s.indexOf("'");
+    const ftStr = s.slice(0, idx).trim();
+    const inStr = s.slice(idx+1).replace('"','').trim();
+    const ft = parseFloat(ftStr) || 0;
+    const inches = inStr ? parseFloat(inStr) : 0;
+    if (isNaN(ft) || isNaN(inches)) return NaN;
+    return ft + inches/12;
+  }
+  if (s.includes('"')) return parseFloat(s.replace('"','')) / 12;
+  return parseFloat(s);
+}
+
+function headingDeg(seg) {
+  // Heading of a segment in screen-coord degrees (0=east, 90=south, 180=west, -90=north).
+  return Math.atan2(seg.dy, seg.dx) * 180 / Math.PI;
+}
+
+function parseSegment(text, priorHeadingDeg = null) {
+  // Combined-components syntax: "5'd & 2'l" → one diagonal segment with summed dx/dy.
+  // Each side is parsed as its own cardinal length+direction; angles aren't allowed here.
+  if (text.includes('&')) {
+    const parts = text.split('&').map(p => p.trim()).filter(Boolean);
+    if (parts.length < 2) throw new Error(`"${text}": '&' must combine two or more length-direction pairs`);
+    let dx = 0, dy = 0;
+    for (const part of parts) {
+      const sub = parseSegment(part);
+      if (sub.autoExtend) throw new Error(`"${text}": '&' requires an explicit length on every part`);
+      if (sub.angle) throw new Error(`"${text}": '&' parts can't have angles — use a single diagonal segment instead`);
+      dx += sub.dx;
+      dy += sub.dy;
+    }
+    const length = Math.hypot(dx, dy);
+    if (!(length > 0)) throw new Error(`"${text}": combined vector is zero`);
+    const dir = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'r' : 'l') : (dy >= 0 ? 'd' : 'u');
+    return { length, dir, angle: 0, dx, dy, raw: text.trim() };
+  }
+
+  let s = text.trim().toLowerCase()
+    .replace(/→/g,' r').replace(/←/g,' l').replace(/↑/g,' u').replace(/↓/g,' d')
+    .replace(/\s*\+\s*/g, '+')              // collapse spaces around + so "2'6 + 3'0" → "2'6+3'0"
+    .replace(/([\d'"])([rlud])/g, '$1 $2')  // split length from direction: "3'0r" → "3'0 r"
+    .replace(/([rlud])(-?\d)/g, '$1 $2');   // split direction from angle: "r90" → "r 90"
+  const tokens = s.split(/\s+/).filter(Boolean);
+  // Auto-extend: just a direction with no length → snap to next aligned vertex
+  if (tokens.length === 1 && tokens[0] in DIR_BASE) {
+    return { autoExtend: true, dir: tokens[0], raw: text.trim() };
+  }
+  if (tokens.length < 2) throw new Error(`"${text}": need length and direction`);
+  // Implicit combined components: "5'd 3'l" (or "5'd3'l") → one diagonal segment.
+  // Triggers when tokens are pairs of (length, direction) with no angle.
+  if (tokens.length >= 4 && tokens.length % 2 === 0) {
+    let allPairs = true;
+    for (let i = 0; i < tokens.length; i += 2) {
+      const len = parseLength(tokens[i]);
+      if (!(len > 0) || !(tokens[i+1] in DIR_BASE)) { allPairs = false; break; }
+    }
+    if (allPairs) {
+      let dx = 0, dy = 0;
+      for (let i = 0; i < tokens.length; i += 2) {
+        const len = parseLength(tokens[i]);
+        const a = DIR_BASE[tokens[i+1]] * Math.PI / 180;
+        dx += Math.cos(a) * len;
+        dy += Math.sin(a) * len;
+      }
+      const length = Math.hypot(dx, dy);
+      if (!(length > 0)) throw new Error(`"${text}": combined vector is zero`);
+      const dir = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'r' : 'l') : (dy >= 0 ? 'd' : 'u');
+      return { length, dir, angle: 0, dx, dy, raw: text.trim() };
+    }
+  }
+  const length = parseLength(tokens[0]);
+  if (!(length > 0)) throw new Error(`"${text}": invalid length`);
+  const dir = tokens[1];
+  if (!(dir in DIR_BASE)) throw new Error(`"${text}": direction must be r, l, u, or d`);
+  const userAngle = tokens[2] !== undefined ? parseFloat(tokens[2]) : 0;
+  if (isNaN(userAngle)) throw new Error(`"${text}": invalid angle`);
+  // Angle interpretation:
+  //  - r/l with explicit angle AND a known prior heading → relative turn from the
+  //    previous segment (r = turn right/CW, l = turn left/CCW). Matches how you'd
+  //    walk a perimeter: "after going east, l 45 = NE; r 45 = SE".
+  //  - Otherwise → degrees CW from the cardinal base (DIR_BASE).
+  const relative = tokens[2] !== undefined && priorHeadingDeg !== null && (dir === 'r' || dir === 'l');
+  const totalDeg = relative
+    ? priorHeadingDeg + (dir === 'r' ? userAngle : -userAngle)
+    : DIR_BASE[dir] + userAngle;
+  const total = totalDeg * Math.PI / 180;
+  return {
+    length, dir, angle: userAngle,
+    dx: Math.cos(total) * length,
+    dy: Math.sin(total) * length,
+    raw: text.trim()
+  };
+}
+
+function formatLength(ft) {
+  if (ft < 0) return '-' + formatLength(-ft);
+  const whole = Math.floor(ft);
+  const inches = Math.round((ft - whole) * 12);
+  if (inches === 12) return `${whole+1}'0"`;
+  return `${whole}'${inches}"`;
+}
+
+// Find every vertex aligned to a ray from the current pen position in `dir`.
+// Returns sorted candidates (closest first), each with { along, point, segment }.
+function findAlignedCandidates(priorSegments, dir) {
+  const start = getStart();
+  let x = start.x, y = start.y;
+  const pts = [{ x, y }];
+  for (const s of priorSegments) { x += s.dx; y += s.dy; pts.push({ x, y }); }
+  const pen = pts[pts.length - 1];
+
+  const rad = DIR_BASE[dir] * Math.PI / 180;
+  const dx = Math.cos(rad), dy = Math.sin(rad);
+  const tol = 0.05;
+  const minForward = 0.01;
+
+  const seen = new Set();
+  const out = [];
+  function add(p) {
+    const key = `${p.x.toFixed(3)},${p.y.toFixed(3)}`;
+    if (seen.has(key)) return;
+    const along = (p.x - pen.x) * dx + (p.y - pen.y) * dy;
+    const perp = Math.abs((p.x - pen.x) * (-dy) + (p.y - pen.y) * dx);
+    if (along > minForward && perp < tol) {
+      seen.add(key);
+      out.push({
+        along,
+        point: { x: p.x, y: p.y },
+        segment: { length: along, dir, angle: 0, dx: dx * along, dy: dy * along, raw: `${formatLength(along)} ${dir} (auto)` },
+      });
+    }
+  }
+  for (const sh of state.shapes) for (let i = 0; i < sh.points.length - 1; i++) add(sh.points[i]);
+  for (const p of pts) add(p);
+  out.sort((a, b) => a.along - b.along);
+  return out;
+}
+
+// Cast a ray from `origin` in direction `dir` and return the closest forward hit on a wall of `shape`,
+// skipping walls adjacent to the origin vertex (passed as `skipVertexIdx`).
+function rayHitsWall(origin, dir, shape, skipVertexIdx) {
+  const rad = DIR_BASE[dir] * Math.PI / 180;
+  const Dx = Math.cos(rad), Dy = Math.sin(rad);
+  const n = shape.points.length - 1; // wall count
+  const adjA = skipVertexIdx;
+  const adjB = (skipVertexIdx - 1 + n) % n;
+  let best = null;
+  for (let i = 0; i < n; i++) {
+    if (i === adjA || i === adjB) continue;
+    const a = shape.points[i], b = shape.points[i + 1];
+    const wx = b.x - a.x, wy = b.y - a.y;
+    const det = wx * Dy - Dx * wy;
+    if (Math.abs(det) < 1e-9) continue;
+    const aox = a.x - origin.x, aoy = a.y - origin.y;
+    const t = (aoy * wx - aox * wy) / det;
+    const u = (Dx * aoy - Dy * aox) / det;
+    if (t > 0.001 && u >= -0.001 && u <= 1.001) {
+      if (!best || t < best.t) {
+        best = { wallIdx: i, point: { x: origin.x + t * Dx, y: origin.y + t * Dy }, distance: t, u };
+      }
+    }
+  }
+  return best;
+}
+
+// =============================================================================
+// GEOMETRY
+// =============================================================================
+function pathPoints(segs) {
+  const start = getStart();
+  const pts = [{ ...start }];
+  let x = start.x, y = start.y;
+  for (const s of segs) { x += s.dx; y += s.dy; pts.push({x,y}); }
+  return pts;
+}
+
+function polygonArea(pts) {
+  let sum = 0;
+  for (let i=0; i<pts.length-1; i++) {
+    const a = pts[i], b = pts[i+1];
+    sum += a.x*b.y - b.x*a.y;
+  }
+  return Math.abs(sum)/2;
+}
+
+function polygonCentroid(pts) {
+  let cx=0, cy=0, a=0;
+  for (let i=0; i<pts.length-1; i++) {
+    const p1=pts[i], p2=pts[i+1];
+    const cross = p1.x*p2.y - p2.x*p1.y;
+    cx += (p1.x+p2.x)*cross; cy += (p1.y+p2.y)*cross; a += cross;
+  }
+  a /= 2;
+  if (Math.abs(a) < 1e-9) return { x: pts[0].x, y: pts[0].y };
+  return { x: cx/(6*a), y: cy/(6*a) };
+}
+
+function wallVector(shape, i) {
+  const a = shape.points[i], b = shape.points[i+1];
+  return { x: b.x-a.x, y: b.y-a.y };
+}
+function wallLength(shape, i) { const v=wallVector(shape,i); return Math.hypot(v.x,v.y); }
+function wallUnit(shape, i) {
+  const v = wallVector(shape, i);
+  const len = Math.hypot(v.x, v.y) || 1;
+  return { x: v.x/len, y: v.y/len };
+}
+
+function findOpposingWall(shape, wallIdx) {
+  const unit = wallUnit(shape, wallIdx);
+  const n = shape.points.length - 1;
+  let best = null, bestScore = -0.95; // require fairly antiparallel
+  for (let j = 0; j < n; j++) {
+    if (j === wallIdx) continue;
+    const other = wallUnit(shape, j);
+    const dot = unit.x*other.x + unit.y*other.y;
+    if (dot < bestScore) { bestScore = dot; best = j; }
+  }
+  return best;
+}
+
+function rebuildSegments(shape) {
+  shape.segments = [];
+  for (let i = 0; i < shape.points.length-1; i++) {
+    const a = shape.points[i], b = shape.points[i+1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const length = Math.hypot(dx, dy);
+    const theta = Math.atan2(dy, dx) * 180 / Math.PI;
+    const bases = [['r',0],['d',90],['l',180],['u',-90]];
+    let best = bases[0], bestDiff = Infinity;
+    for (const [d, ba] of bases) {
+      let diff = ((theta - ba + 540) % 360) - 180;
+      if (Math.abs(diff) < Math.abs(bestDiff)) { bestDiff = diff; best = [d, ba]; }
+    }
+    shape.segments.push({
+      length, dir: best[0], angle: bestDiff, dx, dy,
+      raw: `${formatLength(length)} ${best[0]}${Math.abs(bestDiff)>0.5 ? ' ' + bestDiff.toFixed(1) : ''}`
+    });
+  }
+}
+
+function syncClosure(shape, movedIdx) {
+  // If we moved the first vertex, copy to last (or vice versa)
+  const n = shape.points.length;
+  if (movedIdx === 0) shape.points[n-1] = { ...shape.points[0] };
+  else if (movedIdx === n-1) shape.points[0] = { ...shape.points[n-1] };
+}
+
+// =============================================================================
+// EDIT OPERATIONS
+// =============================================================================
+function setWallLength(shape, wallIdx, newLength, mode) {
+  const unit = wallUnit(shape, wallIdx);
+  const curLen = wallLength(shape, wallIdx);
+  const delta = newLength - curLen;
+  const startIdx = wallIdx;
+  const endIdx = wallIdx + 1;
+  const n = shape.points.length;
+
+  if (mode === 'stretch-end') {
+    shape.points[endIdx].x += unit.x * delta;
+    shape.points[endIdx].y += unit.y * delta;
+    syncClosure(shape, endIdx);
+  } else if (mode === 'stretch-symmetric') {
+    shape.points[startIdx].x -= unit.x * delta/2;
+    shape.points[startIdx].y -= unit.y * delta/2;
+    shape.points[endIdx].x += unit.x * delta/2;
+    shape.points[endIdx].y += unit.y * delta/2;
+    syncClosure(shape, startIdx); syncClosure(shape, endIdx);
+  } else if (mode === 'maintain-rect') {
+    const opp = findOpposingWall(shape, wallIdx);
+    if (opp === null) {
+      setWallLength(shape, wallIdx, newLength, 'stretch-end');
+      return;
+    }
+    // Move end of this wall AND start of opposing wall by delta along this unit
+    shape.points[endIdx].x += unit.x * delta;
+    shape.points[endIdx].y += unit.y * delta;
+    shape.points[opp].x += unit.x * delta;
+    shape.points[opp].y += unit.y * delta;
+    syncClosure(shape, endIdx); syncClosure(shape, opp);
+  }
+  rebuildSegments(shape);
+}
+
+function moveWallByVector(shape, wallIdx, vx, vy) {
+  const startIdx = wallIdx;
+  const endIdx = wallIdx + 1;
+  shape.points[startIdx].x += vx;
+  shape.points[startIdx].y += vy;
+  shape.points[endIdx].x += vx;
+  shape.points[endIdx].y += vy;
+  syncClosure(shape, startIdx); syncClosure(shape, endIdx);
+  rebuildSegments(shape);
+}
+
+function moveVertexByVector(shape, vIdx, vx, vy) {
+  shape.points[vIdx].x += vx;
+  shape.points[vIdx].y += vy;
+  syncClosure(shape, vIdx);
+  rebuildSegments(shape);
+}
+
+function insertVertexOnWall(shape, wallIdx, t = 0.5) {
+  const a = shape.points[wallIdx], b = shape.points[wallIdx+1];
+  const newP = { x: a.x + (b.x-a.x)*t, y: a.y + (b.y-a.y)*t };
+  shape.points.splice(wallIdx+1, 0, newP);
+  rebuildSegments(shape);
+}
+
+function deleteVertex(shape, vIdx) {
+  const n = shape.points.length;
+  if (n <= 4) { alert("Can't delete — shape needs at least 3 walls."); return false; }
+  // Handle closing vertex case
+  if (vIdx === 0 || vIdx === n-1) {
+    shape.points.splice(n-1, 1);
+    shape.points.splice(0, 1);
+    shape.points.push({ ...shape.points[0] });
+  } else {
+    shape.points.splice(vIdx, 1);
+  }
+  rebuildSegments(shape);
+  return true;
+}
+
+function splitPolygon(shape, idx1, idx2) {
+  if (idx1 === idx2) return null;
+  if (idx1 > idx2) [idx1, idx2] = [idx2, idx1];
+  const n = shape.points.length - 1; // not counting closing duplicate
+  if (idx2 - idx1 < 2 || (n - idx2 + idx1) < 2) {
+    alert('Pick two non-adjacent vertices.');
+    return null;
+  }
+  const pts = shape.points.slice(0, -1);
+  // Polygon A: 0..idx1, idx2..end, then close
+  const ptsA = [
+    ...pts.slice(0, idx1+1),
+    ...pts.slice(idx2),
+    { ...pts[0] }
+  ];
+  // Polygon B: idx1..idx2, then close
+  const ptsB = [
+    ...pts.slice(idx1, idx2+1),
+    { ...pts[idx1] }
+  ];
+  const a = { ...shape, points: ptsA, id: state.nextShapeId++, label: shape.label };
+  const b = { ...shape, points: ptsB, id: state.nextShapeId++, label: shape.label + ' (split)' };
+  rebuildSegments(a); rebuildSegments(b);
+  return { a, b };
+}
+
+// =============================================================================
+// FLOOR MANAGEMENT
+// =============================================================================
+function addFloor() {
+  const name = prompt('New floor name:', 'floor-' + (state.floors.length+1));
+  if (!name || state.floors.includes(name)) return;
+  pushUndo();
+  state.floors.push(name);
+  state.activeFloor = name;
+  render();
+}
+function renameFloor() {
+  const old = state.activeFloor;
+  const name = prompt('Rename floor "' + old + '" to:', old);
+  if (!name || name === old || state.floors.includes(name)) return;
+  pushUndo();
+  state.floors[state.floors.indexOf(old)] = name;
+  state.shapes.forEach(s => { if (s.floor === old) s.floor = name; });
+  state.activeFloor = name;
+  render();
+}
+function removeFloor() {
+  const f = state.activeFloor;
+  const used = state.shapes.some(s => s.floor === f);
+  if (used && !confirm(`Floor "${f}" has shapes on it. Delete them too?`)) return;
+  pushUndo();
+  state.shapes = state.shapes.filter(s => s.floor !== f);
+  state.floors = state.floors.filter(x => x !== f);
+  if (!state.floors.length) state.floors = ['main'];
+  state.activeFloor = state.floors[0];
+  render();
+}
+
+// =============================================================================
+// CANVAS / RENDER
+// =============================================================================
+const svg = document.getElementById('canvas');
+
+function shapesOnFloor(floor) { return state.shapes.filter(s => s.floor === floor); }
+function shapesOnOtherFloors() { return state.shapes.filter(s => s.floor !== state.activeFloor); }
+
+function fitView() {
+  const all = [];
+  state.shapes.forEach(s => all.push(...s.points));
+  if (state.segments.length) all.push(...pathPoints(state.segments));
+  const w = svg.clientWidth || 800, h = svg.clientHeight || 600;
+  if (all.length === 0) return { tx: w/2, ty: h/2, scale: 18 };
+  const xs = all.map(p=>p.x), ys = all.map(p=>p.y);
+  const minX=Math.min(...xs), maxX=Math.max(...xs);
+  const minY=Math.min(...ys), maxY=Math.max(...ys);
+  const ww = (maxX-minX) || 1, hh = (maxY-minY) || 1;
+  const pad = 80;
+  const scale = Math.min((w-2*pad)/ww, (h-2*pad)/hh, 40);
+  const tx = pad + (w-2*pad - ww*scale)/2 - minX*scale;
+  const ty = pad + (h-2*pad - hh*scale)/2 - minY*scale;
+  return { tx, ty, scale };
+}
+
+function render() {
+  // Undo / Redo button state
+  const ub = document.getElementById('btn-undo'), rb = document.getElementById('btn-redo');
+  if (ub) { ub.disabled = state.undoStack.length === 0; ub.title = `Undo (Ctrl+Z) — ${state.undoStack.length} steps`; }
+  if (rb) { rb.disabled = state.redoStack.length === 0; rb.title = `Redo (Ctrl+Y) — ${state.redoStack.length} steps`; }
+
+  // Mode tabs
+  document.querySelectorAll('#mode-tabs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === state.mode);
+  });
+  svg.classList.toggle('split-mode', state.mode === 'split');
+
+  // Floor tabs
+  const ftEl = document.getElementById('floor-tabs');
+  ftEl.innerHTML = state.floors.map(f =>
+    `<button class="${f===state.activeFloor?'active':''}" onclick="state.activeFloor='${f}'; state.selection=null; state.splitSelection=null; render();">${f}</button>`
+  ).join('');
+  document.getElementById('floor-help').textContent =
+    state.mode==='split' ? 'Click two vertices in a shape to split it.' :
+    state.mode==='edit' ? 'Click a wall or vertex to edit.' :
+    (state.segments.length === 0
+      ? 'Type segments to build a shape — or click any vertex (green) to start from there.'
+      : 'Type segments to extend the path. Close Shape when you return to start.');
+
+  // SVG render
+  const w = svg.clientWidth, h = svg.clientHeight;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML = `<defs>
+    <pattern id="porchHatch" patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#9bb3cc" stroke-width="1"/>
+    </pattern>
+    <pattern id="unfinishedHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#888" stroke-width="1"/>
+    </pattern>
+  </defs>`;
+  const v = fitView();
+  viewTransform = v;
+  document.documentElement.style.setProperty('--ghost-opacity', state.settings.ghostOpacity);
+  const W = p => ({ x: v.tx + p.x*v.scale, y: v.ty + p.y*v.scale });
+
+  // Ghosts (other floors)
+  if (state.settings.showFloorGhosts) {
+    shapesOnOtherFloors().forEach(sh => renderShape(sh, W, true));
+  }
+  // Active floor
+  shapesOnFloor(state.activeFloor).forEach(sh => renderShape(sh, W, false));
+
+  // Persistent offset annotations
+  renderAnnotations(W);
+
+  // Fence rectangle + selection highlight
+  renderFence(W);
+
+  // Current in-progress segments
+  if (state.segments.length) renderInProgress(W);
+  else if (state.mode === 'walk') {
+    const startScreen = W(getStart());
+    addEl('circle', { cx: startScreen.x, cy: startScreen.y, r: 6, fill: '#2e8b57', stroke: '#fff', 'stroke-width': 2 });
+    const lbl = state.startPoint ? 'start (picked)' : 'start';
+    addEl('text', { x: startScreen.x+10, y: startScreen.y+4, 'font-size': 12, fill: '#666' }, lbl);
+  }
+
+  // Walk preview (auto-extend or pen-jump candidate)
+  if (state.preview && state.mode === 'walk') {
+    const pts = pathPoints(state.segments);
+    const pen = pts[pts.length - 1];
+    const cand = state.preview.candidates[state.preview.candIdx];
+    const a = W(pen), b = W(cand.point);
+    const isJump = !!state.preview.jump;
+    const stroke = isJump ? '#888' : '#ff8800';
+    const dash = isJump ? '2,4' : '6,4';
+    const fill = isJump ? '#888' : '#ff8800';
+    const textFill = isJump ? '#555' : '#cc5500';
+    const prefix = isJump ? '↷ ' : '';
+    addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke, 'stroke-width': 2, 'stroke-dasharray': dash });
+    addEl('circle', { cx: b.x, cy: b.y, r: 8, fill, stroke: '#fff', 'stroke-width': 2 });
+    const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+    addEl('text', { x: mx, y: my - 10, 'text-anchor':'middle', 'font-size':12, 'font-weight':'bold', fill: textFill }, `${prefix}${formatLength(cand.along)} ${state.preview.dir}`);
+  }
+
+  // Split projection preview
+  if (state.splitPreview && state.mode === 'split') {
+    const sp = state.splitPreview;
+    const sh = state.shapes.find(s => s.id === sp.shapeId);
+    if (sh) {
+      const origin = sh.points[sp.originIdx];
+      const a = W(origin), b = W(sp.hit.point);
+      addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: '#ff8800', 'stroke-width': 2.5, 'stroke-dasharray': '6,4' });
+      addEl('circle', { cx: b.x, cy: b.y, r: 8, fill: '#ff8800', stroke: '#fff', 'stroke-width': 2 });
+      const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+      addEl('text', { x: mx, y: my - 10, 'text-anchor':'middle', 'font-size':12, 'font-weight':'bold', fill:'#cc5500' }, `${formatLength(sp.hit.distance)} ${sp.dir}`);
+    }
+  }
+
+  renderSidebar();
+}
+
+function addEl(tag, attrs, text) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  if (text !== undefined) el.textContent = text;
+  svg.appendChild(el);
+  return el;
+}
+
+function renderShape(sh, W, isGhost) {
+  const t = TYPES[sh.type] || TYPES.living;
+  const screenPts = sh.points.map(W);
+  const d = screenPts.map((p,i)=> (i===0?'M':'L') + p.x + ' ' + p.y).join(' ') + ' Z';
+  const cls = isGhost ? 'ghost' : '';
+
+  // Fill
+  const poly = addEl('path', { d, fill: t.fill, stroke: 'black', 'stroke-width': 2, class: cls });
+  if (t.dashed) poly.setAttribute('stroke-dasharray', '8,5');
+  if (!isGhost) {
+    poly.style.cursor = 'pointer';
+    poly.addEventListener('click', () => { state.selection = { kind:'shape', shapeId: sh.id }; render(); });
+  }
+
+  const canPickStart = state.mode === 'walk' && state.segments.length === 0;
+
+  // Walls + segment labels (hit/selection only for non-ghost)
+  for (let i = 0; i < sh.segments.length; i++) {
+    const a = screenPts[i], b = screenPts[i+1];
+    const isSel = !isGhost && state.selection && state.selection.kind === 'wall' && state.selection.shapeId === sh.id && state.selection.idx === i;
+    const wallClass = 'visible-wall' + (isSel ? ' selected' : '') + (isGhost ? ' ghost' : '');
+    const visibleWall = addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: 'black', 'stroke-width': 2, class: wallClass });
+    if (t.dashed) visibleWall.setAttribute('stroke-dasharray', '8,5');
+    if (!isGhost && state.mode === 'edit') {
+      const hit = addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'hit-wall' });
+      hit.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        state.selection = { kind:'wall', shapeId: sh.id, idx: i };
+        render();
+      });
+    }
+    if (state.settings.showSegmentLabels) {
+      const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const len = Math.hypot(dx,dy);
+      if (len >= 30) {
+        const nx=-dy/len, ny=dx/len;
+        const c = W(polygonCentroid(sh.points));
+        const sign = ((mx - c.x)*nx + (my - c.y)*ny) > 0 ? 1 : -1;
+        const tx = mx + nx*12*sign, ty = my + ny*12*sign;
+        addEl('text', { x: tx, y: ty, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':11, 'font-weight':'bold', fill:'#0066cc', class: cls }, formatLength(sh.segments[i].length));
+      }
+    }
+  }
+
+  // Vertices: dots visible on non-ghost (per settings/mode), and on ghosts when picking start.
+  // Hit areas: in edit/split (non-ghost only), and in walk mode for picking start (all shapes).
+  const showDots = !isGhost ? (state.settings.showVertexDots || state.mode !== 'walk') : canPickStart;
+  const addHits = canPickStart || (!isGhost && (state.mode === 'edit' || state.mode === 'split'));
+  if (showDots || addHits) {
+    for (let i = 0; i < sh.points.length - 1; i++) {
+      const p = screenPts[i];
+      const isSel = !isGhost && state.selection && state.selection.kind === 'vertex' && state.selection.shapeId === sh.id && state.selection.idx === i;
+      const isSplitPicked = !isGhost && state.splitSelection && state.splitSelection.shapeId === sh.id && state.splitSelection.idx === i;
+      if (showDots) {
+        const dotClass = 'visible-vertex' + (isSel || isSplitPicked ? ' selected' : '') + (canPickStart ? ' pickable' : '');
+        addEl('circle', { cx: p.x, cy: p.y, r: canPickStart ? 5 : 4, class: dotClass });
+      }
+      if (addHits) {
+        const hit = addEl('circle', { cx: p.x, cy: p.y, r: 12, class: 'hit-vertex' });
+        hit.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          if (state.offsetPick) { handleOffsetPick(sh.points[i]); return; }
+          if (canPickStart) setStartPoint(sh.points[i]);
+          else if (state.mode === 'split') handleSplitClick(sh.id, i);
+          else { state.selection = { kind:'vertex', shapeId: sh.id, idx: i }; render(); }
+        });
+      }
+    }
+  }
+
+  // Centroid label (shown for ghosts too, just faded)
+  if (state.settings.showCentroidLabels) {
+    const c = W(polygonCentroid(sh.points));
+    const area = polygonArea(sh.points);
+    addEl('text', { x: c.x, y: c.y-7, 'text-anchor':'middle', 'font-size':14, 'font-weight':'bold', class: cls }, sh.label);
+    addEl('text', { x: c.x, y: c.y+10, 'text-anchor':'middle', 'font-size':11, fill:'#555', class: cls }, `${Math.round(area)} sq ft`);
+  }
+}
+
+function renderInProgress(W) {
+  const pts = pathPoints(state.segments).map(W);
+  // Use M (move) instead of L (line) for jump segments so the wall path doesn't draw across them
+  const d = pts.map((p,i) => {
+    if (i === 0) return `M${p.x} ${p.y}`;
+    return (state.segments[i-1].jump ? 'M' : 'L') + p.x + ' ' + p.y;
+  }).join(' ');
+  addEl('path', { d, fill: 'none', stroke: '#2b6cb0', 'stroke-width': 2.5, 'stroke-dasharray': '5,3' });
+  // Faint dotted overlay so jumps are visible (without looking like walls)
+  const jumpD = state.segments.map((seg, i) => seg.jump
+    ? `M${pts[i].x} ${pts[i].y} L${pts[i+1].x} ${pts[i+1].y}` : null
+  ).filter(Boolean).join(' ');
+  if (jumpD) addEl('path', { d: jumpD, fill: 'none', stroke: '#aaa', 'stroke-width': 1.2, 'stroke-dasharray': '2,4' });
+  const start = pts[0];
+  addEl('circle', { cx: start.x, cy: start.y, r: 5, fill: '#2e8b57' });
+  const pen = pts[pts.length-1];
+  addEl('circle', { cx: pen.x, cy: pen.y, r: 6, fill: '#c44' });
+  if (state.settings.showSegmentLabels) {
+    state.segments.forEach((seg,i) => {
+      if (seg.jump) return;
+      const a = pts[i], b = pts[i+1];
+      const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const len = Math.hypot(dx,dy);
+      if (len < 30) return;
+      const nx=-dy/len, ny=dx/len;
+      addEl('text', { x: mx+nx*10, y: my+ny*10, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':11, fill:'#2b6cb0' }, formatLength(seg.length));
+    });
+  }
+  // Offset-tool picking: make every in-progress vertex clickable
+  const wpts = pathPoints(state.segments);
+  if (state.offsetPick) {
+    wpts.forEach((wp, i) => {
+      const sp = W(wp);
+      const h = addEl('circle', { cx: sp.x, cy: sp.y, r: 12, class: 'hit-vertex ui-overlay' });
+      h.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        handleOffsetPick(wp);
+      });
+    });
+  }
+  // Gap indicator: dashed line from pen back to start, labeled with the directional offset
+  const wStart = wpts[0];
+  const wPen = wpts[wpts.length - 1];
+  const gapDxW = wStart.x - wPen.x;
+  const gapDyW = wStart.y - wPen.y;
+  const gapLenW = Math.hypot(gapDxW, gapDyW);
+  if (gapLenW > state.settings.autoCloseFeet) {
+    addEl('path', {
+      d: `M${pen.x} ${pen.y} L${start.x} ${start.y}`,
+      fill: 'none', stroke: '#e57c00', 'stroke-width': 1.5, 'stroke-dasharray': '4,4'
+    });
+    const mx = (pen.x + start.x) / 2;
+    const my = (pen.y + start.y) / 2;
+    const sdx = start.x - pen.x, sdy = start.y - pen.y;
+    const slen = Math.hypot(sdx, sdy) || 1;
+    const nx = -sdy / slen, ny = sdx / slen;
+    const label = `OFFSET ${formatLength(gapLenW)} (${formatGapBreakdown(gapDxW, gapDyW)})`;
+    addEl('text', {
+      x: mx + nx * 14, y: my + ny * 14,
+      'text-anchor': 'middle', 'dominant-baseline': 'middle',
+      'font-size': 12, 'font-weight': 'bold', fill: '#e57c00',
+      stroke: 'white', 'stroke-width': 3, 'paint-order': 'stroke fill'
+    }, label);
+  }
+}
+
+// =============================================================================
+// SIDEBAR
+// =============================================================================
+function renderSidebar() {
+  const aside = document.getElementById('sidebar');
+  let html = '';
+  if (state.mode === 'walk') html += sidebarWalk();
+  if (state.mode === 'edit') html += sidebarEdit();
+  if (state.mode === 'split') html += sidebarSplit();
+  if (state.mode === 'fence') html += sidebarFence();
+  html += sidebarOffsets();
+  html += sidebarShapes() + sidebarTotals();
+  aside.innerHTML = html;
+  attachSidebarHandlers();
+}
+
+function renderFence(W) {
+  if (state.fenceDraw) {
+    const a = W(state.fenceDraw.start), b = W(state.fenceDraw.end);
+    const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+    const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+    addEl('rect', { x, y, width: w, height: h, fill: 'rgba(43,108,176,0.08)', stroke: '#2b6cb0', 'stroke-width': 1.5, 'stroke-dasharray': '4,3', class: 'ui-overlay' });
+  }
+  if (state.fenceSelection) {
+    const dot = (sx, sy) => addEl('circle', { cx: sx, cy: sy, r: 6, fill: 'none', stroke: '#2b6cb0', 'stroke-width': 2, class: 'ui-overlay' });
+    state.fenceSelection.shapeVerts.forEach(({ shapeId, idx }) => {
+      const sh = state.shapes.find(s => s.id === shapeId);
+      if (!sh) return;
+      const p = W(sh.points[idx]);
+      dot(p.x, p.y);
+    });
+    if (state.segments.length) {
+      const wpts = pathPoints(state.segments);
+      state.fenceSelection.inProgVerts.forEach(i => {
+        const p = W(wpts[i]);
+        dot(p.x, p.y);
+      });
+    }
+    state.fenceSelection.annEnds.forEach(({ idx, end }) => {
+      const ann = state.annotations[idx];
+      if (!ann) return;
+      const p = W(ann[end]);
+      dot(p.x, p.y);
+    });
+  }
+}
+
+function screenToWorld(clientX, clientY) {
+  if (!viewTransform) return { x: 0, y: 0 };
+  const rect = svg.getBoundingClientRect();
+  const vbW = svg.viewBox.baseVal.width || rect.width;
+  const vbH = svg.viewBox.baseVal.height || rect.height;
+  const sx = (clientX - rect.left) * (vbW / rect.width);
+  const sy = (clientY - rect.top) * (vbH / rect.height);
+  return { x: (sx - viewTransform.tx) / viewTransform.scale, y: (sy - viewTransform.ty) / viewTransform.scale };
+}
+
+function fenceMouseDown(e) {
+  if (state.mode !== 'fence') return;
+  if (e.button !== 0) return;
+  const p = screenToWorld(e.clientX, e.clientY);
+  state.fenceDraw = { start: p, end: p };
+  e.preventDefault();
+}
+function fenceMouseMove(e) {
+  if (!state.fenceDraw) return;
+  state.fenceDraw.end = screenToWorld(e.clientX, e.clientY);
+  render();
+}
+function fenceMouseUp(e) {
+  if (!state.fenceDraw) return;
+  const d = state.fenceDraw;
+  const minDx = Math.abs(d.end.x - d.start.x);
+  const minDy = Math.abs(d.end.y - d.start.y);
+  state.fenceDraw = null;
+  if (minDx < 0.05 && minDy < 0.05) { render(); return; } // ignore stray clicks
+  finalizeFenceSelection(d.start, d.end);
+}
+
+function finalizeFenceSelection(a, b) {
+  const x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x);
+  const y1 = Math.min(a.y, b.y), y2 = Math.max(a.y, b.y);
+  const inside = p => p.x >= x1 && p.x <= x2 && p.y >= y1 && p.y <= y2;
+  const sel = { shapeVerts: [], inProgVerts: [], annEnds: [] };
+  // Closed shapes on active floor (skip the duplicate closing vertex)
+  shapesOnFloor(state.activeFloor).forEach(sh => {
+    for (let i = 0; i < sh.points.length - 1; i++) {
+      if (inside(sh.points[i])) sel.shapeVerts.push({ shapeId: sh.id, idx: i });
+    }
+  });
+  // In-progress walk vertices
+  if (state.segments.length) {
+    pathPoints(state.segments).forEach((p, i) => {
+      if (inside(p)) sel.inProgVerts.push(i);
+    });
+  }
+  // Offset annotation endpoints
+  state.annotations.forEach((ann, i) => {
+    if (inside(ann.a)) sel.annEnds.push({ idx: i, end: 'a' });
+    if (inside(ann.b)) sel.annEnds.push({ idx: i, end: 'b' });
+  });
+  state.fenceSelection = sel;
+  render();
+}
+
+function clearFenceSelection() {
+  state.fenceSelection = null;
+  render();
+}
+
+function applyGroupMove() {
+  const sel = state.fenceSelection;
+  if (!sel) return;
+  const total = sel.shapeVerts.length + sel.inProgVerts.length + sel.annEnds.length;
+  if (!total) { alert('Fence selection is empty.'); return; }
+  const input = document.getElementById('group-move');
+  if (!input) return;
+  const raw = input.value.trim();
+  if (!raw) return;
+  let seg;
+  try { seg = parseSegment(raw); } catch (err) { alert(err.message); return; }
+  if (seg.autoExtend) { alert('Provide a length and direction (e.g. 3\'6 r).'); return; }
+  pushUndo();
+  // Shape vertices
+  const affectedShapes = new Set();
+  sel.shapeVerts.forEach(({ shapeId, idx }) => {
+    const sh = state.shapes.find(s => s.id === shapeId);
+    if (!sh) return;
+    sh.points[idx].x += seg.dx;
+    sh.points[idx].y += seg.dy;
+    syncClosure(sh, idx);
+    affectedShapes.add(shapeId);
+  });
+  affectedShapes.forEach(id => {
+    const sh = state.shapes.find(s => s.id === id);
+    if (sh) rebuildSegments(sh);
+  });
+  // In-progress walk: shift selected points, then rebuild segments from new positions
+  if (sel.inProgVerts.length && state.segments.length) {
+    const wpts = pathPoints(state.segments).map(p => ({ x: p.x, y: p.y }));
+    const idxSet = new Set(sel.inProgVerts);
+    wpts.forEach((p, i) => { if (idxSet.has(i)) { p.x += seg.dx; p.y += seg.dy; } });
+    if (idxSet.has(0)) state.startPoint = { x: wpts[0].x, y: wpts[0].y };
+    state.segments.forEach((s, i) => {
+      const dx = wpts[i+1].x - wpts[i].x;
+      const dy = wpts[i+1].y - wpts[i].y;
+      const length = Math.hypot(dx, dy);
+      s.dx = dx; s.dy = dy; s.length = length;
+      s.dir = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'r' : 'l') : (dy >= 0 ? 'd' : 'u');
+      s.angle = 0;
+      s.raw = `${formatLength(length)} ${s.dir} (adj)`;
+    });
+  }
+  // Annotation endpoints
+  sel.annEnds.forEach(({ idx, end }) => {
+    state.annotations[idx][end].x += seg.dx;
+    state.annotations[idx][end].y += seg.dy;
+  });
+  input.value = '';
+  render();
+}
+
+function sidebarFence() {
+  const sel = state.fenceSelection;
+  const counts = sel
+    ? `${sel.shapeVerts.length} shape vertex(es), ${sel.inProgVerts.length} in-progress vertex(es), ${sel.annEnds.length} annotation endpoint(s)`
+    : '';
+  const intro = state.fenceDraw
+    ? 'Release to capture vertices inside the rectangle.'
+    : (sel
+        ? `Selected: <b>${counts}</b>. Walls with both endpoints captured will translate; walls crossing the fence stretch. Type an offset and press <b>Move</b>.`
+        : 'Click and drag on the canvas to draw a rectangular fence. Vertices fully inside the rectangle will be captured.');
+  const moveBlock = sel ? `
+    <div class="input-row" style="margin-top:8px;">
+      <input id="group-move" placeholder="e.g. 3'6 r  or  6&quot; d">
+      <button data-act="applyGroupMove" class="primary">Move</button>
+    </div>
+    <div class="row-buttons" style="margin-top:6px;">
+      <button data-act="clearFenceSelection" class="danger">Clear selection</button>
+    </div>
+  ` : '';
+  return `
+    <div class="section">
+      <h2>Fence</h2>
+      <div class="help">${intro}</div>
+      ${moveBlock}
+    </div>
+  `;
+}
+
+function sidebarOffsets() {
+  const picking = !!state.offsetPick;
+  const pickHint = picking
+    ? (state.offsetPick.first
+        ? 'Click the <b>second vertex</b> to drop the offset label.'
+        : 'Click the <b>first vertex</b> (any vertex of any shape, or the pen/start dot of an in-progress walk).')
+    : 'Drop a labeled <b>offset measurement</b> between any two vertices on the canvas.';
+  const button = picking
+    ? '<button data-act="cancelOffsetPick" class="danger">Cancel pick</button>'
+    : '<button data-act="startOffsetPick" class="primary">Measure offset</button>';
+  const listHtml = state.annotations.length === 0
+    ? '<div class="help" style="margin-top:6px;">No offsets yet.</div>'
+    : state.annotations.map((ann, i) => {
+        const dx = ann.b.x - ann.a.x, dy = ann.b.y - ann.a.y;
+        const len = Math.hypot(dx, dy);
+        return `<div class="seg-item"><span>${i+1}. ${formatLength(len)} (${formatGapBreakdown(dx, dy)})</span><button data-act="removeAnnotation" data-i="${i}" title="Remove">×</button></div>`;
+      }).join('');
+  const clearBtn = state.annotations.length
+    ? '<div class="row-buttons" style="margin-top:6px;"><button data-act="clearAnnotations" class="danger">Clear all</button></div>'
+    : '';
+  return `
+    <div class="section">
+      <h2>Offset Measurements</h2>
+      <div class="help">${pickHint}</div>
+      <div class="row-buttons" style="margin-top:6px;">${button}</div>
+      <div id="ann-list" style="margin-top:6px;">${listHtml}</div>
+      ${clearBtn}
+    </div>
+  `;
+}
+
+function renderAnnotations(W) {
+  // First-pick highlight (pulse-like ring) — UI-only, stripped from exports
+  if (state.offsetPick && state.offsetPick.first) {
+    const p = W(state.offsetPick.first);
+    addEl('circle', { cx: p.x, cy: p.y, r: 9, fill: 'none', stroke: '#d946ef', 'stroke-width': 2, 'stroke-dasharray': '3,2', class: 'ui-overlay' });
+  }
+  state.annotations.forEach((ann) => {
+    const aS = W(ann.a), bS = W(ann.b);
+    addEl('path', {
+      d: `M${aS.x} ${aS.y} L${bS.x} ${bS.y}`,
+      fill: 'none', stroke: '#d946ef', 'stroke-width': 1.5, 'stroke-dasharray': '4,4'
+    });
+    addEl('circle', { cx: aS.x, cy: aS.y, r: 3, fill: '#d946ef' });
+    addEl('circle', { cx: bS.x, cy: bS.y, r: 3, fill: '#d946ef' });
+    const dx = ann.b.x - ann.a.x, dy = ann.b.y - ann.a.y;
+    const len = Math.hypot(dx, dy);
+    const breakdown = formatGapBreakdown(dx, dy);
+    const mx = (aS.x + bS.x) / 2, my = (aS.y + bS.y) / 2;
+    const sdx = bS.x - aS.x, sdy = bS.y - aS.y;
+    const slen = Math.hypot(sdx, sdy) || 1;
+    const nx = -sdy / slen, ny = sdx / slen;
+    addEl('text', {
+      x: mx + nx * 14, y: my + ny * 14,
+      'text-anchor': 'middle', 'dominant-baseline': 'middle',
+      'font-size': 12, 'font-weight': 'bold', fill: '#d946ef',
+      stroke: 'white', 'stroke-width': 3, 'paint-order': 'stroke fill'
+    }, `${formatLength(len)} (${breakdown})`);
+  });
+}
+
+function startOffsetPick() {
+  state.offsetPick = { first: null };
+  render();
+}
+function cancelOffsetPick() {
+  state.offsetPick = null;
+  render();
+}
+function handleOffsetPick(worldPoint) {
+  if (!state.offsetPick) return;
+  const p = { x: worldPoint.x, y: worldPoint.y };
+  if (!state.offsetPick.first) {
+    state.offsetPick.first = p;
+    render();
+  } else {
+    pushUndo();
+    state.annotations.push({ a: state.offsetPick.first, b: p });
+    state.offsetPick = null;
+    render();
+  }
+}
+function removeAnnotation(i) {
+  pushUndo();
+  state.annotations.splice(i, 1);
+  render();
+}
+function clearAnnotations() {
+  if (!state.annotations.length) return;
+  pushUndo();
+  state.annotations = [];
+  render();
+}
+
+function formatGapBreakdown(dx, dy) {
+  // dx, dy = vector FROM pen end TO start (what a closing segment would travel).
+  const tol = 1/24; // ~1/2"
+  const parts = [];
+  if (Math.abs(dx) > tol) parts.push(`${formatLength(Math.abs(dx))} ${dx > 0 ? 'right' : 'left'}`);
+  if (Math.abs(dy) > tol) parts.push(`${formatLength(Math.abs(dy))} ${dy > 0 ? 'down' : 'up'}`);
+  return parts.length ? parts.join(' + ') : 'aligned';
+}
+
+function sidebarWalk() {
+  const pts = pathPoints(state.segments);
+  const start = pts[0];
+  const last = pts[pts.length-1];
+  const gapDx = start.x - last.x;
+  const gapDy = start.y - last.y;
+  const gap = Math.hypot(gapDx, gapDy);
+  const gapBreakdown = formatGapBreakdown(gapDx, gapDy);
+  const closedTag = state.segments.length === 0 ? '' :
+    (gap < state.settings.autoCloseFeet
+      ? '<span class="closed-badge">✓ closed</span>'
+      : `<span class="open-badge" title="Closing offset: ${gapBreakdown}">gap ${formatLength(gap)} (${gapBreakdown})</span>`);
+  const segListHtml = state.segments.length === 0
+    ? '<div class="help">Type segments above. Each Enter adds one. Comma-separate for batch entry.</div>'
+    : state.segments.map((s,i)=>{
+        const style = s.jump ? ' style="color:#888;font-style:italic;"' : '';
+        return `<div class="seg-item"${style}><span>${i+1}. ${escapeHtml(s.raw)}  →  ${formatLength(s.length)}</span><button data-act="removeSeg" data-i="${i}" title="Remove">×</button></div>`;
+      }).join('');
+  const penInfo = state.segments.length === 0 ?
+    'Pen at start. Type your first segment.' :
+    `Pen at (${last.x.toFixed(2)}, ${last.y.toFixed(2)}) ft — gap ${formatLength(gap)} (${gapBreakdown})`;
+  const startInfo = state.startPoint
+    ? `(${state.startPoint.x.toFixed(2)}, ${state.startPoint.y.toFixed(2)}) ft — picked`
+    : 'origin (0, 0)';
+  const startHint = state.segments.length === 0
+    ? 'Click a green vertex to anchor the start there. Then use "Offset" to nudge it along a wall (or any direction) by a typed distance — useful for starting partway along an existing wall.'
+    : 'Cancel current segments to change start point.';
+  const offsetSection = state.segments.length === 0 ? `
+    <div class="input-row" style="margin-top:8px;">
+      <input id="start-offset" placeholder="offset, e.g.  3'6 r  or  6&quot; d">
+      <button data-act="offsetStart">Offset</button>
+    </div>` : '';
+  const resetBtn = state.startPoint && state.segments.length === 0
+    ? '<div class="row-buttons" style="margin-top:6px;"><button data-act="resetStart">Reset to origin</button></div>'
+    : '';
+  return `
+    <div class="section">
+      <h2>Start Point</h2>
+      <div style="font-family:monospace;font-size:12px;color:#333;margin-bottom:4px;">${startInfo}</div>
+      <div class="help">${startHint}</div>
+      ${offsetSection}
+      ${resetBtn}
+    </div>
+    <div class="section">
+      <h2>New Segment</h2>
+      <div class="input-row">
+        <input id="cmd" placeholder="e.g. 16'4 u   or   3'6 r 45" autofocus>
+        <button data-act="addCmd">Add</button>
+      </div>
+      <div class="row-buttons">
+        <button data-act="undo">↶ Undo</button>
+        <button data-act="closeShape" class="primary">Close Shape</button>
+        <button data-act="cancelShape" class="danger">Cancel</button>
+      </div>
+      <div class="pen-indicator">${penInfo}</div>
+    </div>
+    ${state.preview ? (() => {
+      const isJ = !!state.preview.jump;
+      const bg = isJ ? '#f0f0f0' : '#fff4e6';
+      const border = isJ ? '#888' : '#ff8800';
+      const color = isJ ? '#555' : '#cc5500';
+      const title = isJ ? 'Jump preview' : 'Preview';
+      const cycleHint = isJ ? `Press arrow again to cycle` : `Type <code>${state.preview.dir}</code>+Enter again to cycle`;
+      return `
+    <div class="section" style="background:${bg};border:2px solid ${border};">
+      <h2 style="color:${color};">${title} — ${formatLength(state.preview.candidates[state.preview.candIdx].along)} ${state.preview.dir}</h2>
+      <div class="help">Candidate <b>${state.preview.candIdx + 1} of ${state.preview.candidates.length}</b>. ${cycleHint}. Press Enter with empty input (or click below) to accept. Esc cancels.</div>
+      <div class="row-buttons">
+        <button data-act="commitPreview" class="primary">✓ Accept</button>
+        <button data-act="cancelPreview" class="danger">Cancel</button>
+      </div>
+    </div>`;
+    })() : ''}
+    <div class="section">
+      <h2>Format</h2>
+      <div class="help">
+        <code>&lt;length&gt; &lt;dir&gt; [angle]</code><br>
+        Length: <code>16'4</code>, <code>3'6"</code>, <code>8</code>, <code>0.5</code><br>
+        Direction: <code>r l u d</code>. Angle (after <code>r</code>/<code>l</code>): degrees turned from your previous heading — <code>r</code> turns right, <code>l</code> turns left. (First segment, or <code>u</code>/<code>d</code> with angle: degrees CW from cardinal base.)<br>
+        Batch (separate walls): <code>16'4 u, 26'9 r, 8 d</code><br>
+        Diagonal from components (one wall): <code>5'd 2'l</code> or <code>5'd &amp; 2'l</code><br>
+        <b>Snap-to-vertex:</b> type just <code>r</code> (no length) + Enter to <i>preview</i> the next aligned vertex. Press <code>r</code>+Enter again to cycle. Press Enter on an empty input to accept.<br>
+        <b>Pen-jump (arrow keys):</b> with the input empty, press <code>← ↑ → ↓</code> to <i>jump</i> the pen to the next aligned vertex without drawing a wall. Press the same arrow again to skip further. Enter accepts, Esc cancels.
+      </div>
+    </div>
+    <div class="section">
+      <h2>Current Shape ${closedTag}</h2>
+      <div id="seg-list">${segListHtml}</div>
+    </div>
+  `;
+}
+
+function sidebarEdit() {
+  const sel = state.selection;
+  if (!sel) return `<div class="section"><h2>Edit</h2><div class="help">Click a <b>wall</b> or <b>vertex</b> in a completed area to edit. Click the polygon body to select the whole shape.</div></div>`;
+
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  if (!sh) return '';
+
+  if (sel.kind === 'wall') {
+    const len = wallLength(sh, sel.idx);
+    return `
+      <div class="section">
+        <h2>Wall ${sel.idx+1} of "${escapeHtml(sh.label)}"</h2>
+        <div class="field"><label>Length</label><input id="edit-len" value="${formatLength(len)}"></div>
+        <div class="field"><label>Mode</label><select id="edit-mode">
+          <option value="stretch-end"${state.settings.defaultLengthEditMode==='stretch-end'?' selected':''}>Move end vertex (adjacent walls change)</option>
+          <option value="stretch-symmetric"${state.settings.defaultLengthEditMode==='stretch-symmetric'?' selected':''}>Symmetric (both endpoints move equally)</option>
+          <option value="maintain-rect"${state.settings.defaultLengthEditMode==='maintain-rect'?' selected':''}>Maintain rectangle (move opposite parallel wall too)</option>
+        </select></div>
+        <div class="row-buttons">
+          <button data-act="applyLen" class="primary">Apply length</button>
+        </div>
+        <h2 style="margin-top:14px;">Move Wall</h2>
+        <div class="field"><label>By</label><input id="move-cmd" placeholder="e.g. 3'6 r  or  6&quot; d"></div>
+        <div class="row-buttons">
+          <button data-act="moveWall" class="primary">Move wall</button>
+        </div>
+        <h2 style="margin-top:14px;">Other</h2>
+        <div class="row-buttons">
+          <button data-act="insertVertex">Insert vertex (midpoint)</button>
+          <button data-act="deleteWall" class="danger">Merge (delete this wall)</button>
+        </div>
+      </div>`;
+  }
+
+  if (sel.kind === 'vertex') {
+    const p = sh.points[sel.idx];
+    return `
+      <div class="section">
+        <h2>Vertex ${sel.idx+1} of "${escapeHtml(sh.label)}"</h2>
+        <div class="help">Position: (${p.x.toFixed(2)}, ${p.y.toFixed(2)}) ft</div>
+        <h2 style="margin-top:10px;">Move</h2>
+        <div class="field"><label>By</label><input id="move-cmd" placeholder="e.g. 3'6 r  or  6&quot; d"></div>
+        <div class="row-buttons">
+          <button data-act="moveVertex" class="primary">Move vertex</button>
+        </div>
+        <div class="row-buttons">
+          <button data-act="deleteVertex" class="danger">Delete vertex (merge walls)</button>
+        </div>
+      </div>`;
+  }
+
+  if (sel.kind === 'shape') {
+    return `
+      <div class="section">
+        <h2>Shape "${escapeHtml(sh.label)}"</h2>
+        <div class="field"><label>Label</label><input id="sh-label" value="${escapeHtml(sh.label)}"></div>
+        <div class="field"><label>Type</label><select id="sh-type">
+          ${Object.entries(TYPES).map(([k,v])=>`<option value="${k}"${k===sh.type?' selected':''}>${v.name}</option>`).join('')}
+        </select></div>
+        <div class="field"><label>Floor</label><select id="sh-floor">
+          ${state.floors.map(f=>`<option value="${f}"${f===sh.floor?' selected':''}>${f}</option>`).join('')}
+        </select></div>
+        <div class="row-buttons">
+          <button data-act="applyShape" class="primary">Apply</button>
+          <button data-act="deleteShape" class="danger">Delete shape</button>
+        </div>
+      </div>
+      <div class="section">
+        <h2>Copy shape</h2>
+        <div class="help">Duplicate this shape and place the copy at a typed offset from the original (e.g. <code>10' r</code> or <code>5'd 3'l</code>).</div>
+        <div class="input-row" style="margin-top:6px;">
+          <input id="copy-offset" placeholder="offset, e.g. 10' r  or  5'd 3'l">
+          <button data-act="copyShape" class="primary">Copy + place</button>
+        </div>
+      </div>`;
+  }
+  return '';
+}
+
+function sidebarSplit() {
+  const has1 = !!state.splitSelection;
+  const sp = state.splitPreview;
+  const projectSection = has1 && !sp ? `
+    <h2 style="margin-top:12px;">Or project to wall</h2>
+    <div class="input-row">
+      <input id="split-dir" placeholder="dir: r l u d" maxlength="1" style="text-align:center;">
+      <button data-act="splitProject">Project</button>
+    </div>
+    <div class="help" style="margin-top:4px;">Type a direction key + Enter. The app casts a ray from the picked vertex and snaps to the first wall it hits.</div>
+  ` : '';
+  const previewSection = sp ? `
+    <div class="section" style="background:#fff4e6;border:2px solid #ff8800;margin-top:8px;">
+      <h2 style="color:#cc5500;">Split preview — ${formatLength(sp.hit.distance)} ${sp.dir}</h2>
+      <div class="help">Hits wall ${sp.hit.wallIdx + 1}. A new vertex will be inserted there and the shape divided.</div>
+      <div class="row-buttons">
+        <button data-act="confirmSplitProject" class="primary">✓ Confirm Split</button>
+        <button data-act="cancelSplitProject" class="danger">Cancel preview</button>
+      </div>
+    </div>` : '';
+  return `
+    <div class="section">
+      <h2>Split Shape</h2>
+      <div class="help">
+        ${has1 ? 'Click a <b>second vertex</b> in the same shape — or use direction projection below.' : 'Click the <b>first vertex</b>.'}<br>
+        The shape will be divided. Both halves inherit the parent's label/type/floor.
+      </div>
+      ${projectSection}
+      <div class="row-buttons" style="margin-top:8px;">
+        <button data-act="cancelSplit">Cancel</button>
+      </div>
+    </div>
+    ${previewSection}
+  `;
+}
+
+function sidebarShapes() {
+  const onFloor = shapesOnFloor(state.activeFloor);
+  if (onFloor.length === 0) return `<div class="section"><h2>Areas on "${state.activeFloor}"</h2><div class="help">None yet.</div></div>`;
+  const html = onFloor.map(sh => {
+    const isSel = state.selection && state.selection.shapeId === sh.id;
+    const area = polygonArea(sh.points);
+    return `
+      <div class="shape-item${isSel?' selected':''}">
+        <div class="hdr"><span>${escapeHtml(sh.label)}</span><span>${Math.round(area)} sf</span></div>
+        <div class="meta">${TYPES[sh.type].name} · ${sh.floor}</div>
+        <div class="actions">
+          <button data-act="selectShape" data-id="${sh.id}">Select</button>
+          <button data-act="editShape" data-id="${sh.id}">Quick edit</button>
+          <button data-act="deleteShapeById" data-id="${sh.id}" class="danger">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+  return `<div class="section"><h2>Areas on "${state.activeFloor}"</h2>${html}</div>`;
+}
+
+function sidebarTotals() {
+  if (state.shapes.length === 0) return '';
+  // Totals per floor
+  let html = '<div class="section"><h2>Totals (all floors)</h2><div id="totals">';
+  const byFloor = {};
+  state.shapes.forEach(sh => {
+    if (!byFloor[sh.floor]) byFloor[sh.floor] = {};
+    byFloor[sh.floor][sh.type] = (byFloor[sh.floor][sh.type] || 0) + polygonArea(sh.points);
+  });
+  Object.entries(byFloor).forEach(([floor, types]) => {
+    html += `<div style="margin-top:6px;font-weight:bold;font-size:11px;color:#555;">${floor}</div>`;
+    let floorTotal = 0;
+    Object.entries(types).forEach(([k,v]) => {
+      html += `<div class="row"><span>&nbsp;&nbsp;${TYPES[k].name}</span><span>${Math.round(v)} sf</span></div>`;
+      floorTotal += v;
+    });
+    html += `<div class="row total"><span>&nbsp;&nbsp;Floor total</span><span>${Math.round(floorTotal)} sf</span></div>`;
+  });
+  html += '</div></div>';
+  return html;
+}
+
+// =============================================================================
+// SIDEBAR HANDLERS
+// =============================================================================
+function attachSidebarHandlers() {
+  document.querySelectorAll('#sidebar [data-act]').forEach(el => {
+    el.addEventListener('click', sidebarAction);
+  });
+  const cmd = document.getElementById('cmd');
+  const ARROW_DIR = { ArrowRight: 'r', ArrowLeft: 'l', ArrowUp: 'u', ArrowDown: 'd' };
+  if (cmd) cmd.addEventListener('keydown', e => {
+    if (e.key === 'Enter') addCmd();
+    else if (e.key === 'Escape') { cancelWalkPreview(); cmd.value = ''; }
+    else if (e.key in ARROW_DIR && cmd.value === '') {
+      // Empty input + arrow key → preview/cycle next aligned vertex as a pen-jump (no wall)
+      e.preventDefault();
+      handleAutoExtendKey(ARROW_DIR[e.key], /*asJump=*/true);
+    }
+  });
+  const off = document.getElementById('start-offset');
+  if (off) off.addEventListener('keydown', e => { if (e.key === 'Enter') offsetStart(); });
+  const sdir = document.getElementById('split-dir');
+  if (sdir) sdir.addEventListener('keydown', e => {
+    if (e.key === 'Enter') splitProject();
+    else if (e.key === 'Escape') { cancelSplitProject(); sdir.value = ''; }
+  });
+}
+
+function sidebarAction(e) {
+  const act = e.currentTarget.dataset.act;
+  const i = e.currentTarget.dataset.i;
+  const id = e.currentTarget.dataset.id;
+  switch (act) {
+    case 'addCmd': addCmd(); break;
+    case 'undo': undoHistory(); break;
+    case 'closeShape': closeShape(); break;
+    case 'cancelShape': cancelShape(); break;
+    case 'removeSeg': pushUndo(); state.segments.splice(parseInt(i),1); render(); break;
+    case 'applyLen': applyLengthEdit(); break;
+    case 'moveWall': moveSelectedWall(); break;
+    case 'insertVertex': insertVertexAction(); break;
+    case 'deleteWall': deleteWallAction(); break;
+    case 'moveVertex': moveSelectedVertex(); break;
+    case 'deleteVertex': deleteSelectedVertex(); break;
+    case 'applyShape': applyShapeEdit(); break;
+    case 'deleteShape': deleteSelectedShape(); break;
+    case 'copyShape': copySelectedShape(); break;
+    case 'selectShape': state.mode='edit'; state.selection = {kind:'shape', shapeId: parseInt(id)}; render(); break;
+    case 'editShape': state.mode='edit'; state.selection = {kind:'shape', shapeId: parseInt(id)}; render(); break;
+    case 'deleteShapeById': deleteShapeById(parseInt(id)); break;
+    case 'cancelSplit': state.splitSelection = null; state.splitPreview = null; state.mode='edit'; render(); break;
+    case 'resetStart': resetStart(); break;
+    case 'offsetStart': offsetStart(); break;
+    case 'startOffsetPick': startOffsetPick(); break;
+    case 'cancelOffsetPick': cancelOffsetPick(); break;
+    case 'removeAnnotation': removeAnnotation(parseInt(i)); break;
+    case 'clearAnnotations': clearAnnotations(); break;
+    case 'applyGroupMove': applyGroupMove(); break;
+    case 'clearFenceSelection': clearFenceSelection(); break;
+    case 'commitPreview': commitWalkPreview(); break;
+    case 'cancelPreview': cancelWalkPreview(); break;
+    case 'splitProject': splitProject(); break;
+    case 'confirmSplitProject': confirmSplitProject(); break;
+    case 'cancelSplitProject': cancelSplitProject(); break;
+  }
+}
+
+// =============================================================================
+// EDIT ACTIONS
+// =============================================================================
+function applyLengthEdit() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'wall') return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  if (!sh) return;
+  const newLen = parseLength(document.getElementById('edit-len').value);
+  if (!(newLen > 0)) { alert('Invalid length'); return; }
+  const mode = document.getElementById('edit-mode').value;
+
+  if (state.settings.askOnLengthEdit) {
+    showLengthEditDialog(sh, sel.idx, newLen, mode);
+  } else {
+    pushUndo();
+    setWallLength(sh, sel.idx, newLen, mode);
+    render();
+  }
+}
+
+function showLengthEditDialog(sh, wallIdx, newLen, defaultMode) {
+  const opp = findOpposingWall(sh, wallIdx);
+  const oppLen = opp !== null ? wallLength(sh, opp) : null;
+  const modal = createModal();
+  modal.innerHTML = `
+    <div class="modal">
+      <h3>Change wall length to ${formatLength(newLen)}?</h3>
+      <p style="font-size:13px;color:#555;">Pick how adjacent walls should adapt:</p>
+      <div class="radio-group">
+        <label><input type="radio" name="lemode" value="stretch-end" ${defaultMode==='stretch-end'?'checked':''}>
+          <b>Move end vertex only</b><br><span style="font-size:11px;color:#777;">Adjacent walls will change length and angle. Simplest.</span></label>
+        <label><input type="radio" name="lemode" value="stretch-symmetric" ${defaultMode==='stretch-symmetric'?'checked':''}>
+          <b>Symmetric stretch</b><br><span style="font-size:11px;color:#777;">Wall center stays put; both endpoints move equally.</span></label>
+        <label><input type="radio" name="lemode" value="maintain-rect" ${defaultMode==='maintain-rect'?'checked':''} ${opp===null?'disabled':''}>
+          <b>Maintain rectangle</b><br><span style="font-size:11px;color:#777;">${opp===null?'No opposing parallel wall found.':`Also extends opposite wall (currently ${formatLength(oppLen)}). Keeps the shape rectilinear.`}</span></label>
+      </div>
+      <label style="font-size:11px;color:#888;"><input type="checkbox" id="le-dontask"> Don't ask next time (use default from Settings)</label>
+      <div class="modal-buttons">
+        <button onclick="closeModal()">Cancel</button>
+        <button class="primary" onclick="confirmLengthEdit(${sh.id}, ${wallIdx}, ${newLen})">Apply</button>
+      </div>
+    </div>
+  `;
+}
+
+function confirmLengthEdit(shapeId, wallIdx, newLen) {
+  const sh = state.shapes.find(s => s.id === shapeId);
+  const mode = document.querySelector('input[name="lemode"]:checked').value;
+  const dontAsk = document.getElementById('le-dontask').checked;
+  if (dontAsk) {
+    state.settings.askOnLengthEdit = false;
+    state.settings.defaultLengthEditMode = mode;
+    saveSettings();
+  }
+  pushUndo();
+  setWallLength(sh, wallIdx, newLen, mode);
+  closeModal();
+  render();
+}
+
+function moveSelectedWall() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'wall') return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  const cmd = document.getElementById('move-cmd').value;
+  try {
+    const seg = parseSegment(cmd);
+    pushUndo();
+    moveWallByVector(sh, sel.idx, seg.dx, seg.dy);
+    render();
+  } catch (err) { alert(err.message); }
+}
+
+function insertVertexAction() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'wall') return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  pushUndo();
+  insertVertexOnWall(sh, sel.idx);
+  state.selection = { kind:'vertex', shapeId: sh.id, idx: sel.idx+1 };
+  render();
+}
+
+function deleteWallAction() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'wall') return;
+  if (state.settings.confirmDelete && !confirm('Delete this wall (merge adjacent walls)?')) return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  pushUndo();
+  if (deleteVertex(sh, sel.idx+1)) {
+    state.selection = null;
+    render();
+  } else {
+    state.undoStack.pop(); // revert the push if deleteVertex bailed
+  }
+}
+
+function moveSelectedVertex() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'vertex') return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  const cmd = document.getElementById('move-cmd').value;
+  try {
+    const seg = parseSegment(cmd);
+    pushUndo();
+    moveVertexByVector(sh, sel.idx, seg.dx, seg.dy);
+    render();
+  } catch (err) { alert(err.message); }
+}
+
+function deleteSelectedVertex() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'vertex') return;
+  if (state.settings.confirmDelete && !confirm('Delete this vertex (merge adjacent walls)?')) return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  pushUndo();
+  if (deleteVertex(sh, sel.idx)) {
+    state.selection = null;
+    render();
+  } else {
+    state.undoStack.pop();
+  }
+}
+
+function applyShapeEdit() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'shape') return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  pushUndo();
+  sh.label = document.getElementById('sh-label').value;
+  sh.type = document.getElementById('sh-type').value;
+  sh.floor = document.getElementById('sh-floor').value;
+  render();
+}
+
+function copySelectedShape() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'shape') return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  if (!sh) return;
+  const input = document.getElementById('copy-offset');
+  if (!input) return;
+  const raw = input.value.trim();
+  if (!raw) { alert('Enter an offset like 10\' r or 5\'d 3\'l'); return; }
+  let seg;
+  try { seg = parseSegment(raw); } catch (err) { alert(err.message); return; }
+  if (seg.autoExtend) { alert('Provide a length and direction (e.g. 10\' r).'); return; }
+  pushUndo();
+  const newId = state.nextShapeId++;
+  const newShape = {
+    id: newId,
+    label: `${sh.label} (copy)`,
+    type: sh.type,
+    floor: sh.floor,
+    points: sh.points.map(p => ({ x: p.x + seg.dx, y: p.y + seg.dy })),
+    segments: sh.segments.map(s => ({ ...s })),
+  };
+  state.shapes.push(newShape);
+  state.selection = { kind: 'shape', shapeId: newId };
+  input.value = '';
+  render();
+}
+
+function deleteSelectedShape() {
+  const sel = state.selection;
+  if (!sel) return;
+  if (state.settings.confirmDelete && !confirm('Delete entire shape?')) return;
+  pushUndo();
+  state.shapes = state.shapes.filter(s => s.id !== sel.shapeId);
+  state.selection = null;
+  render();
+}
+
+function deleteShapeById(id) {
+  if (state.settings.confirmDelete && !confirm('Delete entire shape?')) return;
+  pushUndo();
+  state.shapes = state.shapes.filter(s => s.id !== id);
+  if (state.selection && state.selection.shapeId === id) state.selection = null;
+  render();
+}
+
+// =============================================================================
+// SPLIT MODE
+// =============================================================================
+function splitProject() {
+  const input = document.getElementById('split-dir');
+  if (!input) return;
+  const raw = input.value.trim().toLowerCase();
+  if (!raw) return;
+  if (!(raw in DIR_BASE)) { alert('Direction must be r, l, u, or d.'); return; }
+  if (!state.splitSelection) { alert('Click the first vertex before projecting.'); return; }
+  const sh = state.shapes.find(s => s.id === state.splitSelection.shapeId);
+  if (!sh) return;
+  const origin = sh.points[state.splitSelection.idx];
+  const hit = rayHitsWall(origin, raw, sh, state.splitSelection.idx);
+  if (!hit) { alert(`No wall hit by ray in direction "${raw}".`); return; }
+  state.splitPreview = { shapeId: sh.id, originIdx: state.splitSelection.idx, dir: raw, hit };
+  input.value = '';
+  render();
+}
+
+function confirmSplitProject() {
+  const sp = state.splitPreview;
+  if (!sp) return;
+  const sh = state.shapes.find(s => s.id === sp.shapeId);
+  if (!sh) return;
+  pushUndo();
+  // Insert a new vertex on the hit wall (between points[wallIdx] and points[wallIdx+1]).
+  const wallIdx = sp.hit.wallIdx;
+  sh.points.splice(wallIdx + 1, 0, { x: sp.hit.point.x, y: sp.hit.point.y });
+  rebuildSegments(sh);
+  // Origin index may have shifted if it was after the inserted vertex.
+  let originIdx = sp.originIdx;
+  if (originIdx > wallIdx) originIdx += 1;
+  const newVertexIdx = wallIdx + 1;
+  const result = splitPolygon(sh, originIdx, newVertexIdx);
+  if (!result) {
+    // Revert insert + undo
+    sh.points.splice(wallIdx + 1, 1);
+    rebuildSegments(sh);
+    state.undoStack.pop();
+    state.splitPreview = null;
+    render();
+    return;
+  }
+  const i = state.shapes.indexOf(sh);
+  state.shapes.splice(i, 1, result.a, result.b);
+  state.splitSelection = null;
+  state.splitPreview = null;
+  state.mode = 'edit';
+  state.selection = { kind: 'shape', shapeId: result.a.id };
+  render();
+}
+
+function cancelSplitProject() {
+  state.splitPreview = null;
+  render();
+}
+
+function handleSplitClick(shapeId, vIdx) {
+  if (!state.splitSelection) {
+    state.splitSelection = { shapeId, idx: vIdx };
+    render();
+    return;
+  }
+  if (state.splitSelection.shapeId !== shapeId) {
+    alert('Both vertices must be in the same shape.');
+    return;
+  }
+  const idx1 = state.splitSelection.idx, idx2 = vIdx;
+  const sh = state.shapes.find(s => s.id === shapeId);
+  const result = splitPolygon(sh, idx1, idx2);
+  if (!result) { state.splitSelection = null; render(); return; }
+  pushUndo();
+  // Replace the original with the two new ones
+  const i = state.shapes.indexOf(sh);
+  state.shapes.splice(i, 1, result.a, result.b);
+  state.splitSelection = null;
+  state.mode = 'edit';
+  state.selection = { kind:'shape', shapeId: result.a.id };
+  render();
+}
+
+// =============================================================================
+// WALK MODE COMMANDS
+// =============================================================================
+function addCmd() {
+  const input = document.getElementById('cmd');
+  if (!input) return;
+  const raw = input.value.trim();
+
+  // Empty input + active preview → commit it
+  if (!raw) {
+    if (state.preview) commitWalkPreview();
+    return;
+  }
+
+  const parts = raw.split(',').map(p => p.trim()).filter(Boolean);
+  try {
+    // Special case: a single bare direction → enter/advance preview mode
+    const firstProbe = parseSegment(parts[0]);
+    if (parts.length === 1 && firstProbe.autoExtend) {
+      handleAutoExtendKey(firstProbe.dir);
+      input.value = '';
+      input.focus();
+      return;
+    }
+
+    // Any other input — commit any pending preview first, then process normally.
+    if (state.preview) commitWalkPreview(/*silent=*/true);
+
+    let priorHeading = state.segments.length > 0
+      ? headingDeg(state.segments[state.segments.length - 1])
+      : null;
+    const resolved = [];
+    for (const part of parts) {
+      const p = parseSegment(part, priorHeading);
+      let seg;
+      if (p.autoExtend) {
+        const cands = findAlignedCandidates([...state.segments, ...resolved], p.dir);
+        if (!cands.length) throw new Error(`No vertex aligned to "${p.dir}" of the current pen position.`);
+        seg = cands[0].segment;
+      } else {
+        seg = p;
+      }
+      resolved.push(seg);
+      priorHeading = headingDeg(seg);
+    }
+    pushUndo();
+    state.segments.push(...resolved);
+    input.value = '';
+    render();
+    const cmdEl = document.getElementById('cmd');
+    if (cmdEl) { cmdEl.focus(); }
+  } catch (err) { alert(err.message); }
+}
+
+function handleAutoExtendKey(dir, asJump = false) {
+  // Cycle if we already have a preview in same direction AND same mode (jump vs extend)
+  if (state.preview && state.preview.dir === dir && !!state.preview.jump === asJump) {
+    state.preview.candIdx = (state.preview.candIdx + 1) % state.preview.candidates.length;
+    render();
+    return;
+  }
+  // New preview (possibly switching direction or mode)
+  const cands = findAlignedCandidates(state.segments, dir);
+  if (!cands.length) { alert(`No vertex aligned to "${dir}" of the current pen position.`); return; }
+  state.preview = { dir, candIdx: 0, candidates: cands, jump: asJump };
+  render();
+}
+
+function commitWalkPreview(silent) {
+  if (!state.preview) return;
+  const cand = state.preview.candidates[state.preview.candIdx];
+  pushUndo();
+  if (state.preview.jump) {
+    state.segments.push({
+      ...cand.segment,
+      jump: true,
+      raw: `↷ ${formatLength(cand.along)} ${state.preview.dir} (jump)`
+    });
+  } else {
+    state.segments.push(cand.segment);
+  }
+  state.preview = null;
+  if (!silent) render();
+}
+
+function cancelWalkPreview() {
+  if (!state.preview) return;
+  state.preview = null;
+  render();
+}
+
+function cancelShape() {
+  if (state.segments.length === 0 && !state.preview) return;
+  if (state.segments.length && !confirm('Discard current segments?')) return;
+  pushUndo();
+  state.segments = [];
+  state.preview = null;
+  render();
+}
+
+// Extract walls (non-jump segments) with their absolute endpoints by walking the chain.
+function extractWalls(segments) {
+  const start = getStart();
+  let x = start.x, y = start.y;
+  const walls = [];
+  for (const s of segments) {
+    const sx = x, sy = y;
+    x += s.dx; y += s.dy;
+    if (!s.jump) walls.push({ a: { x: sx, y: sy }, b: { x, y } });
+  }
+  return walls;
+}
+
+// Given walls (each {a, b}), assemble an ordered polygon vertex list by traversing
+// the wall graph. Returns null if walls don't form a cycle or path with 0/2 endpoints.
+function assemblePolygonFromWalls(walls) {
+  if (walls.length < 3) return null;
+  const eps = 0.05;
+  const sameP = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y) < eps;
+  const verts = [];
+  function vId(p) {
+    for (let i = 0; i < verts.length; i++) if (sameP(verts[i], p)) return i;
+    verts.push({ x: p.x, y: p.y });
+    return verts.length - 1;
+  }
+  const adj = []; // adj[id] = [{wallIdx, otherId}]
+  for (let i = 0; i < walls.length; i++) {
+    const aId = vId(walls[i].a), bId = vId(walls[i].b);
+    if (aId === bId) continue;
+    if (!adj[aId]) adj[aId] = [];
+    if (!adj[bId]) adj[bId] = [];
+    adj[aId].push({ wallIdx: i, otherId: bId });
+    adj[bId].push({ wallIdx: i, otherId: aId });
+  }
+  for (let i = 0; i < verts.length; i++) if (!adj[i]) adj[i] = [];
+  const ones = [], odd = [];
+  for (let i = 0; i < verts.length; i++) {
+    const d = adj[i].length;
+    if (d === 1) ones.push(i);
+    else if (d % 2 === 1 || d === 0) odd.push(i);
+  }
+  let startId;
+  if (ones.length === 0 && odd.length === 0) startId = 0;          // closed cycle
+  else if (ones.length === 2 && odd.length === 0) startId = ones[0]; // open path with 2 endpoints
+  else return null;
+  const used = new Set();
+  const path = [startId];
+  let cur = startId;
+  while (used.size < walls.length) {
+    const next = adj[cur].find(a => !used.has(a.wallIdx));
+    if (!next) break;
+    used.add(next.wallIdx);
+    path.push(next.otherId);
+    cur = next.otherId;
+  }
+  if (used.size !== walls.length) return null;
+  return path.map(id => ({ x: verts[id].x, y: verts[id].y }));
+}
+
+function closeShape() {
+  if (state.segments.length < 3) { alert('Need at least 3 segments.'); return; }
+  const hasJumps = state.segments.some(s => s.jump);
+  let pointsToUse;
+  if (hasJumps) {
+    const walls = extractWalls(state.segments);
+    if (walls.length < 3) { alert('Need at least 3 wall segments (jumps don’t count).'); return; }
+    const polygon = assemblePolygonFromWalls(walls);
+    if (!polygon) {
+      alert('Cannot auto-close: the walls (excluding jumps) don’t form a closed cycle or a simple open path. Either walk the missing wall, or remove jump segments from the list.');
+      return;
+    }
+    pointsToUse = [...polygon];
+    const first = pointsToUse[0], last = pointsToUse[pointsToUse.length - 1];
+    const gap = Math.hypot(last.x - first.x, last.y - first.y);
+    if (gap > 0.01) {
+      if (gap > state.settings.autoCloseFeet) {
+        if (!confirm(`Walls don’t fully close (gap ${formatLength(gap)}). Force-close with straight line?`)) return;
+      }
+      pointsToUse.push({ ...first });
+    }
+  } else {
+    const pts = pathPoints(state.segments);
+    const start = pts[0];
+    const last = pts[pts.length-1];
+    const gap = Math.hypot(last.x - start.x, last.y - start.y);
+    if (gap > state.settings.autoCloseFeet) {
+      if (!confirm(`Shape doesn’t close (gap ${formatLength(gap)}). Force-close with straight line back to start?`)) return;
+      pointsToUse = [...pts, { ...start }];
+    } else {
+      pointsToUse = pts.map((p,i) => i === pts.length-1 ? { ...start } : p);
+    }
+  }
+  const label = prompt('Label for this area:', `Area ${state.nextShapeId}`);
+  if (label === null) return;
+  const typeKey = prompt(`Type? (${Object.keys(TYPES).join(', ')})`, 'living');
+  if (!typeKey || !(typeKey in TYPES)) { alert('Cancelled.'); return; }
+  pushUndo();
+  const shape = {
+    id: state.nextShapeId++,
+    points: pointsToUse,
+    segments: hasJumps ? [] : [...state.segments],
+    label, type: typeKey, floor: state.activeFloor,
+  };
+  if (hasJumps) rebuildSegments(shape);
+  state.shapes.push(shape);
+  state.segments = [];
+  state.startPoint = null;
+  render();
+}
+
+// =============================================================================
+// MODE SWITCHING
+// =============================================================================
+document.querySelectorAll('#mode-tabs button').forEach(b => {
+  b.addEventListener('click', () => {
+    state.mode = b.dataset.mode;
+    state.selection = null;
+    state.splitSelection = null;
+    state.preview = null;
+    state.splitPreview = null;
+    render();
+  });
+});
+
+svg.addEventListener('click', (e) => {
+  if (e.target === svg) {
+    state.selection = null;
+    render();
+  }
+});
+
+svg.addEventListener('mousedown', fenceMouseDown);
+window.addEventListener('mousemove', fenceMouseMove);
+window.addEventListener('mouseup', fenceMouseUp);
+
+(function initSubjectInput() {
+  const inp = document.getElementById('subject-input');
+  if (!inp) return;
+  inp.value = state.subject || '';
+  inp.addEventListener('input', () => { state.subject = inp.value; });
+})();
+
+(function initFloorBarGhostSlider() {
+  const slider = document.getElementById('floor-ghost-opacity');
+  const valEl = document.getElementById('floor-ghost-opacity-val');
+  if (!slider || !valEl) return;
+  const sync = () => {
+    slider.value = state.settings.ghostOpacity;
+    valEl.textContent = Math.round(state.settings.ghostOpacity * 100) + '%';
+    document.documentElement.style.setProperty('--ghost-opacity', state.settings.ghostOpacity);
+  };
+  sync();
+  slider.addEventListener('input', () => {
+    const v = parseFloat(slider.value);
+    state.settings.ghostOpacity = v;
+    valEl.textContent = Math.round(v * 100) + '%';
+    document.documentElement.style.setProperty('--ghost-opacity', v);
+  });
+  slider.addEventListener('change', () => { saveSettings(); });
+  window.__syncFloorGhostSlider = sync; // let openSettings refresh us after Save
+})();
+
+// =============================================================================
+// MODAL & SETTINGS
+// =============================================================================
+function createModal() {
+  const host = document.getElementById('modal-host');
+  host.innerHTML = '<div class="modal-bg" onclick="if(event.target===this) closeModal()"></div>';
+  return host.querySelector('.modal-bg');
+}
+function closeModal() { document.getElementById('modal-host').innerHTML = ''; }
+
+function openSettings() {
+  const m = createModal();
+  const s = state.settings;
+  m.innerHTML = `
+    <div class="modal">
+      <h3>Settings</h3>
+      <div class="settings-grid">
+        ${settingRow('showSegmentLabels', 'Show dimension labels on walls')}
+        ${settingRow('showCentroidLabels', 'Show area label + sq ft at center')}
+        ${settingRow('showVertexDots', 'Show vertex dots when not in edit mode')}
+        ${settingRow('showFloorGhosts', 'Show other floors faded as ghosts')}
+        ${settingRow('exportIncludeTitle', 'Include subject as title on SVG/PNG exports')}
+        ${settingRow('exportIncludeLegend', 'Include legend (fill/line key) on SVG/PNG exports')}
+        ${settingRow('confirmDelete', 'Confirm before deleting walls/vertices/shapes')}
+        ${settingRow('askOnLengthEdit', 'Ask which mode to use when changing a wall length')}
+        ${settingRow('snapAngleTo90', 'Snap angles to 90° when entering segments (TODO)')}
+      </div>
+      <div style="margin-top:14px;">
+        <label style="font-size:12px;">Default length-edit mode:
+          <select id="set-default-mode" style="margin-left:8px;">
+            <option value="stretch-end"${s.defaultLengthEditMode==='stretch-end'?' selected':''}>Move end vertex</option>
+            <option value="stretch-symmetric"${s.defaultLengthEditMode==='stretch-symmetric'?' selected':''}>Symmetric stretch</option>
+            <option value="maintain-rect"${s.defaultLengthEditMode==='maintain-rect'?' selected':''}>Maintain rectangle</option>
+          </select>
+        </label>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:12px;">Export page size:
+          <select id="set-page-size" style="margin-left:8px;">
+            <option value="auto"${s.exportPageSize==='auto'?' selected':''}>Auto (canvas size)</option>
+            <option value="letter-portrait"${s.exportPageSize==='letter-portrait'?' selected':''}>Letter — Portrait (8.5×11)</option>
+            <option value="letter-landscape"${s.exportPageSize==='letter-landscape'?' selected':''}>Letter — Landscape (11×8.5)</option>
+          </select>
+        </label>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:12px;">Auto-close threshold (feet):
+          <input type="number" id="set-close" value="${s.autoCloseFeet}" step="0.01" min="0" max="1" style="width:80px;">
+        </label>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:12px; display:flex; align-items:center; gap:8px;">
+          Other-floor opacity:
+          <input type="range" id="set-ghost-opacity" min="0.05" max="1" step="0.05" value="${s.ghostOpacity}" style="flex:1;">
+          <span id="set-ghost-opacity-val" style="font-family:monospace; min-width:36px; text-align:right;">${Math.round(s.ghostOpacity*100)}%</span>
+        </label>
+      </div>
+      <div class="modal-buttons">
+        <button onclick="closeModal()">Cancel</button>
+        <button class="primary" onclick="applySettings()">Save</button>
+      </div>
+    </div>
+  `;
+  const slider = document.getElementById('set-ghost-opacity');
+  const valEl = document.getElementById('set-ghost-opacity-val');
+  const originalOpacity = s.ghostOpacity;
+  if (slider) {
+    slider.addEventListener('input', () => {
+      const v = parseFloat(slider.value);
+      document.documentElement.style.setProperty('--ghost-opacity', v);
+      valEl.textContent = Math.round(v*100) + '%';
+    });
+  }
+  const bg = document.querySelector('#modal-host .modal-bg');
+  if (bg) bg.addEventListener('click', e => {
+    if (e.target === bg) document.documentElement.style.setProperty('--ghost-opacity', originalOpacity);
+  });
+}
+
+function settingRow(key, label) {
+  return `<div class="row"><label><input type="checkbox" id="set-${key}" ${state.settings[key]?'checked':''}> ${label}</label></div>`;
+}
+
+function applySettings() {
+  ['showSegmentLabels','showCentroidLabels','showVertexDots','showFloorGhosts','exportIncludeTitle','exportIncludeLegend','confirmDelete','askOnLengthEdit','snapAngleTo90'].forEach(k => {
+    state.settings[k] = document.getElementById('set-'+k).checked;
+  });
+  state.settings.defaultLengthEditMode = document.getElementById('set-default-mode').value;
+  state.settings.autoCloseFeet = parseFloat(document.getElementById('set-close').value) || 0.05;
+  state.settings.exportPageSize = document.getElementById('set-page-size').value || 'auto';
+  state.settings.ghostOpacity = parseFloat(document.getElementById('set-ghost-opacity').value) || 0.45;
+  if (typeof window.__syncFloorGhostSlider === 'function') window.__syncFloorGhostSlider();
+  saveSettings();
+  closeModal();
+  render();
+}
+
+function saveSettings() {
+  localStorage.setItem('sketchWalkerSettings', JSON.stringify(state.settings));
+}
+
+// =============================================================================
+// EXPORT
+// =============================================================================
+function exportSVG() {
+  const clone = svgForExport();
+  const xml = new XMLSerializer().serializeToString(clone);
+  triggerDownload(new Blob(['<?xml version="1.0"?>\n', xml], { type: 'image/svg+xml' }), 'sketch.svg');
+}
+function exportPNG() {
+  const clone = svgForExport();
+  const w = parseFloat(clone.getAttribute('width')), h = parseFloat(clone.getAttribute('height'));
+  // For page-fit exports, set viewport width/height on the source SVG too so the
+  // browser rasterizes at the page size (Image() honors width/height attrs).
+  const xml = new XMLSerializer().serializeToString(clone);
+  const url = URL.createObjectURL(new Blob([xml], { type:'image/svg+xml;charset=utf-8' }));
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = w*2; c.height = h*2;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,c.width,c.height);
+    ctx.drawImage(img,0,0,c.width,c.height);
+    c.toBlob(b => triggerDownload(b,'sketch.png'));
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+}
+const EXPORT_PAGE_SIZES = {
+  'auto':             null,
+  'letter-portrait':  { w: 816,  h: 1056 }, // 8.5×11 in @ 96 DPI
+  'letter-landscape': { w: 1056, h: 816 },
+};
+
+function svgForExport() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, text) => {
+    const el = document.createElementNS(ns, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    if (text !== undefined) el.textContent = text;
+    return el;
+  };
+
+  // ---- 1. Decide what's on the export ----
+  const includeTitle = state.settings.exportIncludeTitle && (state.subject || '').trim().length > 0;
+  const usedTypes = [...new Set(state.shapes.map(s => s.type))].filter(k => k in TYPES);
+  const includeLegend = state.settings.exportIncludeLegend && usedTypes.length > 0;
+
+  // Title + legend layout in PAGE coords (so they stay readable regardless of canvas scale)
+  const titleH = includeTitle ? 80 : 0;
+  const legendRowH = 26;
+  const legendFooterH = 32;
+  const legendPad = 14;
+  const legendHeaderH = 28;
+  const legendH = includeLegend ? (legendPad*2 + legendHeaderH + usedTypes.length * legendRowH + legendFooterH) : 0;
+
+  // ---- 2. Tight bbox of actual content in SCREEN coords (live render) ----
+  const allWorldPts = [];
+  state.shapes.forEach(sh => allWorldPts.push(...sh.points));
+  if (state.segments.length) allWorldPts.push(...pathPoints(state.segments));
+  state.annotations.forEach(a => { allWorldPts.push(a.a); allWorldPts.push(a.b); });
+
+  let tight;
+  if (allWorldPts.length === 0 || !viewTransform) {
+    tight = { x: 0, y: 0, w: svg.clientWidth, h: svg.clientHeight };
+  } else {
+    const sxs = allWorldPts.map(p => viewTransform.tx + p.x * viewTransform.scale);
+    const sys = allWorldPts.map(p => viewTransform.ty + p.y * viewTransform.scale);
+    const sMinX = Math.min(...sxs), sMaxX = Math.max(...sxs);
+    const sMinY = Math.min(...sys), sMaxY = Math.max(...sys);
+    const labelPad = 70; // room for outside dimension labels + centroid labels
+    tight = {
+      x: sMinX - labelPad,
+      y: sMinY - labelPad,
+      w: (sMaxX - sMinX) + labelPad * 2,
+      h: (sMaxY - sMinY) + labelPad * 2,
+    };
+  }
+
+  // ---- 3. Page size & available canvas area ----
+  const page = EXPORT_PAGE_SIZES[state.settings.exportPageSize] || null;
+  const sideMargin = 24;
+  let pageW, pageH;
+  if (page) {
+    pageW = page.w;
+    pageH = page.h;
+  } else {
+    // Auto: page width = tight content width + margins; height fits content + title + legend
+    pageW = Math.max(640, tight.w + sideMargin * 2);
+    pageH = titleH + sideMargin + tight.h + sideMargin + legendH;
+  }
+
+  const canvasAvailW = pageW - sideMargin * 2;
+  const canvasAvailH = pageH - titleH - legendH - sideMargin * 2;
+  const fitScale = Math.min(canvasAvailW / tight.w, canvasAvailH / tight.h);
+  const fittedW = tight.w * fitScale;
+  const fittedH = tight.h * fitScale;
+  const canvasX = sideMargin + (canvasAvailW - fittedW) / 2;
+  const canvasY = titleH + sideMargin + (canvasAvailH - fittedH) / 2;
+
+  // ---- 4. Build the export SVG: page-coord outer, nested SVG for the canvas ----
+  const liveDefs = svg.querySelector('defs');
+  const out = document.createElementNS(ns, 'svg');
+  out.setAttribute('xmlns', ns);
+  out.setAttribute('width', pageW);
+  out.setAttribute('height', pageH);
+  out.setAttribute('viewBox', `0 0 ${pageW} ${pageH}`);
+
+  if (liveDefs) out.appendChild(liveDefs.cloneNode(true));
+
+  // Page background
+  out.appendChild(mk('rect', { width: pageW, height: pageH, fill: '#fff' }));
+
+  // Title block in page coords (full readable size)
+  if (includeTitle) {
+    const subj = (state.subject || '').trim();
+    const sub = (state.subtitle || '').trim();
+    out.appendChild(mk('text', {
+      x: pageW / 2, y: 38, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
+      'font-size': 22, 'font-weight':'bold', fill:'#222'
+    }, subj));
+    out.appendChild(mk('text', {
+      x: pageW / 2, y: 60, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
+      'font-size': 13, fill:'#555'
+    }, sub || 'Not to scale — dimensions as labeled'));
+  }
+
+  // ---- 5. Nested SVG that crops to the tight bbox and scales to fit ----
+  const liveClone = svg.cloneNode(true);
+  // Strip UI-only elements that shouldn't appear in exports
+  ['.hit-wall', '.hit-vertex', '.visible-vertex', '.ui-overlay'].forEach(sel => {
+    [...liveClone.querySelectorAll(sel)].forEach(n => n.remove());
+  });
+  // Clear "selected" styling on walls so exports don't show blue highlights
+  [...liveClone.querySelectorAll('.visible-wall.selected')].forEach(n => {
+    n.classList.remove('selected');
+  });
+  // Remove the defs from the live clone (we already copied them to `out`)
+  const cloneDefs = liveClone.querySelector('defs');
+  if (cloneDefs) cloneDefs.remove();
+
+  const nested = document.createElementNS(ns, 'svg');
+  nested.setAttribute('x', canvasX);
+  nested.setAttribute('y', canvasY);
+  nested.setAttribute('width', fittedW);
+  nested.setAttribute('height', fittedH);
+  nested.setAttribute('viewBox', `${tight.x} ${tight.y} ${tight.w} ${tight.h}`);
+  nested.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  // Move the cloned live content into the nested SVG
+  while (liveClone.firstChild) nested.appendChild(liveClone.firstChild);
+  out.appendChild(nested);
+
+  // ---- 6. Legend in page coords at the bottom ----
+  if (includeLegend) {
+    const y0 = pageH - legendH + legendPad;
+    const x0 = sideMargin;
+    const lw = pageW - sideMargin * 2;
+    out.appendChild(mk('rect', {
+      x: x0, y: y0 - legendPad, width: lw, height: legendH,
+      fill: 'none', stroke: '#999', 'stroke-width': 0.75
+    }));
+    out.appendChild(mk('text', {
+      x: x0 + 14, y: y0 + 4, 'font-family':'Arial, sans-serif',
+      'font-size': 16, 'font-weight':'bold', fill:'#222'
+    }, 'Legend'));
+    // Two-column layout if there are many types
+    const usePerColumn = usedTypes.length > 4 ? Math.ceil(usedTypes.length / 2) : usedTypes.length;
+    const colW = lw / (usedTypes.length > 4 ? 2 : 1);
+    usedTypes.forEach((key, i) => {
+      const t = TYPES[key];
+      const col = Math.floor(i / usePerColumn);
+      const rowInCol = i % usePerColumn;
+      const rowX = x0 + 14 + col * colW;
+      const rowY = y0 + 22 + rowInCol * legendRowH;
+      const swatch = mk('rect', {
+        x: rowX, y: rowY, width: 30, height: 18,
+        fill: t.fill, stroke: 'black', 'stroke-width': 1
+      });
+      if (t.dashed) swatch.setAttribute('stroke-dasharray','5,3');
+      out.appendChild(swatch);
+      out.appendChild(mk('text', {
+        x: rowX + 40, y: rowY + 14, 'font-family':'Arial, sans-serif', 'font-size': 13, fill:'#222'
+      }, t.name));
+      const total = state.shapes.filter(s => s.type === key).reduce((a, s) => a + polygonArea(s.points), 0);
+      out.appendChild(mk('text', {
+        x: rowX + colW - 24, y: rowY + 14, 'text-anchor':'end',
+        'font-family':'Arial, sans-serif', 'font-size': 13, 'font-weight':'bold', fill:'#444'
+      }, `${Math.round(total)} sq ft`));
+    });
+    // Wall-style swatches as a footer row
+    const footerY = y0 + 22 + usePerColumn * legendRowH + 8;
+    out.appendChild(mk('line', {
+      x1: x0 + 14, y1: footerY + 6, x2: x0 + 60, y2: footerY + 6,
+      stroke:'black', 'stroke-width': 2.5
+    }));
+    out.appendChild(mk('text', {
+      x: x0 + 68, y: footerY + 10, 'font-family':'Arial, sans-serif', 'font-size': 12, fill:'#222'
+    }, 'Enclosed wall'));
+    out.appendChild(mk('line', {
+      x1: x0 + 220, y1: footerY + 6, x2: x0 + 266, y2: footerY + 6,
+      stroke:'black', 'stroke-width': 2.5, 'stroke-dasharray':'8,5'
+    }));
+    out.appendChild(mk('text', {
+      x: x0 + 274, y: footerY + 10, 'font-family':'Arial, sans-serif', 'font-size': 12, fill:'#222'
+    }, 'Open / dashed edge'));
+  }
+
+  return out;
+}
+
+function saveJSON() {
+  const data = { ...state };
+  triggerDownload(new Blob([JSON.stringify(data,null,2)], { type:'application/json' }), 'sketch.json');
+}
+document.getElementById('load-json').addEventListener('change', (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      Object.assign(state, d);
+      state.selection = null; state.splitSelection = null;
+      const subjInp = document.getElementById('subject-input');
+      if (subjInp) subjInp.value = state.subject || '';
+      render();
+    } catch (err) { alert('Load failed: '+err.message); }
+  };
+  r.readAsText(f);
+});
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+window.addEventListener('resize', render);
+
+window.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undoHistory(); }
+  else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoHistory(); }
+  else if (e.key === 'Escape' && state.offsetPick) { cancelOffsetPick(); }
+  else if (e.key === 'Escape' && state.mode === 'fence' && (state.fenceSelection || state.fenceDraw)) { state.fenceDraw = null; state.fenceSelection = null; render(); }
+});
+
+render();
+</script>
+</body>
+</html>

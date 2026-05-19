@@ -1,0 +1,40 @@
+CValRSketch
+Copyright (C) 2026 CAA-EBV-CO-OP and the CValRSketch contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+================================================================================
+  ATTRIBUTION NOTICE
+================================================================================
+
+If you fork, redistribute, host, or build upon CValRSketch, please credit
+the original project and link back to:
+
+    CValRSketch — https://github.com/CAA-EBV-CO-OP/CValRSketch
+
+================================================================================
+  FULL LICENSE TEXT
+================================================================================
+
+The full text of the GNU Affero General Public License version 3 should
+appear in this file. Because the build environment that generated this
+initial commit was offline, only the notice above was committed.
+
+Before publishing this repository, REPLACE THIS FILE with the official
+AGPL-3.0 text from:
+
+    https://www.gnu.org/licenses/agpl-3.0.txt
+
+After replacement, GitHub's license detector will recognize AGPL-3.0
+automatically and display it in the repo sidebar.

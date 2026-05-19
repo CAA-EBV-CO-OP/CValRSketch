@@ -1,0 +1,40 @@
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# AI tooling
+.claude/
+
+# Local sketch saves (anything you save via the app)
+sketch.json
+sketches/
+*-sketch.json
+
+# Local exports
+sketch.svg
+sketch.png
+*.export.svg
+*.export.png
+
+# Client work — never commit identifiable property sketches/photos
+*.JPG
+*.jpg
+*.png
+*.JPEG
+*.jpeg
+# (but allow committed example/reference assets if explicitly named)
+!docs/**/*.png
+!docs/**/*.jpg
+
+# Logs / temp
+*.log
+*.tmp
+tmp/
