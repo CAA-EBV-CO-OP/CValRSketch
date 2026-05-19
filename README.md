@@ -11,11 +11,11 @@ Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the
 
 ## Overview
 
-Appraisers typically record field measurements on paper and then transfer them into a sketch tool to produce a clean drawing with area totals. CValRSketch is a single self-contained HTML file that handles this step: enter measurements directly, review the resulting polygon, label areas, and export a print-ready sketch.
+Create a sketch with simple distance and direction into the tool to produce a clean drawing with area totals. CValRSketch is a single self-contained HTML file that handles this step: enter measurements directly, review the resulting polygon, label areas, and export a print-ready sketch.
 
 The file requires no installation, no server, and no account. Sketches are saved and loaded as JSON files on the local machine.
 
-Developed within the CAA-EBV-CO-OP community.
+Developed for the CAA-EBV-CO-OP community.
 
 ---
 
