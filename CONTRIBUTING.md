@@ -1,6 +1,8 @@
 # Contributing to CValRSketch
 
-Thanks for your interest in contributing. CValRSketch is a small, single-file project — most contributions will be quick and self-contained.
+Contributions are welcome. This is a small, single-file project, so most changes are self-contained.
+
+---
 
 ## Setup
 
@@ -9,52 +11,60 @@ There is no install step. Clone the repo and open `sketch_walker.html` in any mo
 ```bash
 git clone https://github.com/CAA-EBV-CO-OP/CValRSketch.git
 cd CValRSketch
-# open sketch_walker.html in Chrome / Edge / Firefox / Safari
+# Open sketch_walker.html in Chrome, Edge, Firefox, or Safari
 ```
 
-No `npm install`, no `pip install`, no build pipeline.
+No package manager, no build pipeline, no server required.
+
+---
 
 ## Editing
 
-The entire app lives in `sketch_walker.html`:
-- HTML at the top
-- inline `<style>` block
-- inline `<script>` block (sectioned with `// =====` banner comments)
+The entire application lives in `sketch_walker.html`:
 
-Use any text editor or IDE that handles HTML. VS Code's HTML+JavaScript intellisense works well.
+- HTML markup at the top
+- Inline `<style>` block
+- Inline `<script>` block, sectioned with `// ===== banner comments`
 
-## Verifying changes
+Any standard text editor or IDE works. VS Code provides useful HTML and JavaScript assistance for this file type.
 
-After a non-trivial JavaScript change, **always syntax-check** the script block. A single missing `)` will silently kill the entire script and the app will appear frozen on reload:
+---
+
+## Verifying Changes
+
+After any non-trivial JavaScript edit, check for syntax errors before testing. A single missing parenthesis will silently prevent all event listeners from registering, making the app appear frozen:
 
 ```bash
-# Extract the <script> contents and check with Node
-awk 'NR>=137 && NR<=2428' sketch_walker.html > /tmp/sw.js
-node --check /tmp/sw.js
+awk 'NR>=137 && NR<=2428' sketch_walker.html > /tmp/sw.js && node --check /tmp/sw.js
 ```
 
-(Adjust line numbers if the `<script>` / `</script>` boundaries have moved.)
+Adjust the line range if the `<script>`/`</script>` boundaries have moved.
 
-Then test the change interactively by reloading the page (`Ctrl+F5` to bust the browser cache).
+After confirming the syntax, reload the page (`Ctrl+F5`) and test the change interactively.
 
-## Style
+---
 
-- Vanilla JavaScript only. No bundlers, transpilers, or framework dependencies.
-- Single file. Keep it that way unless the user explicitly approves splitting it.
-- Sparse comments. Code should be self-documenting; comments are for non-obvious *why*.
-- No emoji in code or commit messages unless requested.
-- Follow Semantic Versioning for releases ([VERSION.md](./VERSION.md) and [CHANGELOG.md](./CHANGELOG.md)).
+## Style Guidelines
 
-See **[CLAUDE.md](./CLAUDE.md)** for a much more detailed developer guide — it documents the code layout, coordinate systems, key design decisions, and past gotchas.
+- Vanilla JavaScript only. No bundlers, transpilers, or external libraries.
+- The app must remain a single self-contained file unless explicitly approved otherwise.
+- Comments should explain non-obvious reasoning, not restate what the code does.
+- Follow Semantic Versioning for releases. See `VERSION.md` and `CHANGELOG.md`.
 
-## Pull requests
+For a detailed guide to the code layout, coordinate systems, key design decisions, and known gotchas, see `CLAUDE.md`.
+
+---
+
+## Pull Requests
 
 - Branch from `main`.
 - Keep PRs focused — one logical change per PR.
-- Update [CHANGELOG.md](./CHANGELOG.md) under `[Unreleased]` for any user-facing change.
-- Bump the version in [VERSION.md](./VERSION.md) and the `README.md` header if the change warrants a release.
-- Reference the issue number in the PR description if there is one.
+- Update `CHANGELOG.md` under `[Unreleased]` for any user-facing change.
+- Bump the version in `VERSION.md` and the `README.md` header if the change warrants a release.
+- Reference the issue number in the PR description if applicable.
+
+---
 
 ## License
 
-By contributing, you agree your contributions will be licensed under the **AGPL-3.0** license that covers the project. See [LICENSE](./LICENSE).
+By contributing, you agree that your contributions will be licensed under the AGPL-3.0 license that covers this project. See `LICENSE`.
