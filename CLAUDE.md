@@ -1,145 +1,166 @@
-# CLAUDE.md — Developer notes for AI-assisted contributions
+# CLAUDE.md — Developer Notes
 
-This file briefs future Claude sessions (or any AI assistant) on how to work in this codebase.
-**Read this before making changes.**
-
----
-
-## 1. What this project is — and what it isn't
-
-CValRSketch is a **single-file, vanilla-JavaScript web app**. There is **no R, no Shiny, no MongoDB, no Python, no reticulate, no build pipeline, no bundler**. The "data flow" is: user types segments → DOM/SVG updates → optional JSON save to disk via `<a download>`.
-
-If you find yourself reaching for `library(shiny)`, `renderUI`, `NS()`, `pip install`, `npm install`, or a `package.json`, **stop**: none of those tools are part of this project, and adding them would be a major architectural change requiring user sign-off.
+This file briefs AI assistants and contributors on how to work in this codebase. Read before making changes.
 
 ---
 
-## 2. Project structure
+## 1. Project Overview
+
+CValRSketch is a single-file, vanilla-JavaScript web application. The entire app — HTML, CSS, and JavaScript — lives in `sketch_walker.html`. There is no build pipeline, no package manager, no server-side component, and no external runtime dependencies.
+
+Any architectural change beyond editing that single file (e.g. splitting into multiple files, adding a build step, introducing a framework or library) requires explicit approval from the project owner before proceeding.
+
+---
+
+## 2. Project Structure
 
 ```
 .
-├── sketch_walker.html      ← the entire app (HTML + inline CSS + inline JS)
+├── sketch_walker.html   ← the entire application
 ├── README.md
 ├── CHANGELOG.md
 ├── VERSION.md
-├── CLAUDE.md               ← this file
+├── CLAUDE.md            ← this file
 ├── CONTRIBUTING.md
-├── LICENSE                 ← AGPL-3.0
+├── LICENSE              ← AGPL-3.0
 └── .gitignore
 ```
 
-Everything lives in **one file**: `sketch_walker.html`. That is intentional and is a hard constraint — the app must remain shareable as a single file you can email or drop on a USB stick. Do **not** split it into separate `.js` / `.css` files without explicit user approval.
+---
+
+## 3. Code Layout Inside sketch_walker.html
+
+The single `<script>` block (approximately 2400 lines) is divided by `// ===== banner comments`. Major sections in order:
+
+**CONFIGURATION** — `TYPES` (area type metadata: fill colour, dashed flag, label), `DIR_BASE` (direction → degrees), `SETTINGS_DEFAULTS`.
+
+**STATE** — the single `state` object. Contains `segments`, `shapes`, `floors`, `activeFloor`, `selection`, `mode`, `nextShapeId`, `startPoint`, `preview`, `splitSelection`, `undoStack`, `redoStack`, `annotations`, `offsetPick`, `fenceDraw`, `fenceSelection`, `subject`, `subtitle`, `settings`. Also `viewTransform` (module-level snapshot of the most recent `fitView` output, used for screen↔world conversion outside `render()`).
+
+**PARSING & FORMATTING** — `parseLength`, `parseSegment` (walk-mode input), `formatLength`, `headingDeg`, `findAlignedCandidates`, ray-cast helpers.
+
+**EDIT OPERATIONS** — `setWallLength`, `moveWallByVector`, `moveVertexByVector`, `insertVertexOnWall`, `deleteVertex`, `syncClosure`, `rebuildSegments`.
+
+**RENDER** — `fitView`, `render`, `renderShape`, `renderInProgress`, `renderAnnotations`, `renderFence`, `pathPoints`. All SVG element creation goes through `addEl(tag, attrs, text)`.
+
+**SIDEBAR** — `renderSidebar`, `sidebarWalk`, `sidebarEdit`, `sidebarSplit`, `sidebarFence`, `sidebarOffsets`, `sidebarShapes`, `sidebarTotals`. Events delegated via `[data-act]` attributes routed through `sidebarAction`.
+
+**WALK MODE COMMANDS** — `addCmd`, `closeShape`, `cancelShape`, `commitWalkPreview`.
+
+**EDIT/SPLIT MODE COMMANDS** — `applyLengthEdit`, `moveSelectedWall`, `applyShapeEdit`, `copySelectedShape`, `confirmSplitProject`.
+
+**OFFSET ANNOTATION TOOL** — `startOffsetPick`, `handleOffsetPick`, `removeAnnotation`, `clearAnnotations`, `formatGapBreakdown`.
+
+**FENCE TOOL** — `screenToWorld`, `fenceMouseDown/Move/Up`, `finalizeFenceSelection`, `applyGroupMove`, `clearFenceSelection`.
+
+**MODAL & SETTINGS** — `openSettings`, `applySettings`, `saveSettings`.
+
+**EXPORT** — `EXPORT_PAGE_SIZES`, `svgForExport` (outer page SVG + nested canvas SVG), `exportSVG`, `exportPNG`.
+
+**SAVE/LOAD** — `saveJSON`, load handler, `snapshotState`, `restoreState`, `pushUndo`, `undoHistory`, `redoHistory`.
+
+**EVENT WIRING** — sidebar click delegation, SVG mouse handlers, global keyboard handler, IIFEs for floor-bar slider and subject input.
 
 ---
 
-## 3. Code layout inside `sketch_walker.html`
+## 4. Critical Rules and Gotchas
 
-The single `<script>` block (currently ~2400 lines) is sectioned by `// =====` banner comments. The major sections, in order:
+### 4.1 Syntax Errors Kill the Entire Script
 
-1. **CONFIGURATION** — `TYPES` (area type metadata: fill color, dashed, name), `DIR_BASE` (`r/l/u/d` → degrees), `SETTINGS_DEFAULTS`.
-2. **STATE** — the single `state` object. Includes `segments`, `shapes`, `floors`, `activeFloor`, `selection`, `mode`, `nextShapeId`, `startPoint`, `preview`, `splitSelection`, `undoStack`, `redoStack`, `annotations`, `offsetPick`, `fenceDraw`, `fenceSelection`, `subject`, `subtitle`, `settings`. Also `viewTransform` (module-level, holds the most recent fitView output for screen↔world conversion outside `render()`).
-3. **PARSING & FORMATTING** — `parseLength`, `parseSegment` (the heart of walk-mode input), `formatLength`, `headingDeg`, `findAlignedCandidates`, ray-cast helpers, etc.
-4. **EDIT OPERATIONS** — `setWallLength`, `moveWallByVector`, `moveVertexByVector`, `insertVertexOnWall`, `deleteVertex`, `syncClosure`, `rebuildSegments`, etc.
-5. **RENDER** — `fitView`, `render`, `renderShape`, `renderInProgress`, `renderAnnotations`, `renderFence`, `pathPoints`. All canvas drawing goes through `addEl(tag, attrs, text)`.
-6. **SIDEBAR** — `renderSidebar`, `sidebarWalk`, `sidebarEdit`, `sidebarSplit`, `sidebarFence`, `sidebarOffsets`, `sidebarShapes`, `sidebarTotals`. Event delegation via `[data-act]` attributes routed through `sidebarAction`.
-7. **WALK MODE COMMANDS** — `addCmd`, `closeShape`, `cancelShape`, `commitWalkPreview`, etc.
-8. **EDIT/SPLIT MODE COMMANDS** — `applyLengthEdit`, `moveSelectedWall`, `applyShapeEdit`, `copySelectedShape`, `confirmSplitProject`, etc.
-9. **OFFSET ANNOTATION TOOL** — `startOffsetPick`, `handleOffsetPick`, `removeAnnotation`, `clearAnnotations`, `formatGapBreakdown`.
-10. **FENCE TOOL** — `screenToWorld`, `fenceMouseDown/Move/Up`, `finalizeFenceSelection`, `applyGroupMove`, `clearFenceSelection`.
-11. **MODAL & SETTINGS** — `openSettings`, `applySettings`, `saveSettings`.
-12. **EXPORT** — `EXPORT_PAGE_SIZES`, `svgForExport` (page-coord outer + nested SVG for canvas content), `exportSVG`, `exportPNG`.
-13. **SAVE/LOAD** — `saveJSON`, the load handler, `snapshotState`, `restoreState`, `pushUndo`, `undoHistory`, `redoHistory`.
-14. **EVENT WIRING (bottom of file)** — sidebar click delegation, SVG mouse handlers, global keyboard handler, IIFEs that init the floor-bar slider and subject input.
+A single syntax error (missing parenthesis, mismatched brace, stray comma) silently prevents all event listeners from registering. The app appears frozen on reload — buttons, keyboard shortcuts, and even the file picker will not respond.
 
----
-
-## 4. Critical rules and gotchas
-
-### 4.1 The whole `<script>` is parsed as one block
-A single syntax error (missing `)`, mismatched brace, stray comma) **kills the entire script** and the app appears completely frozen on reload — buttons don't respond, even the Load file picker won't trigger its callback because no event listeners get registered. **Always syntax-check after editing JavaScript:**
+Always syntax-check after non-trivial JavaScript edits:
 
 ```bash
 awk 'NR>=137 && NR<=2428' sketch_walker.html > /tmp/sw.js && node --check /tmp/sw.js
 ```
 
-Adjust the line range if the `<script>`/`</script>` tags move. Run this before declaring any non-trivial JS edit complete.
+Adjust the line range if the `<script>`/`</script>` boundaries have moved.
 
-### 4.2 `state.segments` vs `shape.segments`
-- `state.segments` = the **in-progress walk** (typed but not yet closed into a shape).
-- `shape.segments` = walls of a **completed shape**, regenerated by `rebuildSegments()` from `shape.points`.
-Don't mix them up.
+### 4.2 state.segments vs shape.segments
 
-### 4.3 Coordinate systems
-- **World coords (feet)** — used for `state.startPoint`, `state.segments[i].dx/dy`, `shape.points[i].{x,y}`, `state.annotations[i].{a,b}`. Y grows downward (screen-like).
-- **Screen coords (pixels)** — produced by `W(p)` inside `render()`, where `W` closes over the current fitView.
-- **`viewTransform`** is a module-level snapshot of the last fitView, so non-render code (mouse handlers) can compute screen↔world via `screenToWorld(clientX, clientY)`.
+- `state.segments` — the in-progress walk (entered but not yet closed into a shape).
+- `shape.segments` — walls of a completed shape, regenerated by `rebuildSegments()` from `shape.points`.
 
-### 4.4 Cardinal direction conventions
+These are distinct and should not be mixed.
+
+### 4.3 Coordinate Systems
+
+- **World coords (feet)** — used for `state.startPoint`, `state.segments[i].dx/dy`, `shape.points[i].{x,y}`, `state.annotations[i].{a,b}`. Y grows downward.
+- **Screen coords (pixels)** — produced by `W(p)` inside `render()`, which closes over the current `fitView` output.
+- `viewTransform` is a module-level snapshot so mouse handlers can call `screenToWorld(clientX, clientY)` without access to the render closure.
+
+### 4.4 Cardinal Direction Conventions
+
 `DIR_BASE = { r: 0, d: 90, l: 180, u: -90 }` (screen-angle degrees, CW from east).
 
-The `parseSegment` function has **two angle conventions** depending on context:
-- **First segment / `u` / `d` with angle** — angle is degrees CW from `DIR_BASE[dir]`.
-- **`r` or `l` with angle and a prior heading** — angle is degrees of *turn from previous heading* (`r` turns CW/right, `l` turns CCW/left).
+`parseSegment` uses two angle conventions:
+- First segment, or `u`/`d` with angle: angle is degrees CW from `DIR_BASE[dir]`.
+- `r` or `l` with angle and a prior heading: angle is degrees of turn from the previous heading (right = CW, left = CCW).
 
-This is documented in the in-app FORMAT help text. Don't "fix" one into the other without checking — the relative-angle convention is what makes perimeter walking intuitive.
+The relative-angle convention is what makes perimeter walking intuitive. Do not change this behaviour without understanding the full impact.
 
-### 4.5 Save/load and undo
-- `snapshotState()` is the source of truth for what gets saved in undo and `localStorage`-equivalent JSON. **If you add new state that should be undo-able, add it to `snapshotState()` *and* `restoreState()`.**
-- `saveJSON()` uses `{ ...state }` so it captures everything automatically — but `restoreState()` (used by undo) does **not**, so undo can silently drop new state fields.
-- Transient UI state (`fenceSelection`, `fenceDraw`, `offsetPick`, `selection`, `splitSelection`, `preview`, `splitPreview`) should be **reset** in `restoreState()` to avoid stale pointers into geometry that may have changed.
+### 4.5 Save/Load and Undo
 
-### 4.6 Export pipeline (`svgForExport`)
-- The export **does not just clone the live SVG**. It builds a new outer SVG at page size (e.g. 816×1056 for letter portrait), renders the title and legend at full page-coord font sizes, and embeds the cloned live SVG inside a nested `<svg>` whose `viewBox` is the tight bbox of the actual content. This keeps title/legend readable regardless of how much the canvas needs to shrink to fit.
-- UI-only elements get a `class: 'ui-overlay'` (fence rings, fence rect, offset-pick highlight). The export strips `.hit-wall`, `.hit-vertex`, `.visible-vertex`, `.ui-overlay`, and the `.selected` class on walls. **If you add a new overlay, tag it with `ui-overlay` or it WILL appear in client-facing exports.**
-- `<defs>` is copied to the outer SVG and removed from the inner clone; `url(#porchHatch)` references resolve within the SVG document.
+- `snapshotState()` defines what is persisted in undo history and JSON saves. New state fields that should be undo-able must be added to both `snapshotState()` and `restoreState()`.
+- Transient UI state (`fenceSelection`, `fenceDraw`, `offsetPick`, `selection`, `splitSelection`, `preview`, `splitPreview`) should be reset in `restoreState()` to avoid stale references.
 
-### 4.7 Don't pollute the canvas
-The canvas (`<svg id="canvas">`) is treated as a render target. Each `render()` call sets `svg.innerHTML` and re-adds everything. So:
-- Don't attach long-lived event listeners to canvas children — they'll be destroyed on the next render.
-- Don't store DOM refs across renders. Use `state` for persistence.
+### 4.6 Export Pipeline
 
-### 4.8 Floor isolation
-- `shapesOnFloor(floorName)` filters shapes by `sh.floor`. Ghosts come from `shapesOnOtherFloors()`.
-- `state.activeFloor` is the current floor. Fence operations and most edits should only affect `activeFloor` shapes (this is implicit because only active shapes have hit areas).
+The export builds a new outer SVG at page size, renders the title and legend at full page-coordinate font sizes, and embeds the live canvas content in a nested `<svg>` whose `viewBox` is the tight bounding box of actual content. This keeps title and legend readable regardless of how much the canvas is scaled to fit.
+
+Elements with class `ui-overlay` are stripped from exports (fence rings, fence rectangle, offset-pick highlight). The export also strips `.hit-wall`, `.hit-vertex`, `.visible-vertex`, and the `.selected` class on walls. Any new visual-only overlay must be tagged `ui-overlay` to prevent it appearing in client-facing exports.
+
+`<defs>` is copied to the outer SVG and removed from the inner clone so `url(#...)` references resolve correctly.
+
+### 4.7 Canvas Is a Render Target
+
+Each `render()` call sets `svg.innerHTML` and redraws everything. Do not attach persistent event listeners to canvas children — they are destroyed on the next render. Use `state` for persistence, not DOM references.
+
+### 4.8 Floor Isolation
+
+`shapesOnFloor(floorName)` filters shapes by `sh.floor`. `state.activeFloor` is the current editing context. Fence operations and edits should only affect active-floor shapes.
 
 ---
 
-## 5. Design decisions worth knowing
+## 5. Design Decisions
 
-| Decision | Why |
+| Decision | Rationale |
 |---|---|
-| Single-file app, no build | Must be emailable / portable. Appraisers may use it on a chromebook or borrowed laptop. |
-| Vanilla JS, no framework | Keeps the file small (~100KB) and removes dependency rot. The app is mostly DOM + SVG, which vanilla handles fine. |
-| World coords in feet (not meters or pixels) | The user mental model is imperial; matches how walls are called out on site (`16'4"`). |
-| Y-down coords (screen-style), not math-style | Aligns with SVG natively, avoids constant flipping. |
-| Magenta for annotations, orange for in-progress gap, blue for selection | Color-coded by purpose; visually distinct without needing legends. |
-| Imperial-only formatting (`16'4"`) | Same reason as feet. If you add metric support, gate it behind a setting; don't replace. |
-| AGPL-3.0 license | Copyleft + attribution required, matches the CAA-EBV-CO-OP community conventions (see `CAADataBridge`). |
+| Single-file app, no build step | Must be portable — shareable as a standalone file |
+| Vanilla JS, no framework | Keeps file size small (~100 KB); avoids dependency management |
+| World coords in feet | Matches imperial field measurement conventions |
+| Y-down coordinates | Aligns natively with SVG; avoids coordinate flipping |
+| Magenta for annotations, orange for gap, blue for selection | Visually distinct by purpose |
+| Imperial-only formatting | Matches the measurement conventions of the target workflow; metric support, if added, should be gated behind a setting |
+| AGPL-3.0 license | Consistent with other CAA-EBV-CO-OP tools (see CAADataBridge) |
 
 ---
 
-## 6. Recurring bugs / past incidents
+## 6. Known Incidents
 
-- **2026-05-19 — frozen app on reload.** A missing `)` in `svgForExport` killed the script silently; only the Load file dialog opened (it's a native input), nothing else worked. Lesson: always run `node --check` after non-trivial JS edits.
-- **2026-05-19 — vertex rings in PNG export.** Fence-selection highlight rings (no class) survived export. Lesson: tag any visual that should NOT export with `class: 'ui-overlay'`.
-- **2026-05-19 — legend text too small in letter-fit exports.** Before the refactor, legend was inside the scaled canvas group and shrank with it. Fixed by rendering legend in page coords on the outer SVG.
-- **Multiple sessions — angle convention confusion.** `r 45` after going east always meant SE (45° CW from east), but `l 45` meant SW (also 45° CW from west = SW), not the intuitive NE-mirror. Fix: `r`/`l` with explicit angle are *turns from previous heading*, not from cardinal base. See section 4.4.
+**2026-05-19 — App frozen on reload.** A missing `)` in `svgForExport` silently killed the script. The file picker still worked (native input), but no JS handlers were registered. Fix: run `node --check` after any non-trivial JS edit.
+
+**2026-05-19 — Vertex rings appearing in PNG exports.** Fence-selection highlight rings had no class and survived the export strip. Fix: tag any visual that should not export with `class: 'ui-overlay'`.
+
+**2026-05-19 — Legend text too small in letter-fit exports.** The legend was inside the scaled canvas group and shrank with it. Fix: render legend in page coordinates on the outer SVG.
+
+**Multiple sessions — Angle convention confusion.** `r 45` after going east was interpreted as SE (45° CW from east), but the intuitive meaning in perimeter walking is a 45° right turn from the current heading. Fix: `r`/`l` with an explicit angle are always turns from the previous heading. See section 4.4.
 
 ---
 
 ## 7. Conventions
 
-- **Comments** — sparse. Default to no comment; only add one when the WHY isn't obvious (subtle invariants, browser quirks, intentional workarounds). Don't narrate code that's already self-describing.
-- **No emoji** in code, UI text, or commit messages unless the user explicitly asks for them.
-- **Commit messages** — focus on the *why*, not the *what*. The diff shows the what.
-- **Branches / PRs** — for any change beyond a one-line fix, open a PR rather than pushing to `main`.
+- **Comments** — add only where the reasoning is not obvious from the code. Do not narrate self-describing logic.
+- **Commit messages** — describe the reason for the change, not a restatement of the diff.
+- **Branches and PRs** — for any change beyond a one-line fix, open a PR rather than pushing directly to main.
 
 ---
 
-## 8. Things to ask the user before doing
+## 8. Confirm with the Project Owner Before
 
-- Splitting the single file into multiple files / introducing a build step.
-- Adding any runtime dependency (CDN script, library, font, …).
-- Switching from imperial to metric defaults.
-- Touching the `parseSegment` angle convention.
-- Pushing to `main`; deleting branches; rewriting history.
-- Removing the AGPL-3.0 license or changing license terms.
+- Splitting the single file into multiple files or introducing a build step
+- Adding any runtime dependency (CDN script, library, external font)
+- Changing the default measurement system
+- Modifying the `parseSegment` angle convention
+- Force-pushing, deleting branches, or rewriting history
+- Changing the license
