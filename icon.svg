@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2b3a4a"/>
+  <!-- House outline -->
+  <path d="M120 376 L120 200 L256 100 L392 200 L392 376 Z"
+        fill="#f4f0e6" stroke="#fff" stroke-width="10" stroke-linejoin="round"/>
+  <!-- Floor plan walls inside -->
+  <path d="M120 260 L392 260" stroke="#fff" stroke-width="8"/>
+  <path d="M256 260 L256 376" stroke="#fff" stroke-width="8"/>
+  <!-- Dimension tick -->
+  <path d="M120 410 L392 410" stroke="#9bb3cc" stroke-width="4"/>
+  <path d="M120 400 L120 420 M392 400 L392 420" stroke="#9bb3cc" stroke-width="4"/>
+  <text x="256" y="448" font-family="Arial, sans-serif" font-size="46" font-weight="bold"
+        text-anchor="middle" fill="#9bb3cc">40'</text>
+</svg>

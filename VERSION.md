@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.8.0`
+**Current version:** `0.9.0`
 **Released:** 2026-05-19
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.9.0   | 2026-05-19 | minor  | Progressive Web App: installable on iPhone/Android, runs offline           |
 | 0.8.0   | 2026-05-19 | minor  | Export rewrite: page-coord title/legend, tight bbox, UI-overlay stripping, whole-number sq ft |
 | 0.7.0   | 2026-05-19 | minor  | Subject title, legend in exports, Letter portrait/landscape page-fit, ghost-opacity slider in header |
 | 0.6.0   | 2026-05-19 | minor  | Fence mode (rubber-band group stretch); Copy shape with typed offset       |

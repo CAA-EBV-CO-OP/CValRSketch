@@ -3,7 +3,7 @@
 **A browser-based floor plan sketching tool for residential property appraisal.**
 Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
 
-**Version:** 0.8.0 (2026-05-19)
+**Version:** 0.9.0 (2026-05-19)
 **License:** [AGPL-3.0](./LICENSE)
 **Repo:** https://github.com/CAA-EBV-CO-OP/CValRSketch
 
@@ -21,8 +21,21 @@ Developed for the CAA-EBV-CO-OP community.
 
 ## Quick Start
 
+### Desktop (Chrome / Edge / Firefox / Safari)
 1. Clone or download this repo.
 2. Open `sketch_walker.html` in any modern browser (Chrome, Edge, Firefox, Safari).
+
+### Install on iPhone / iPad / Android (PWA)
+
+CValRSketch is a Progressive Web App. To install it as a home-screen icon that opens full-screen and runs offline:
+
+1. Host the repo over HTTPS — the simplest path is enabling **GitHub Pages** on this repo (Settings → Pages → Deploy from `main` / root). Any static host works.
+2. Open the hosted URL on your phone in **Chrome (Android)** or **Safari (iOS)**.
+3. **Android:** Chrome surfaces an "Install" / "Add to Home screen" prompt automatically.
+4. **iOS:** tap the Share button → **Add to Home Screen**.
+5. Launch from the home-screen icon. It opens full-screen, no browser chrome, and works offline after the first load.
+
+Service workers do not run on `file://`, so PWA install requires hosting. For local testing, run any static server (e.g. `python -m http.server` in the repo folder) and open `http://localhost:8000/sketch_walker.html`.
 
 The file is fully self-contained: HTML + inline CSS + vanilla JavaScript. No external dependencies, no network calls.
 

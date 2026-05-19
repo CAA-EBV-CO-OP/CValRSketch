@@ -33,6 +33,8 @@ sketch.png
 # (but allow committed example/reference assets if explicitly named)
 !docs/**/*.png
 !docs/**/*.jpg
+# App icons (PWA install) — keep these
+!icon-*.png
 
 # Logs / temp
 *.log

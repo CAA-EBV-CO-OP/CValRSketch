@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Planned
+- Voice-to-text segment entry (Web Speech API) with a grammar-first parser and verbal confirmation
+- Touch gestures (pinch-zoom, two-finger pan) for tablet/phone use
+- "Snap-to-close" one-click button when gap is small but non-zero
+- Diagnose hint: "wall N may be X too long/short" suggestions based on gap direction
+
+---
+
+## [0.9.0] — 2026-05-19
+
+### Added
+- **Progressive Web App support.** Add to Home Screen on iOS Safari or Chrome Android installs CValRSketch as a launcher icon that opens full-screen and runs offline.
+- `manifest.webmanifest` declaring app name, theme, icons, and standalone display mode.
+- `sw.js` service worker with offline-first caching (cache key `cvalrsketch-v0.9.0`).
+- `icon.svg`, `icon-192.png`, `icon-512.png` for home-screen icons across platforms (including iOS apple-touch-icon).
+- Mobile viewport meta + Apple PWA capability meta tags in the HTML head.
+
+### Notes
+- PWA install requires HTTPS hosting (e.g. GitHub Pages). Service workers don't run on `file://`.
+
+---
 - Inverse-scale dimension labels in exports so they stay readable on heavily-shrunk page-fit exports
 - Touch/pinch gesture support for tablets
 - Mouse-drag placement for `Copy shape` (currently typed-offset only)

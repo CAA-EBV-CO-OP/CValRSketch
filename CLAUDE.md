@@ -71,7 +71,7 @@ A single syntax error (missing parenthesis, mismatched brace, stray comma) silen
 Always syntax-check after non-trivial JavaScript edits:
 
 ```bash
-awk 'NR>=137 && NR<=2428' sketch_walker.html > /tmp/sw.js && node --check /tmp/sw.js
+awk 'NR>=145 && NR<=2443' sketch_walker.html > /tmp/sw.js && node --check /tmp/sw.js
 ```
 
 Adjust the line range if the `<script>`/`</script>` boundaries have moved.

@@ -35,7 +35,7 @@ Any standard text editor or IDE works. VS Code provides useful HTML and JavaScri
 After any non-trivial JavaScript edit, check for syntax errors before testing. A single missing parenthesis will silently prevent all event listeners from registering, making the app appear frozen:
 
 ```bash
-awk 'NR>=137 && NR<=2428' sketch_walker.html > /tmp/sw.js && node --check /tmp/sw.js
+awk 'NR>=145 && NR<=2443' sketch_walker.html > /tmp/sw.js && node --check /tmp/sw.js
 ```
 
 Adjust the line range if the `<script>`/`</script>` boundaries have moved.
