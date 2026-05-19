@@ -1,9 +1,10 @@
 // CValRSketch service worker — offline-first cache of the single-file app.
 // Bumping CACHE_NAME forces a fresh fetch + cache rebuild on next install.
-const CACHE_NAME = 'cvalrsketch-v0.9.1';
+const CACHE_NAME = 'cvalrsketch-v0.10.0';
 const CORE_ASSETS = [
   './',
   './index.html',
+  './core.js',
   './manifest.webmanifest',
   './icon.svg',
   './icon-192.png',

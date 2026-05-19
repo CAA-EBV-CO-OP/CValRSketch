@@ -20,7 +20,11 @@ No package manager, no build pipeline, no server required.
 
 ## Editing
 
-The entire application lives in `index.html`:
+The application is split across two files:
+- `index.html` — desktop UI (HTML, inline `<style>`, inline `<script>` for UI logic).
+- `core.js` — shared pure logic (parser, geometry, edit ops). Both `index.html` and the mobile page load it via `<script src="core.js">`.
+
+Within `index.html`:
 
 - HTML markup at the top
 - Inline `<style>` block
@@ -35,7 +39,7 @@ Any standard text editor or IDE works. VS Code provides useful HTML and JavaScri
 After any non-trivial JavaScript edit, check for syntax errors before testing. A single missing parenthesis will silently prevent all event listeners from registering, making the app appear frozen:
 
 ```bash
-awk 'NR>=145 && NR<=2443' index.html > /tmp/sw.js && node --check /tmp/sw.js
+awk 'NR>=146 && NR<=2119' index.html > /tmp/sw.js && node --check /tmp/sw.js && node --check core.js
 ```
 
 Adjust the line range if the `<script>`/`</script>` boundaries have moved.

@@ -6,7 +6,11 @@ This file briefs AI assistants and contributors on how to work in this codebase.
 
 ## 1. Project Overview
 
-CValRSketch is a single-file, vanilla-JavaScript web application. The entire app — HTML, CSS, and JavaScript — lives in `index.html` (formerly `sketch_walker.html`; a stub at that old path now redirects). There is no build pipeline, no package manager, no server-side component, and no external runtime dependencies.
+CValRSketch is a vanilla-JavaScript web application split across two files:
+- `index.html` — the desktop UI (formerly `sketch_walker.html`; a stub at that old path redirects).
+- `core.js` — pure logic shared by the desktop UI and the upcoming `m/index.html` mobile UI. No DOM access, no global state; functions take everything they need as arguments.
+
+There is no build pipeline, no package manager, no server-side component, and no external runtime dependencies. `core.js` is loaded via a plain `<script src="core.js">` tag from each HTML page.
 
 Any architectural change beyond editing that single file (e.g. splitting into multiple files, adding a build step, introducing a framework or library) requires explicit approval from the project owner before proceeding.
 
@@ -16,7 +20,9 @@ Any architectural change beyond editing that single file (e.g. splitting into mu
 
 ```
 .
-├── index.html           ← the entire application (canonical entry)
+├── index.html           ← desktop UI (canonical entry)
+├── core.js              ← shared pure logic (parsing, geometry, edit ops)
+├── m/index.html         ← mobile-first UI (upcoming, v0.11.0)
 ├── sketch_walker.html   ← redirect stub for legacy URL
 ├── README.md
 ├── CHANGELOG.md
@@ -72,7 +78,7 @@ A single syntax error (missing parenthesis, mismatched brace, stray comma) silen
 Always syntax-check after non-trivial JavaScript edits:
 
 ```bash
-awk 'NR>=145 && NR<=2443' index.html > /tmp/sw.js && node --check /tmp/sw.js
+awk 'NR>=146 && NR<=2119' index.html > /tmp/sw.js && node --check /tmp/sw.js && node --check core.js
 ```
 
 Adjust the line range if the `<script>`/`</script>` boundaries have moved.
