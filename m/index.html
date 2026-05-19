@@ -57,56 +57,39 @@
   .status.closed { color: #2e8b57; }
   /* Bottom controls */
   .controls { flex: 0 0 auto; background: #fafafa; border-top: 1px solid #ccc; }
-  /* Direction pad */
-  .dirpad {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-    gap: 4px;
-    padding: 6px;
-    aspect-ratio: 3 / 1.6; /* keep proportions; height computed from width */
-    max-height: 150px;
-  }
-  .dirpad button {
-    background: #fff; border: 1px solid #ccc; border-radius: 8px;
-    font-size: 22px; font-weight: bold; color: #2b3a4a;
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.1s, border-color 0.1s;
-    -webkit-touch-callout: none;
-  }
-  .dirpad button.selected { background: #2b6cb0; color: #fff; border-color: #1b4a7a; }
-  .dirpad button.cardinal { font-size: 18px; }
-  .dirpad .center {
-    background: #f4f0e6; border: 1px dashed #999; font-size: 11px;
-    color: #888; font-weight: normal;
-  }
-  .dirpad .center.has-input { background: #fef9e7; }
-  /* Distance display + keypad */
-  .dist-display {
+  /* Entry display — shows the segment expression as the user builds it */
+  .entry {
     background: #fff; padding: 8px 12px;
     border-top: 1px solid #ddd; border-bottom: 1px solid #ddd;
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; align-items: center; gap: 8px;
     font-family: ui-monospace, monospace;
+    min-height: 40px;
   }
-  .dist-display .label { color: #666; font-size: 11px; }
-  .dist-display .value { font-size: 18px; font-weight: bold; }
-  .dist-display .value.placeholder { color: #aaa; font-weight: normal; }
+  .entry .label { color: #888; font-size: 11px; text-transform: uppercase; }
+  .entry .value { flex: 1; font-size: 18px; font-weight: bold; color: #2b3a4a; }
+  .entry .value.placeholder { color: #aaa; font-weight: normal; font-size: 13px; }
+  .entry .preview { color: #2e8b57; font-size: 11px; }
+  /* Keypad */
   .keypad {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
+    gap: 5px;
     padding: 6px;
   }
   .keypad button {
     background: #fff; border: 1px solid #ccc; border-radius: 8px;
-    font-size: 18px; font-weight: bold; color: #222;
-    min-height: 44px;
+    font-size: 19px; font-weight: bold; color: #222;
+    min-height: 48px;
+    transition: background 0.08s;
+    -webkit-touch-callout: none;
   }
-  .keypad button.unit { background: #f4f0e6; font-size: 14px; }
-  .keypad button.add { background: #2e8b57; color: #fff; border-color: #1d6a3e; font-size: 16px; }
-  .keypad button.add.disabled { background: #ccc; color: #fff; border-color: #aaa; }
-  .keypad button.back { background: #f8d7da; color: #721c24; }
-  .keypad button:active { transform: scale(0.97); }
+  .keypad button.unit { background: #f4f0e6; font-size: 15px; }
+  .keypad button.dir  { background: #e8f0fa; color: #2b3a4a; font-size: 17px; }
+  .keypad button.dir:active { background: #2b6cb0; color: #fff; }
+  .keypad button.back { background: #f8d7da; color: #721c24; font-size: 22px; }
+  .keypad button.add  { background: #2e8b57; color: #fff; border-color: #1d6a3e; font-size: 17px; grid-column: span 4; min-height: 52px; }
+  .keypad button.add.disabled { background: #b9c7b8; border-color: #b9c7b8; color: #f0f0f0; }
+  .keypad button:active { transform: scale(0.96); }
   /* Drawer */
   .drawer-bg {
     position: fixed; inset: 0;
@@ -199,26 +182,18 @@
 <div class="status" id="status">Pen at start. Pick a direction and a distance.</div>
 
 <div class="controls">
-  <div class="dirpad" id="dirpad">
-    <button data-dir="ul" aria-label="up-left">↖</button>
-    <button data-dir="u" class="cardinal" aria-label="up">↑ U</button>
-    <button data-dir="ur" aria-label="up-right">↗</button>
-    <button data-dir="l" class="cardinal" aria-label="left">← L</button>
-    <button class="center" id="dir-center">tap a direction</button>
-    <button data-dir="r" class="cardinal" aria-label="right">R →</button>
-    <button data-dir="dl" aria-label="down-left">↙</button>
-    <button data-dir="d" class="cardinal" aria-label="down">↓ D</button>
-    <button data-dir="dr" aria-label="down-right">↘</button>
-  </div>
-  <div class="dist-display">
-    <span class="label" id="dist-label">DISTANCE</span>
-    <span class="value placeholder" id="dist-value">tap numbers</span>
+  <div class="entry">
+    <span class="label">ENTRY</span>
+    <span class="value placeholder" id="entry-value">type length, then direction</span>
+    <span class="preview" id="entry-preview"></span>
   </div>
   <div class="keypad" id="keypad">
-    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="ft" class="unit">ft</button>
-    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="in" class="unit">in</button>
-    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="+" class="unit">+</button>
-    <button data-k="0">0</button><button data-k="."><span style="font-size:22px">·</span></button><button data-k="back" class="back">⌫</button><button data-k="add" id="btn-add" class="add">✓ Add</button>
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="back" class="back" aria-label="backspace">⌫</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="ft" class="unit">ft</button>
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="in" class="unit">in</button>
+    <button data-k="0">0</button><button data-k="." aria-label="decimal"><span style="font-size:24px;line-height:1;">·</span></button><button data-k="+" class="unit">+</button><button data-k="clear" class="back" aria-label="clear entry">×</button>
+    <button data-k="l" class="dir">L</button><button data-k="u" class="dir">U</button><button data-k="d" class="dir">D</button><button data-k="r" class="dir">R</button>
+    <button data-k="add" id="btn-add" class="add">✓ Add Wall</button>
   </div>
 </div>
 
@@ -294,9 +269,10 @@ let state = {
 };
 
 // ----- Walk-input state (mobile-specific) -----
-let pickedDir = null;       // 'r' | 'l' | 'u' | 'd' | 'ur' | 'ul' | 'dr' | 'dl'
-let distEntry = '';         // raw entry string before parsing
-let diagonalPhase = null;   // null or { axis1, len1 } during diagonal entry
+// Single text buffer the user builds via the keypad. Mirrors the desktop's typed
+// segment box. parseSegment handles everything: cardinal walls, diagonals via
+// chained `<len><dir><len><dir>` (rise/run), and angles like `r 45`.
+let entryText = '';
 
 // ----- View transform (screen ↔ world) -----
 let view = { tx: 0, ty: 0, scale: 1 };
@@ -501,9 +477,7 @@ function renderInProgress(W) {
 function renderStatus() {
   const el = $('status');
   if (!state.segments.length) {
-    el.textContent = pickedDir
-      ? `Direction: ${dirLabel(pickedDir)}. Enter distance and tap ✓ Add.`
-      : 'Pen at start. Pick a direction.';
+    el.textContent = 'Pen at start. Type a length and direction.';
     el.className = 'status';
     return;
   }
@@ -521,171 +495,98 @@ function renderStatus() {
 }
 
 // =============================================================================
-// INPUT — direction pad + numeric keypad
+// INPUT — keypad builds a single text buffer that parseSegment consumes.
+// Matches the desktop's typed-segment flow:
+//   "16'4 r"          → cardinal wall
+//   "2'6 r 1'6 d"     → diagonal via rise/run (auto-combines components)
+//   "16'4 r 45"       → wall with 45° turn from previous heading
+//   "r" (no length)   → auto-extend to next aligned vertex
 // =============================================================================
-const DIAG_AXES = { ur: ['u','r'], ul: ['u','l'], dr: ['d','r'], dl: ['d','l'] };
 
-function dirLabel(d) {
-  return { r: 'right', l: 'left', u: 'up', d: 'down',
-           ur: 'up-right diagonal', ul: 'up-left diagonal',
-           dr: 'down-right diagonal', dl: 'down-left diagonal' }[d] || d;
+const DIR_KEYS = { l: 'l', r: 'r', u: 'u', d: 'd' };
+
+function lastChar() { return entryText.slice(-1); }
+function endsWithSpace() { return lastChar() === ' ' || entryText === ''; }
+
+function appendEntry(ch, { spaceBefore = false } = {}) {
+  if (spaceBefore && entryText && !endsWithSpace()) entryText += ' ';
+  entryText += ch;
+  updateEntryDisplay();
 }
 
-function setDir(d) {
-  pickedDir = d;
-  const isDiag = d in DIAG_AXES;
-  diagonalPhase = isDiag ? { axes: DIAG_AXES[d], len1: null, ax1Selected: null } : null;
-  distEntry = '';
-  updateDirHighlight();
-  updateDistDisplay();
-  $('dir-center').textContent = isDiag ? '↳ enter 1st leg' : dirLabel(d);
-  $('dir-center').classList.toggle('has-input', true);
-  renderStatus();
+function backspaceEntry() {
+  if (!entryText) return;
+  // Strip trailing space, then one meaningful char
+  entryText = entryText.replace(/\s+$/, '');
+  entryText = entryText.slice(0, -1);
+  entryText = entryText.replace(/\s+$/, '');
+  updateEntryDisplay();
 }
 
-function updateDirHighlight() {
-  document.querySelectorAll('.dirpad button[data-dir]').forEach(b => {
-    b.classList.toggle('selected', b.dataset.dir === pickedDir);
-  });
-}
-
-function updateDistDisplay() {
-  const v = $('dist-value');
-  if (!distEntry) {
-    v.textContent = pickedDir ? 'tap numbers' : 'pick direction first';
-    v.classList.add('placeholder');
-  } else {
-    v.textContent = distEntry;
-    v.classList.remove('placeholder');
-  }
-  $('dist-label').textContent = diagonalPhase
-    ? (diagonalPhase.len1 == null ? `LEG 1 (${dirLabel(diagonalPhase.axes[0])} or ${dirLabel(diagonalPhase.axes[1])})` : `LEG 2 of diagonal`)
-    : 'DISTANCE';
-  $('btn-add').classList.toggle('disabled', !pickedDir || (!distEntry && !diagonalPhase && !canAutoExtend()));
-}
-
-function canAutoExtend() {
-  // Auto-extend works only when picked dir is a cardinal and there's at least one prior segment or shape.
-  if (!pickedDir || pickedDir.length !== 1) return false;
-  return state.segments.length > 0 || state.shapes.some(s => s.floor === state.activeFloor);
+function clearEntry() {
+  entryText = '';
+  updateEntryDisplay();
 }
 
 function pressKey(k) {
-  if (!pickedDir) { toast('Pick a direction first'); return; }
-  if (k === 'back') {
-    if (distEntry) distEntry = distEntry.slice(0, -1);
-    updateDistDisplay();
-    return;
-  }
-  if (k === 'add') { commitSegment(); return; }
-  if (k === 'ft') { if (distEntry && !distEntry.includes("'")) distEntry += "'"; updateDistDisplay(); return; }
-  if (k === 'in') {
-    if (!distEntry) return;
-    if (!distEntry.includes("'")) distEntry += "'";  // implicit ft=0 → "'4" treated as 4in
-    if (!distEntry.endsWith('"')) distEntry += '"';
-    updateDistDisplay();
-    return;
-  }
-  if (k === '+') {
-    // Sub-measurement add — only allowed within a single leg.
-    if (!distEntry) return;
-    if (!distEntry.endsWith('+')) distEntry += '+';
-    updateDistDisplay();
-    return;
-  }
-  if (k === '.') {
-    // Only allow one decimal point in the active token (between + and end).
-    const active = distEntry.split('+').pop() || '';
-    if (!active.includes('.')) { distEntry += '.'; updateDistDisplay(); }
-    return;
-  }
-  // Digit
-  if (/^\d$/.test(k)) {
-    // Strip trailing inch quote so a digit after "4\"" makes sense as starting a new value (rare)
-    distEntry += k;
-    updateDistDisplay();
-  }
-}
-
-function normalizeDistance(raw) {
-  // Turn "16'4", "16'4\"", "164in", "0.5", etc. into core's parseLength-acceptable form.
-  let s = raw.trim();
-  if (!s) return '';
-  // If no unit characters at all, assume feet
-  if (!/['"]/.test(s) && !s.includes('+')) return s;     // e.g. "10" → "10" ft via parseLength
-  return s;
-}
-
-function commitSegment() {
-  if (!pickedDir) { toast('Pick a direction'); return; }
-  // Diagonal: first leg, then we wait for second
-  if (diagonalPhase && diagonalPhase.len1 == null) {
-    const len = parseLength(normalizeDistance(distEntry));
-    if (!(len > 0)) { toast('Enter a positive distance'); return; }
-    diagonalPhase.len1 = len;
-    // Auto-pick the axis: cardinal direction matching the diagonal's first axis
-    diagonalPhase.ax1Selected = diagonalPhase.axes[0];
-    distEntry = '';
-    $('dir-center').textContent = '↳ enter 2nd leg';
-    updateDistDisplay();
-    return;
-  }
-  if (diagonalPhase && diagonalPhase.len1 != null) {
-    const len2 = parseLength(normalizeDistance(distEntry));
-    if (!(len2 > 0)) { toast('Enter a positive distance'); return; }
-    const text = `${formatLength(diagonalPhase.len1)} ${diagonalPhase.axes[0]} & ${formatLength(len2)} ${diagonalPhase.axes[1]}`;
-    addSegmentText(text);
-    resetEntry();
-    return;
-  }
-  // Cardinal direction
-  if (!distEntry) {
-    // Try auto-extend (bare direction + Add)
-    if (canAutoExtend()) {
-      const cands = findAlignedCandidates(state.segments, pickedDir, getStart(), state.shapes);
-      if (!cands.length) { toast('No aligned vertex to snap to'); return; }
-      pushUndo();
-      state.segments.push(cands[0].segment);
-      resetEntry();
-      render();
+  switch (k) {
+    case 'back':  backspaceEntry(); return;
+    case 'clear': clearEntry();     return;
+    case 'add':   commitEntry();    return;
+    case 'ft':    appendEntry("'"); return;
+    case 'in':    appendEntry('"'); return;
+    case '+':     appendEntry('+'); return;
+    case '.':     appendEntry('.'); return;
+    case 'l': case 'r': case 'u': case 'd':
+      // Direction always preceded by a space (so 16'4r reads as 16'4 r visually)
+      appendEntry(k, { spaceBefore: true });
       return;
-    }
-    toast('Enter a distance');
-    return;
-  }
-  const text = `${normalizeDistance(distEntry)} ${pickedDir}`;
-  addSegmentText(text);
-  resetEntry();
-}
-
-function addSegmentText(text) {
-  let priorHeading = null;
-  if (state.segments.length) priorHeading = headingDeg(state.segments[state.segments.length - 1]);
-  try {
-    const seg = parseSegment(text, priorHeading);
-    if (seg.autoExtend) {
-      const cands = findAlignedCandidates(state.segments, seg.dir, getStart(), state.shapes);
-      if (!cands.length) { toast('No aligned vertex'); return; }
-      pushUndo();
-      state.segments.push(cands[0].segment);
-    } else {
-      pushUndo();
-      state.segments.push(seg);
-    }
-    render();
-  } catch (err) {
-    toast(err.message);
+    default:
+      if (/^\d$/.test(k)) appendEntry(k);
   }
 }
 
-function resetEntry() {
-  pickedDir = null;
-  diagonalPhase = null;
-  distEntry = '';
-  updateDirHighlight();
-  updateDistDisplay();
-  $('dir-center').textContent = 'tap a direction';
-  $('dir-center').classList.remove('has-input');
+function previewSegment() {
+  if (!entryText.trim()) return null;
+  const priorHeading = state.segments.length ? headingDeg(state.segments[state.segments.length - 1]) : null;
+  try { return parseSegment(entryText, priorHeading); } catch (e) { return { error: e.message }; }
+}
+
+function updateEntryDisplay() {
+  const v = $('entry-value');
+  const p = $('entry-preview');
+  if (!entryText) {
+    v.textContent = 'type length, then direction';
+    v.classList.add('placeholder');
+    p.textContent = '';
+  } else {
+    v.textContent = entryText;
+    v.classList.remove('placeholder');
+    const seg = previewSegment();
+    if (!seg || seg.error) p.textContent = '';
+    else if (seg.autoExtend) p.textContent = '↳ auto-extend ' + seg.dir;
+    else p.textContent = `→ ${formatLength(seg.length)} ${seg.dir}${seg.angle ? ' @ ' + seg.angle + '°' : ''}`;
+  }
+  $('btn-add').classList.toggle('disabled', !entryText.trim());
+}
+
+function commitEntry() {
+  if (!entryText.trim()) return;
+  const priorHeading = state.segments.length ? headingDeg(state.segments[state.segments.length - 1]) : null;
+  let seg;
+  try { seg = parseSegment(entryText, priorHeading); }
+  catch (err) { toast(err.message); return; }
+  pushUndo();
+  if (seg.autoExtend) {
+    const cands = findAlignedCandidates(state.segments, seg.dir, getStart(), state.shapes);
+    if (!cands.length) { toast('No aligned vertex to snap to'); state.undoStack.pop(); return; }
+    state.segments.push(cands[0].segment);
+  } else {
+    state.segments.push(seg);
+  }
+  entryText = '';
+  updateEntryDisplay();
+  render();
 }
 
 // =============================================================================
@@ -799,7 +700,7 @@ function closeShape() {
   state.shapes.push(shape);
   state.segments = [];
   state.startPoint = null;
-  resetEntry();
+  clearEntry();
   render();
   renderDrawer();
 }
@@ -809,7 +710,7 @@ function cancelWalk() {
   if (!confirm('Discard current segments?')) return;
   pushUndo();
   state.segments = [];
-  resetEntry();
+  clearEntry();
   render();
 }
 
@@ -1072,7 +973,7 @@ function loadJSON(file) {
       state.selection = null;
       state.undoStack = []; state.redoStack = [];
       $('subject-input').value = state.subject || '';
-      resetEntry();
+      clearEntry();
       render();
       renderDrawer();
       toast('Sketch loaded');
@@ -1143,9 +1044,6 @@ svg.addEventListener('pointerdown', (e) => {
 // =============================================================================
 // WIRE UP UI
 // =============================================================================
-document.querySelectorAll('#dirpad button[data-dir]').forEach(b => {
-  b.addEventListener('click', () => setDir(b.dataset.dir));
-});
 document.querySelectorAll('#keypad button').forEach(b => {
   b.addEventListener('click', () => pressKey(b.dataset.k));
 });
@@ -1212,7 +1110,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 // =============================================================================
 // INIT
 // =============================================================================
-updateDistDisplay();
+updateEntryDisplay();
 render();
 renderDrawer();
 </script>
