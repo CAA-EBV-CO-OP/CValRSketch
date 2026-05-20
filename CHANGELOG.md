@@ -15,6 +15,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.14] — 2026-05-19
+
+### Changed
+- **Mobile vertex/wall edit controls now slide INTO the keypad area** instead of opening a modal that hides the sketch. The bottom strip swaps between three modes:
+  - **Walk** (default) — entry display + numeric keypad
+  - **Editing vertex/wall** — header with current position/length + Done button, big direction-snap buttons (L/U/D/R), typed-offset input, plus set-as-start / delete actions
+  - **Fence** — group select / move panel (existing)
+- Tapping a vertex on an active-floor shape opens the edit panel directly (skipping the previous "use as start vs move" modal). The "Use as start" action is a button inside the panel now.
+- Tapping a wall opens the wall edit panel directly (skipping the wall-editor modal).
+- **Ghost vertices** (other floors) still open a small modal — only the "Use as next start point" action applies, so the panel would be overkill.
+- The canvas remains fully visible while editing, so direction-snaps and offset applies update the sketch live and you can see exactly what each tap does.
+
+### Why
+- The previous modal occluded the sketch you were trying to align with. Now you can see both the controls AND the geometry, so snapping a vertex/wall to the next aligned position is a tap-and-watch experience.
+
+---
+
 ## [0.11.13] — 2026-05-19
 
 ### Fixed

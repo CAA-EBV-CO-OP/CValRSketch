@@ -90,8 +90,28 @@
   /* Fence mode swaps the keypad for a small panel */
   .fence-panel { display: none; padding: 10px 12px; background: #fff4e6; border-top: 2px solid #e57c00; }
   .controls.fence-active .entry,
-  .controls.fence-active .keypad { display: none; }
+  .controls.fence-active .keypad,
+  .controls.fence-active .edit-panel { display: none; }
   .controls.fence-active .fence-panel { display: flex; flex-direction: column; gap: 8px; }
+  /* In-place edit panel (replaces keypad while editing a vertex or wall, so the canvas stays visible) */
+  .edit-panel { display: none; padding: 10px 12px; background: #f0f4fb; border-top: 2px solid #2b6cb0; flex-direction: column; gap: 8px; }
+  .controls.editing .entry,
+  .controls.editing .keypad,
+  .controls.editing .fence-panel { display: none; }
+  .controls.editing .edit-panel { display: flex; }
+  .edit-panel .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .edit-panel .head .title { flex: 1; font-size: 12px; color: #2b3a4a; font-family: ui-monospace, monospace; line-height: 1.3; }
+  .edit-panel .head .title b { font-size: 13px; }
+  .edit-panel .head .done { padding: 8px 14px; border: 1px solid #2b6cb0; background: #fff; color: #2b6cb0; border-radius: 8px; font-weight: bold; font-size: 13px; }
+  .edit-panel .dirs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .edit-panel .dirs button { padding: 14px 0; font-size: 17px; font-weight: bold; background: #2b6cb0; color: #fff; border: none; border-radius: 8px; }
+  .edit-panel .dirs button:active { background: #1b4a7a; }
+  .edit-panel .row { display: flex; gap: 6px; align-items: center; }
+  .edit-panel .row input { flex: 1; padding: 9px; font-size: 14px; border: 1px solid #b8c5d6; border-radius: 8px; min-width: 0; }
+  .edit-panel .row button { padding: 9px 12px; background: #2b6cb0; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; white-space: nowrap; }
+  .edit-panel .row button.danger { background: #f8d7da; color: #721c24; }
+  .edit-panel .row button.subtle { background: #fff; color: #2b3a4a; border: 1px solid #b8c5d6; }
+  .edit-panel .hint { font-size: 11px; color: #6b7280; text-transform: uppercase; margin: 2px 0 -2px; }
   .fence-panel .status { font-size: 12px; color: #6b3410; font-family: ui-monospace, monospace; }
   .fence-panel input[type="text"] {
     width: 100%; padding: 10px; font-size: 16px;
@@ -255,6 +275,7 @@
       <button id="fence-done-btn" class="danger">Done</button>
     </div>
   </div>
+  <div class="edit-panel" id="edit-panel"></div>
 </div>
 
 <div class="drawer-bg" id="drawer-bg"></div>
@@ -318,7 +339,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.13'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.14'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -355,6 +376,10 @@ let entryText = '';
 //   ↗ Connect    → commits the entire path as ONE diagonal wall from the pen
 //                  to the final endpoint (the in-between vertices are dropped).
 let chainPreview = null;  // null | { legs: [{along, point, segment, dir}, ...] }
+
+// In-place edit panel — replaces the keypad while editing a vertex or wall.
+// Lets the canvas stay visible so direction-snap / offset edits are visible live.
+let editTarget = null;  // null | { kind: 'vertex' | 'wall', shapeId, idx }
 
 // Fence (group select / stretch) mode — toggled from drawer.
 let fenceMode = false;
@@ -547,7 +572,7 @@ function renderShape(sh, W, isGhost) {
       hit.addEventListener('click', (ev) => {
         ev.stopPropagation();
         state.selection = { kind: 'wall', shapeId: sh.id, idx: i };
-        openWallEditor(sh, i);
+        enterWallEdit(sh, i);
       });
     }
     // Length label
@@ -584,10 +609,180 @@ function renderShape(sh, W, isGhost) {
       const hit = addEl('circle', { cx: sp.x, cy: sp.y, r: 18, fill: 'transparent' });
       hit.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        openVertexMenu({ x: p.x, y: p.y }, sh, i, isGhost);
+        enterVertexEdit(sh, i, isGhost);
       });
     });
   }
+}
+
+// ----- In-place edit panel (replaces keypad while editing) -----
+
+function enterVertexEdit(sh, vIdx, isGhost) {
+  if (fenceMode) return;  // fence-drag intercepts taps while in fence mode
+  if (isGhost) {
+    // Ghosts can only be set-as-start; show the small modal for that single choice.
+    openGhostVertexMenu(sh.points[vIdx], sh);
+    return;
+  }
+  cancelChainPreview();
+  editTarget = { kind: 'vertex', shapeId: sh.id, idx: vIdx };
+  $('controls').classList.add('editing');
+  renderEditPanel();
+  render();
+}
+
+function enterWallEdit(sh, wallIdx) {
+  if (fenceMode) return;
+  cancelChainPreview();
+  editTarget = { kind: 'wall', shapeId: sh.id, idx: wallIdx };
+  $('controls').classList.add('editing');
+  renderEditPanel();
+  render();
+}
+
+function exitEdit() {
+  editTarget = null;
+  $('controls').classList.remove('editing');
+  render();
+}
+
+function renderEditPanel() {
+  if (!editTarget) return;
+  const sh = state.shapes.find(s => s.id === editTarget.shapeId);
+  if (!sh) { exitEdit(); return; }
+  const panel = $('edit-panel');
+  if (editTarget.kind === 'vertex') {
+    const p = sh.points[editTarget.idx];
+    panel.innerHTML = `
+      <div class="head">
+        <div class="title"><b>Vertex</b> · "${escapeHtml(sh.label)}"<br>at <b>(${p.x.toFixed(2)}, ${p.y.toFixed(2)}) ft</b></div>
+        <button class="done" id="edit-done">Done</button>
+      </div>
+      <div class="hint">Snap to next aligned vertex</div>
+      <div class="dirs">
+        <button data-snap="l">← L</button>
+        <button data-snap="u">↑ U</button>
+        <button data-snap="d">↓ D</button>
+        <button data-snap="r">R →</button>
+      </div>
+      <div class="hint">Or move by typed offset</div>
+      <div class="row">
+        <input id="edit-offset" type="text" placeholder="e.g. 3'6 r, 5'd 2'l">
+        <button id="edit-apply-offset">Apply</button>
+      </div>
+      <div class="row">
+        <button class="subtle" id="edit-set-start">📍 Use as start</button>
+        <button class="danger" id="edit-delete">Delete vertex</button>
+      </div>
+    `;
+    document.querySelectorAll('#edit-panel [data-snap]').forEach(b => {
+      b.onclick = () => moveVertexToAligned(sh, editTarget.idx, b.dataset.snap, renderEditPanel);
+    });
+    $('edit-apply-offset').onclick = () => {
+      const v = $('edit-offset').value.trim();
+      if (!v) { toast('Enter an offset like 3\'6 r'); return; }
+      let seg;
+      try { seg = parseSegment(v); } catch (e) { toast(e.message); return; }
+      if (seg.autoExtend) { toast('Need an explicit length'); return; }
+      pushUndo();
+      moveVertexByVector(sh, editTarget.idx, seg.dx, seg.dy);
+      render();
+      renderEditPanel();
+      toast(`Moved ${formatLength(seg.length)} ${seg.dir}`);
+    };
+    $('edit-set-start').onclick = () => {
+      setStartPoint({ x: p.x, y: p.y }, sh.label, false);
+      exitEdit();
+    };
+    $('edit-delete').onclick = () => {
+      if (!confirm('Delete this vertex (merge adjacent walls)?')) return;
+      pushUndo();
+      if (deleteVertex(sh, editTarget.idx)) {
+        exitEdit();
+        render();
+      } else {
+        toast("Can't delete — shape needs ≥3 walls");
+        state.undoStack.pop();
+      }
+    };
+  } else if (editTarget.kind === 'wall') {
+    const a = sh.points[editTarget.idx], b = sh.points[editTarget.idx + 1];
+    const len = wallLength(sh, editTarget.idx);
+    panel.innerHTML = `
+      <div class="head">
+        <div class="title"><b>Wall ${editTarget.idx + 1}</b> · "${escapeHtml(sh.label)}"<br>${formatLength(len)} · (${a.x.toFixed(1)},${a.y.toFixed(1)}) → (${b.x.toFixed(1)},${b.y.toFixed(1)})</div>
+        <button class="done" id="edit-done">Done</button>
+      </div>
+      <div class="hint">Change length</div>
+      <div class="row">
+        <input id="edit-len" type="text" value="${formatLength(len)}">
+        <button id="edit-apply-len">Apply</button>
+      </div>
+      <div class="hint">Snap-move whole wall (from start endpoint)</div>
+      <div class="dirs">
+        <button data-snap="l">← L</button>
+        <button data-snap="u">↑ U</button>
+        <button data-snap="d">↓ D</button>
+        <button data-snap="r">R →</button>
+      </div>
+      <div class="hint">Or move whole wall by typed offset</div>
+      <div class="row">
+        <input id="edit-offset" type="text" placeholder="e.g. 3'6 r, 5'd 2'l">
+        <button id="edit-apply-offset">Apply</button>
+        <button class="danger" id="edit-delete">Delete wall</button>
+      </div>
+    `;
+    $('edit-apply-len').onclick = () => {
+      const newLen = parseLength($('edit-len').value);
+      if (!(newLen > 0)) { toast('Invalid length'); return; }
+      pushUndo();
+      setWallLength(sh, editTarget.idx, newLen, state.settings.defaultLengthEditMode);
+      render();
+      renderEditPanel();
+      toast(`Length ${formatLength(newLen)}`);
+    };
+    document.querySelectorAll('#edit-panel [data-snap]').forEach(btn => {
+      btn.onclick = () => snapMoveWall(sh, editTarget.idx, btn.dataset.snap, renderEditPanel);
+    });
+    $('edit-apply-offset').onclick = () => {
+      const v = $('edit-offset').value.trim();
+      if (!v) { toast('Enter an offset like 3\'6 r'); return; }
+      let seg;
+      try { seg = parseSegment(v); } catch (e) { toast(e.message); return; }
+      if (seg.autoExtend) { toast('Need an explicit length'); return; }
+      pushUndo();
+      moveWallByVector(sh, editTarget.idx, seg.dx, seg.dy);
+      $('edit-offset').value = '';
+      render();
+      renderEditPanel();
+      toast(`Moved ${formatLength(seg.length)} ${seg.dir}`);
+    };
+    $('edit-delete').onclick = () => {
+      if (!confirm('Delete this wall (merge adjacent walls)?')) return;
+      pushUndo();
+      if (deleteVertex(sh, editTarget.idx + 1)) {
+        exitEdit();
+        render();
+      } else {
+        toast("Can't delete — shape needs ≥3 walls");
+        state.undoStack.pop();
+      }
+    };
+  }
+  $('edit-done').onclick = exitEdit;
+}
+
+// Small modal kept for ghost vertices (only one action: set as start).
+function openGhostVertexMenu(p, sh) {
+  showModal(`
+    <h3>Vertex on "${escapeHtml(sh.label)}" (other floor)</h3>
+    <p style="font-size:12px; color:#666; margin:0;">at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}) ft</p>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+      <button class="primary" id="vm-start">📍 Use as next start point</button>
+    </div>
+    <div class="modal-buttons"><button onclick="closeModal()">Cancel</button></div>
+  `);
+  $('vm-start').onclick = () => { closeModal(); setStartPoint(p, sh.label, true); };
 }
 
 function openVertexMenu(p, sh, vIdx, isGhost) {
@@ -696,6 +891,8 @@ function enterFenceMode() {
   fenceDraw = null;
   fenceSelection = null;
   cancelChainPreview();
+  // Exit any in-place edit panel so the fence panel can take over the bottom area.
+  if (editTarget) { editTarget = null; $('controls').classList.remove('editing'); }
   // Clear any stuck pointer state from prior gestures — iOS occasionally drops
   // pointerup events and leaves the map non-empty, which makes the 1-finger
   // fence-drag branch never fire on the next attempt. ("Fence works once" bug.)
