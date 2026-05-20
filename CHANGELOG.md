@@ -15,6 +15,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.9] — 2026-05-19
+
+### Fixed
+- **Mobile vertex / wall taps not opening their editors.** The `pointerdown` handler was calling `svg.setPointerCapture()` on every touch, including plain single-finger taps. On iOS this redirects the eventual `click` event to the SVG element instead of the child hit-circle, so the vertex menu / wall editor handlers never fired. Now pointer capture is only set when we're actually starting a gesture (pinch zoom or fence drag). Single-finger taps go through the normal click path.
+
+### Notes
+- This bug had been silently affecting tap targets since v0.11.0 — the fence rollout made it noticeable when vertex taps stopped working as expected.
+
+---
+
 ## [0.11.8] — 2026-05-19
 
 ### Added

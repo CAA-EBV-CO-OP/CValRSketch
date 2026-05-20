@@ -314,7 +314,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.8';  // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.9';  // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -1401,9 +1401,14 @@ const activePointers = new Map();
 let gestureStart = null;
 
 svg.addEventListener('pointerdown', (e) => {
-  svg.setPointerCapture(e.pointerId);
+  // IMPORTANT: do NOT setPointerCapture unconditionally. On iOS, capturing the
+  // pointer on a plain single-finger tap can redirect the eventual click event
+  // away from child hit-circles (vertices, walls). Only capture once we know
+  // we're starting a gesture (pinch or fence-drag).
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (activePointers.size === 2) {
+    // Pinch — capture both pointers so we keep getting move events
+    activePointers.forEach((_, id) => svg.setPointerCapture(id));
     const pts = [...activePointers.values()];
     gestureStart = {
       d: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
@@ -1413,6 +1418,8 @@ svg.addEventListener('pointerdown', (e) => {
     };
     fenceDraw = null;  // pinch wins over fence-drag
   } else if (fenceMode && activePointers.size === 1) {
+    // Fence-drag — capture this pointer
+    svg.setPointerCapture(e.pointerId);
     const p = screenToWorld(e.clientX, e.clientY);
     fenceDraw = { start: p, end: p };
     fenceSelection = null;

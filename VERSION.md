@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.8`
+**Current version:** `0.11.9`
 **Released:** 2026-05-19
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.9  | 2026-05-19 | patch  | Mobile fix: tapping a vertex or wall now reliably triggers its click handler. Pointer capture was being set on every touch, which redirected click events away from child hit-circles on iOS. |
 | 0.11.8  | 2026-05-19 | patch  | Mobile: fence tool (group select / stretch) ported from desktop. Toggle from drawer; one-finger drag draws rectangle; pinch still zooms. Apply typed offset to move selected vertices; walls crossing the fence stretch automatically. |
 | 0.11.7  | 2026-05-19 | patch  | Mobile: tapping a vertex now opens a small actions modal — "Use as next start point" and "Move vertex by offset…" — instead of jumping straight to set-start. Extensible for future per-vertex actions. |
 | 0.11.6  | 2026-05-19 | patch  | Mobile: auto-extend now falls back to **perpendicular-line projection** when no directly-aligned vertex exists. So `L` walks until pen's X matches another vertex's X — helps close shapes when start isn't horizontally/vertically aligned. |
