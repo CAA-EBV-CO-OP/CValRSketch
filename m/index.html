@@ -121,6 +121,10 @@
   .fence-panel .row button { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #c79a6a; background: #fff; font-size: 13px; font-weight: bold; }
   .fence-panel .row button.primary { background: #e57c00; color: #fff; border-color: #c66a00; }
   .fence-panel .row button.danger  { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+  .fence-panel .hint { font-size: 11px; color: #6b3410; text-transform: uppercase; margin: 4px 0 -2px; }
+  .fence-panel .dirs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .fence-panel .dirs button { padding: 14px 0; font-size: 16px; font-weight: bold; background: #e57c00; color: #fff; border: none; border-radius: 8px; }
+  .fence-panel .dirs button:active { background: #c66a00; }
   body.fence-active header { background: #c66a00; }
   /* Entry display — shows the segment expression as the user builds it */
   .entry {
@@ -268,7 +272,15 @@
   </div>
   <div class="fence-panel">
     <div class="status" id="fence-status">Drag on the canvas to select vertices inside a rectangle.</div>
-    <input type="text" id="fence-move-input" placeholder="Move selected by, e.g. 3'6 r">
+    <div class="hint">Snap selection to next aligned vertex</div>
+    <div class="dirs">
+      <button data-fsnap="l">← L</button>
+      <button data-fsnap="u">↑ U</button>
+      <button data-fsnap="d">↓ D</button>
+      <button data-fsnap="r">R →</button>
+    </div>
+    <div class="hint">Or move by typed offset</div>
+    <input type="text" id="fence-move-input" placeholder="e.g. 3'6 r">
     <div class="row">
       <button id="fence-move-btn" class="primary">↔ Move</button>
       <button id="fence-clear-btn">Clear</button>
@@ -339,7 +351,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.14'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.15'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -944,6 +956,77 @@ function finalizeFenceSelection(a, b) {
   render();
 }
 
+// Compute the centroid of all selected vertices (used as the reference point
+// for snap-direction moves). For a single-vertex selection this is exactly
+// that vertex; for multi-vertex it's the average position.
+function fenceSelectionCentroid() {
+  if (!fenceSelection) return null;
+  let sumX = 0, sumY = 0, n = 0;
+  fenceSelection.shapeVerts.forEach(({ shapeId, idx }) => {
+    const sh = state.shapes.find(s => s.id === shapeId);
+    if (!sh) return;
+    const p = sh.points[idx];
+    sumX += p.x; sumY += p.y; n++;
+  });
+  if (fenceSelection.inProgVerts.length && state.segments.length) {
+    const wpts = pathPoints(state.segments, getStart());
+    fenceSelection.inProgVerts.forEach(i => {
+      sumX += wpts[i].x; sumY += wpts[i].y; n++;
+    });
+  }
+  if (!n) return null;
+  return { x: sumX / n, y: sumY / n };
+}
+
+// Apply a (dx, dy) translation to every selected vertex. Walls fully inside
+// translate; walls crossing the fence stretch (since their other endpoint isn't
+// selected). Shared logic between applyFenceMove (typed offset) and
+// snapFenceMove (direction-snap).
+function applyFenceMoveBy(dx, dy) {
+  const affected = new Set();
+  fenceSelection.shapeVerts.forEach(({ shapeId, idx }) => {
+    const sh = state.shapes.find(s => s.id === shapeId);
+    if (!sh) return;
+    sh.points[idx].x += dx;
+    sh.points[idx].y += dy;
+    syncClosure(sh, idx);
+    affected.add(shapeId);
+  });
+  affected.forEach(id => { const sh = state.shapes.find(s => s.id === id); if (sh) rebuildSegments(sh); });
+  if (fenceSelection.inProgVerts.length && state.segments.length) {
+    const wpts = pathPoints(state.segments, getStart()).map(p => ({ x: p.x, y: p.y }));
+    const idxSet = new Set(fenceSelection.inProgVerts);
+    wpts.forEach((p, i) => { if (idxSet.has(i)) { p.x += dx; p.y += dy; } });
+    if (idxSet.has(0)) state.startPoint = { x: wpts[0].x, y: wpts[0].y };
+    state.segments.forEach((s, i) => {
+      const ddx = wpts[i+1].x - wpts[i].x, ddy = wpts[i+1].y - wpts[i].y;
+      s.dx = ddx; s.dy = ddy; s.length = Math.hypot(ddx, ddy);
+      s.dir = Math.abs(ddx) >= Math.abs(ddy) ? (ddx >= 0 ? 'r' : 'l') : (ddy >= 0 ? 'd' : 'u');
+      s.angle = 0;
+      s.raw = `${formatLength(s.length)} ${s.dir} (adj)`;
+    });
+  }
+}
+
+// Snap the selection in a cardinal direction: find the closest aligned-or-
+// projected vertex from the selection's centroid in that direction, then
+// translate every selected vertex by the resulting offset.
+function snapFenceMove(dir) {
+  if (!fenceSelection) { toast('Drag a rectangle first'); return; }
+  const total = fenceSelection.shapeVerts.length + fenceSelection.inProgVerts.length;
+  if (!total) { toast('Selection is empty'); return; }
+  const ref = fenceSelectionCentroid();
+  if (!ref) { toast('Selection is empty'); return; }
+  const cands = findSnapCandidates([], dir, ref, state.shapes);
+  if (!cands.length) { toast(`No snap target to the ${dir}`); return; }
+  const target = cands[0].point;
+  pushUndo();
+  applyFenceMoveBy(target.x - ref.x, target.y - ref.y);
+  render();
+  updateFencePanel();
+  toast(`Snapped selection ${dir} → (${target.x.toFixed(2)}, ${target.y.toFixed(2)})`);
+}
+
 function applyFenceMove() {
   if (!fenceSelection) { toast('Drag a rectangle first'); return; }
   const total = fenceSelection.shapeVerts.length + fenceSelection.inProgVerts.length;
@@ -954,31 +1037,8 @@ function applyFenceMove() {
   try { seg = parseSegment(raw); } catch (err) { toast(err.message); return; }
   if (seg.autoExtend) { toast('Need an explicit length'); return; }
   pushUndo();
-  const affected = new Set();
-  fenceSelection.shapeVerts.forEach(({ shapeId, idx }) => {
-    const sh = state.shapes.find(s => s.id === shapeId);
-    if (!sh) return;
-    sh.points[idx].x += seg.dx;
-    sh.points[idx].y += seg.dy;
-    syncClosure(sh, idx);
-    affected.add(shapeId);
-  });
-  affected.forEach(id => { const sh = state.shapes.find(s => s.id === id); if (sh) rebuildSegments(sh); });
-  if (fenceSelection.inProgVerts.length && state.segments.length) {
-    const wpts = pathPoints(state.segments, getStart()).map(p => ({ x: p.x, y: p.y }));
-    const idxSet = new Set(fenceSelection.inProgVerts);
-    wpts.forEach((p, i) => { if (idxSet.has(i)) { p.x += seg.dx; p.y += seg.dy; } });
-    if (idxSet.has(0)) state.startPoint = { x: wpts[0].x, y: wpts[0].y };
-    state.segments.forEach((s, i) => {
-      const dx = wpts[i+1].x - wpts[i].x, dy = wpts[i+1].y - wpts[i].y;
-      s.dx = dx; s.dy = dy; s.length = Math.hypot(dx, dy);
-      s.dir = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'r' : 'l') : (dy >= 0 ? 'd' : 'u');
-      s.angle = 0;
-      s.raw = `${formatLength(s.length)} ${s.dir} (adj)`;
-    });
-  }
+  applyFenceMoveBy(seg.dx, seg.dy);
   $('fence-move-input').value = '';
-  fenceSelection = null;
   updateFencePanel();
   render();
   toast(`Moved by ${formatLength(seg.length)} ${seg.dir}`);
@@ -1892,6 +1952,9 @@ $('fence-done-btn').onclick  = exitFenceMode;
 $('fence-clear-btn').onclick = () => { fenceSelection = null; updateFencePanel(); render(); };
 $('fence-move-btn').onclick  = applyFenceMove;
 $('fence-move-input').addEventListener('keydown', e => { if (e.key === 'Enter') applyFenceMove(); });
+document.querySelectorAll('#controls .fence-panel [data-fsnap]').forEach(btn => {
+  btn.onclick = () => snapFenceMove(btn.dataset.fsnap);
+});
 
 // Force-reload that bypasses all caches (HTTP cache + any active service worker)
 async function forceReload() {

@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.14`
+**Current version:** `0.11.15`
 **Released:** 2026-05-19
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.15 | 2026-05-19 | patch  | Mobile: fence panel gains L/U/D/R snap buttons. Each tap moves the selection toward the closest aligned vertex from the selection's centroid in that direction — same pattern as vertex / wall snap. Closes gaps in one tap when you've fence-selected the pen vertex. |
 | 0.11.14 | 2026-05-19 | patch  | Mobile: vertex/wall edit controls now slide INTO the keypad area (replacing entry+keypad) instead of opening a modal that hides the sketch. Canvas stays visible while snapping/moving so you can see the result live. |
 | 0.11.13 | 2026-05-19 | patch  | Mobile: fence-tool re-entry fix (clear stuck pointer state on enter/exit). Wall editor expanded — change length, move by typed offset, or snap-move with L/U/D/R buttons (same pattern as vertex editor). |
 | 0.11.12 | 2026-05-19 | patch  | Mobile snap fix: direct alignments no longer always beat projections. Both are merged into a single sorted-by-distance candidate list, so the truly-closest target wins. Affects chain auto-extend, vertex direction-snap, and bare-direction auto-extend. |

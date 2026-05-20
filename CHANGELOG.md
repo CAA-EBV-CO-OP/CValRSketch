@@ -15,6 +15,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.15] — 2026-05-19
+
+### Added
+- **Direction-snap buttons in the mobile fence panel.** After fence-selecting one or more vertices, four big buttons (← L, ↑ U, ↓ D, R →) appear above the typed-offset input. Each tap moves the entire selection toward the next aligned vertex in that direction, using the **centroid** of the selected vertices as the snap reference. Same `findSnapCandidates` (direct alignment + perpendicular projection, closest wins) as the pen / vertex / wall snap.
+- For a single-vertex fence selection (a common close-the-gap workflow — fence the pen vertex, tap U, gap closed in two taps), the centroid IS the vertex, so the snap is unambiguous.
+
+### Changed
+- `applyFenceMove` (typed offset) and the new `snapFenceMove` (direction tap) now share an `applyFenceMoveBy(dx, dy)` helper, so all fence-move behaviour (walls fully inside translate; walls crossing the fence stretch; in-progress vertex shifts; rebuild segments) is in one place.
+
+### Why
+- Closing a gap by fence-selecting the pen and typing `5'0 u` worked, but typed offsets get tedious when the snap target is "the next aligned vertex". One-tap direction-snap matches the vertex/wall edit panels and the chain auto-extend, so the snap mental model is consistent across every move tool.
+
+---
+
 ## [0.11.14] — 2026-05-19
 
 ### Changed
