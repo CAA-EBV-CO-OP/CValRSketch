@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.3`
+**Current version:** `0.11.4`
 **Released:** 2026-05-19
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.4  | 2026-05-19 | patch  | Mobile: version stamp in header + drawer; "Reload latest (clear cache)" button to force a fresh fetch. |
 | 0.11.3  | 2026-05-19 | patch  | Mobile: tap any green vertex to anchor the start point; "Reset start" + "Offset start" in the drawer. |
 | 0.11.2  | 2026-05-19 | patch  | Mobile: collapse / expand toggle for the entry tools so the canvas can use the full screen. |
 | 0.11.1  | 2026-05-19 | patch  | Mobile input flow flipped to length-then-direction (matches desktop). Diagonals via chained rise/run like `2'6 r 1'6 d`. Drops the diagonal-corner buttons. |

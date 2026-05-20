@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CValRSketch">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
 <link rel="apple-touch-icon" href="../icon-192.png">
@@ -32,7 +35,8 @@
     padding: 8px 12px;
     flex: 0 0 auto;
   }
-  header .title { flex: 1; font-size: 14px; font-weight: bold; }
+  header .title { flex: 1; font-size: 14px; font-weight: bold; display: flex; align-items: baseline; gap: 6px; }
+  header .ver { font-size: 11px; font-weight: normal; color: rgba(255,255,255,0.65); }
   header button {
     background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.3);
     border-radius: 6px; padding: 6px 10px; font-size: 16px; min-width: 44px; min-height: 36px;
@@ -196,7 +200,7 @@
 
 <header>
   <button id="btn-menu" aria-label="Menu">☰</button>
-  <div class="title" id="title-text">CValRSketch</div>
+  <div class="title" id="title-text"><span>CValRSketch</span><span class="ver" id="header-version"></span></div>
   <button id="btn-undo" aria-label="Undo">↶</button>
   <button id="btn-close-shape" aria-label="Close Shape">✓</button>
 </header>
@@ -265,10 +269,12 @@
 
   <h2>About</h2>
   <p style="font-size:12px; color:#666; margin:4px 0;">
-    CValRSketch — mobile preview.<br>
+    CValRSketch — mobile<br>
+    <span id="drawer-version" style="font-family:ui-monospace,monospace; font-weight:bold; color:#222;"></span><br>
     <a href="../" style="color:#2b6cb0;">Open desktop version</a><br>
     <a href="https://github.com/CAA-EBV-CO-OP/CValRSketch" style="color:#2b6cb0;">Source on GitHub</a>
   </p>
+  <button id="btn-force-reload" class="primary">↻ Reload latest (clear cache)</button>
 </aside>
 
 <div class="modal-bg" id="modal-bg">
@@ -283,6 +289,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
+const APP_VERSION = '0.11.4';  // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -1154,6 +1161,24 @@ $('btn-menu').onclick = openDrawer;
 $('drawer-bg').onclick = closeDrawer;
 $('btn-undo').onclick = undoHistory;
 $('btn-close-shape').onclick = closeShape;
+// Force-reload that bypasses all caches (HTTP cache + any active service worker)
+async function forceReload() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) { /* best effort */ }
+  // Cache-bust query string + replace (avoid adding a new history entry)
+  const url = location.pathname + '?v=' + Date.now() + location.hash;
+  location.replace(url);
+}
+$('btn-force-reload').onclick = forceReload;
+
 $('btn-reset-start').onclick = () => { resetStart(); renderDrawer(); };
 $('btn-offset-start').onclick = () => {
   const v = $('start-offset-input').value;
@@ -1224,6 +1249,8 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 // =============================================================================
 // INIT
 // =============================================================================
+$('header-version').textContent = 'v' + APP_VERSION;
+$('drawer-version').textContent = 'v' + APP_VERSION;
 updateEntryDisplay();
 render();
 renderDrawer();

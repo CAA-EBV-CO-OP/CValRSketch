@@ -15,6 +15,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.4] — 2026-05-19
+
+### Added
+- **Version stamp visible in the mobile header** (`vX.Y.Z` in small grey text next to the title) so you can always tell at a glance which version is loaded, without opening the drawer.
+- **Drawer → About → "Reload latest (clear cache)" button.** Unregisters any service workers, deletes all caches, then reloads the page with a cache-bust query string (`?v=<timestamp>`). The most reliable way to bypass iOS Safari's aggressive PWA caching when a new version has shipped but the app keeps showing the old UI.
+- Added `Cache-Control: no-cache, no-store, must-revalidate` + `Pragma: no-cache` + `Expires: 0` meta tags to the mobile page so Safari is more inclined to revalidate on every load. (Meta tags have limited effect compared to real HTTP headers — GitHub Pages won't let us set those — but they help in the browser-tab case.)
+
+### Notes
+- If you've installed the mobile page as a home-screen app on iOS and aren't seeing a new feature, open the drawer (☰), scroll to About, and tap **Reload latest (clear cache)**. The page will reload and the version stamp in the header should match the latest release on GitHub.
+
+---
+
 ## [0.11.3] — 2026-05-19
 
 ### Added
