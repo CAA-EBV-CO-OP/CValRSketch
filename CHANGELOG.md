@@ -15,6 +15,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.7] — 2026-05-19
+
+### Added
+- **Vertex actions modal on mobile.** Tapping a vertex (when no walk is in progress) now opens a confirmation modal showing the vertex coords and the shape it belongs to, with two actions:
+  - **📍 Use as next start point** — anchors the next walk there.
+  - **↔ Move this vertex by offset…** — opens a secondary modal that takes a typed offset (e.g. `3'6 r`, `6" d`, or `2'l 1'u` for a diagonal). Adjacent walls stretch automatically. Only available for vertices on the active floor (ghost vertices on other floors get the start-point option only).
+
+### Changed
+- Tap-to-set-start no longer fires immediately; the modal gives you a chance to back out if you tapped the wrong vertex.
+
+### Why
+- Makes per-vertex editing discoverable and extensible. Future actions (delete, snap to grid, etc.) can slot into the same modal without re-plumbing the hit handler.
+
+---
+
 ## [0.11.6] — 2026-05-19
 
 ### Added

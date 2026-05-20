@@ -289,7 +289,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.6';  // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.7';  // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -516,10 +516,62 @@ function renderShape(sh, W, isGhost) {
       const hit = addEl('circle', { cx: sp.x, cy: sp.y, r: 18, fill: 'transparent' });
       hit.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        setStartPoint({ x: p.x, y: p.y }, sh.label, isGhost);
+        openVertexMenu({ x: p.x, y: p.y }, sh, i, isGhost);
       });
     });
   }
+}
+
+function openVertexMenu(p, sh, vIdx, isGhost) {
+  const canBeStart = state.segments.length === 0;
+  const canMove    = !isGhost;
+  const lines = [];
+  if (canBeStart) lines.push(`<button class="primary" id="vm-start">📍 Use as next start point</button>`);
+  if (canMove)    lines.push(`<button id="vm-move">↔ Move this vertex by offset…</button>`);
+  if (!lines.length) lines.push(`<p style="color:#888; font-size:12px;">No actions available for this vertex.</p>`);
+  showModal(`
+    <h3>Vertex on "${escapeHtml(sh.label)}"${isGhost ? ' (other floor)' : ''}</h3>
+    <p style="font-size:12px; color:#666; margin: 0;">at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}) ft</p>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+      ${lines.join('')}
+    </div>
+    <div class="modal-buttons">
+      <button onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+  if (canBeStart) $('vm-start').onclick = () => {
+    closeModal();
+    setStartPoint(p, sh.label, isGhost);
+  };
+  if (canMove) $('vm-move').onclick = () => openVertexMoveModal(sh, vIdx, p);
+}
+
+function openVertexMoveModal(sh, vIdx, p) {
+  showModal(`
+    <h3>Move vertex by offset</h3>
+    <p style="font-size:12px; color:#666; margin: 0;">From (${p.x.toFixed(2)}, ${p.y.toFixed(2)}) ft. Adjacent walls stretch automatically.</p>
+    <input id="vmove-input" type="text" inputmode="text" placeholder="e.g. 3'6 r, 6&quot; d, or 2'l 1'u"
+      style="padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;" autofocus>
+    <p style="font-size:11px; color:#888; margin: 0;">Diagonal offsets via rise/run: <code>2'l 1'u</code> moves 2' left and 1' up.</p>
+    <div class="modal-buttons">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="primary" id="vmove-apply">Apply</button>
+    </div>
+  `);
+  const apply = () => {
+    const v = $('vmove-input').value.trim();
+    if (!v) { toast('Enter an offset like 3\'6 r'); return; }
+    let seg;
+    try { seg = parseSegment(v); } catch (err) { toast(err.message); return; }
+    if (seg.autoExtend) { toast('Need an explicit length'); return; }
+    pushUndo();
+    moveVertexByVector(sh, vIdx, seg.dx, seg.dy);
+    closeModal();
+    render();
+    toast(`Moved by ${formatLength(seg.length)} ${seg.dir}`);
+  };
+  $('vmove-apply').onclick = apply;
+  $('vmove-input').addEventListener('keydown', e => { if (e.key === 'Enter') apply(); });
 }
 
 function setStartPoint(p, shapeLabel, isGhost) {

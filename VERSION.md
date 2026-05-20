@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.6`
+**Current version:** `0.11.7`
 **Released:** 2026-05-19
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.7  | 2026-05-19 | patch  | Mobile: tapping a vertex now opens a small actions modal — "Use as next start point" and "Move vertex by offset…" — instead of jumping straight to set-start. Extensible for future per-vertex actions. |
 | 0.11.6  | 2026-05-19 | patch  | Mobile: auto-extend now falls back to **perpendicular-line projection** when no directly-aligned vertex exists. So `L` walks until pen's X matches another vertex's X — helps close shapes when start isn't horizontally/vertically aligned. |
 | 0.11.5  | 2026-05-19 | patch  | Mobile: auto-extend preview with cycle-through. Tap L/U/D/R with no length to preview the next aligned vertex; tap the same direction again to cycle to further candidates; tap ✓ to commit. |
 | 0.11.4  | 2026-05-19 | patch  | Mobile: version stamp in header + drawer; "Reload latest (clear cache)" button to force a fresh fetch. |
