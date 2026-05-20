@@ -15,6 +15,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.18] — 2026-05-20
+
+### Added
+- **Wall-delete now has three options** instead of the binary Cancel/OK confirm. Tapping **Delete wall** in the wall edit panel opens a modal:
+  - **🔗 Merge adjacent walls (join into one straight wall)** — current behaviour. Removes the shared vertex so the two adjacent walls collapse into one straight wall.
+  - **✂ Detach for re-walking (replace this wall with a new path)** — *new*. Removes the shape entirely and turns the remaining walls (in order, starting just after the deleted wall) into in-progress walking segments. Start point is set to the end of the deleted wall, so the pen ends up at the start of the deleted wall — exactly where you need to walk in the replacement geometry. Use this to swap a wall for a notch, bay, chamfer, or any custom shape, then ✓ Close Shape to re-form the area.
+  - **Cancel** — does nothing.
+
+### Why
+- Some wall edits aren't a length tweak — they're "this wall should actually have a 3' bump-out". Previously you'd have to delete the wall, delete several others, and re-walk the whole thing. Now: tap wall → Delete → Detach → walk the new path → Close.
+
+---
+
 ## [0.11.17] — 2026-05-20
 
 ### Changed

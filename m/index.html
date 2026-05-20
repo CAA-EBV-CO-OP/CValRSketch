@@ -351,7 +351,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.17'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.18'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -772,19 +772,82 @@ function renderEditPanel() {
       if (maybeHandleIntersection([sh.id], 'wall move')) return;
       toast(`Moved ${formatLength(seg.length)} ${seg.dir}`);
     };
-    $('edit-delete').onclick = () => {
-      if (!confirm('Delete this wall (merge adjacent walls)?')) return;
-      pushUndo();
-      if (deleteVertex(sh, editTarget.idx + 1)) {
-        exitEdit();
-        render();
-      } else {
-        toast("Can't delete — shape needs ≥3 walls");
-        state.undoStack.pop();
-      }
-    };
+    $('edit-delete').onclick = () => openDeleteWallModal(sh, editTarget.idx);
   }
   $('edit-done').onclick = exitEdit;
+}
+
+// Three-way delete-wall modal:
+//   1. Cancel — do nothing
+//   2. Merge — current behaviour: remove the shared vertex so adjacent walls
+//      collapse into one straight wall (the "join the two closest points" the
+//      old confirm() dialog described).
+//   3. Detach for re-walking — remove the shape and convert the remaining
+//      walls into in-progress segments starting at the deleted wall's END
+//      endpoint, so the user can walk in a notch / bay / chamfer to replace it
+//      and close the shape again.
+function openDeleteWallModal(sh, wallIdx) {
+  showModal(`
+    <h3>Delete wall ${wallIdx + 1} of "${escapeHtml(sh.label)}"?</h3>
+    <p style="font-size:12px; color:#666; margin:0;">Pick how the rest of the shape should respond.</p>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+      <button class="primary" id="dw-merge">🔗 Merge adjacent walls (join into one straight wall)</button>
+      <button id="dw-detach" style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d;">✂ Detach for re-walking (replace this wall with a new path)</button>
+    </div>
+    <div class="modal-buttons"><button onclick="closeModal()">Cancel</button></div>
+  `);
+  $('dw-merge').onclick = () => {
+    closeModal();
+    pushUndo();
+    if (deleteVertex(sh, wallIdx + 1)) {
+      exitEdit();
+      render();
+      toast('Wall merged');
+    } else {
+      toast("Can't delete — shape needs ≥3 walls");
+      state.undoStack.pop();
+    }
+  };
+  $('dw-detach').onclick = () => {
+    closeModal();
+    detachWallToOpenPath(sh, wallIdx);
+  };
+}
+
+// Replace a closed shape with an in-progress walk that's missing the deleted
+// wall, so the user can re-walk what should be there instead. Start point is
+// set to the END vertex of the deleted wall (so the path naturally walks
+// "around" the shape back to a stand-in for the START vertex of the deleted
+// wall, which the user then closes onto by walking the new replacement walls).
+function detachWallToOpenPath(sh, wallIdx) {
+  if (state.segments.length) {
+    toast('Cancel your current walk first');
+    return;
+  }
+  const n = sh.segments.length;
+  if (n < 3) { toast('Shape too small to detach a wall'); return; }
+  pushUndo();
+  // Walk the OTHER (n-1) walls in order, starting just after the deleted one.
+  // sh.points indexes: 0..n. Wall i connects points i and i+1.
+  // Deleted wall: wallIdx. End vertex of deleted wall: wallIdx + 1.
+  // Next wall after it: wallIdx + 1 (connects points wallIdx+1 → wallIdx+2).
+  const remaining = [];
+  for (let i = 1; i < n; i++) {
+    const w = sh.segments[(wallIdx + i) % n];
+    remaining.push({
+      length: w.length, dir: w.dir, angle: w.angle || 0,
+      dx: w.dx, dy: w.dy,
+      raw: `${formatLength(w.length)} ${w.dir} (was wall ${((wallIdx + i) % n) + 1})`,
+    });
+  }
+  state.shapes = state.shapes.filter(s => s.id !== sh.id);
+  state.startPoint = { ...sh.points[(wallIdx + 1) % sh.points.length] };
+  state.segments = remaining;
+  exitEdit();
+  // Refresh related UI in case the deleted shape was tracked in the drawer
+  renderDrawer();
+  render();
+  toast(`Detached — walk in the replacement for wall ${wallIdx + 1}, then ✓ to close`);
 }
 
 // Small modal kept for ghost vertices (only one action: set as start).
