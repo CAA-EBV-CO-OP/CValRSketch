@@ -15,6 +15,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.5] — 2026-05-19
+
+### Added
+- **Auto-extend with preview + cycle on mobile.** When the entry is empty, tap a direction button (`L` / `U` / `D` / `R`) and the page **previews** the next aligned vertex in that direction — orange dashed line from the pen to the candidate, with a labeled length. Tap the same direction button **again** to cycle to the next-further-aligned vertex (and again, and again — wraps around). Tap **✓ Add Wall** to commit the currently-previewed candidate.
+- The entry display shows `↳ R → 10'4"` and a hint line `candidate 1 of 3 · tap R again to cycle, ✓ to commit` so you always know what tapping ✓ will produce.
+
+### Changed
+- Tapping `⌫` / `×` / any non-direction key cancels an active preview, returning you to normal entry mode.
+- Mirrors the desktop's `r`+Enter cycle behaviour, adapted for touch.
+
+### Why
+- Lets you walk along existing geometry vertex-to-vertex using only the direction keys and ✓ Add — no length entry needed when the target vertex aligns with an existing wall.
+
+---
+
 ## [0.11.4] — 2026-05-19
 
 ### Added

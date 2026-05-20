@@ -289,7 +289,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.4';  // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.5';  // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -316,6 +316,12 @@ let state = {
 // segment box. parseSegment handles everything: cardinal walls, diagonals via
 // chained `<len><dir><len><dir>` (rise/run), and angles like `r 45`.
 let entryText = '';
+
+// Auto-extend preview: when the user taps a direction with no length in the
+// entry, we don't commit immediately — we preview the snap point. Tapping the
+// SAME direction button again cycles through further-out aligned vertices.
+// Tap ✓ Add Wall to commit the current candidate; tap × or ⌫ to cancel.
+let autoExtendPreview = null;  // null | { dir, candIdx, candidates: [...] }
 
 // ----- View transform (screen ↔ world) -----
 let view = { tx: 0, ty: 0, scale: 1 };
@@ -428,6 +434,21 @@ function render() {
     const sp = W(getStart());
     addEl('circle', { cx: sp.x, cy: sp.y, r: 6, fill: '#2e8b57' });
     addEl('text', { x: sp.x + 10, y: sp.y + 4, 'font-size': 11, fill: '#666' }, 'start');
+  }
+  // Auto-extend candidate preview (orange dashed line + ring at the target vertex)
+  if (autoExtendPreview) {
+    const startW = state.segments.length
+      ? pathPoints(state.segments, getStart()).slice(-1)[0]
+      : getStart();
+    const target = autoExtendPreview.candidates[autoExtendPreview.candIdx].point;
+    const a = W(startW), b = W(target);
+    addEl('path', { d: `M${a.x} ${a.y} L${b.x} ${b.y}`, fill: 'none', stroke: '#e57c00', 'stroke-width': 2, 'stroke-dasharray': '5,3' });
+    addEl('circle', { cx: b.x, cy: b.y, r: 9, fill: 'none', stroke: '#e57c00', 'stroke-width': 2 });
+    addEl('text', {
+      x: (a.x + b.x)/2, y: (a.y + b.y)/2 - 8,
+      'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold',
+      fill: '#e57c00', stroke: 'white', 'stroke-width': 3, 'paint-order': 'stroke fill'
+    }, `${formatLength(autoExtendPreview.candidates[autoExtendPreview.candIdx].along)} ${autoExtendPreview.dir}`);
   }
   renderStatus();
 }
@@ -624,20 +645,44 @@ function clearEntry() {
 
 function pressKey(k) {
   switch (k) {
-    case 'back':  backspaceEntry(); return;
-    case 'clear': clearEntry();     return;
+    case 'back':  cancelAutoExtend(); backspaceEntry(); return;
+    case 'clear': cancelAutoExtend(); clearEntry();     return;
     case 'add':   commitEntry();    return;
-    case 'ft':    appendEntry("'"); return;
-    case 'in':    appendEntry('"'); return;
-    case '+':     appendEntry('+'); return;
-    case '.':     appendEntry('.'); return;
+    case 'ft':    cancelAutoExtend(); appendEntry("'"); return;
+    case 'in':    cancelAutoExtend(); appendEntry('"'); return;
+    case '+':     cancelAutoExtend(); appendEntry('+'); return;
+    case '.':     cancelAutoExtend(); appendEntry('.'); return;
     case 'l': case 'r': case 'u': case 'd':
-      // Direction always preceded by a space (so 16'4r reads as 16'4 r visually)
-      appendEntry(k, { spaceBefore: true });
+      pressDirection(k);
       return;
     default:
-      if (/^\d$/.test(k)) appendEntry(k);
+      if (/^\d$/.test(k)) { cancelAutoExtend(); appendEntry(k); }
   }
+}
+
+function pressDirection(d) {
+  // If the entry already has digits, the user is mid-segment — append the
+  // direction to the entry as usual (length-then-direction flow).
+  if (entryText.trim()) {
+    appendEntry(d, { spaceBefore: true });
+    return;
+  }
+  // Otherwise: enter / cycle the auto-extend preview for this direction.
+  if (autoExtendPreview && autoExtendPreview.dir === d) {
+    autoExtendPreview.candIdx = (autoExtendPreview.candIdx + 1) % autoExtendPreview.candidates.length;
+  } else {
+    const cands = findAlignedCandidates(state.segments, d, getStart(), state.shapes);
+    if (!cands.length) { toast(`No aligned vertex to the ${d}`); return; }
+    autoExtendPreview = { dir: d, candIdx: 0, candidates: cands };
+  }
+  updateEntryDisplay();
+  render();
+}
+
+function cancelAutoExtend() {
+  if (!autoExtendPreview) return;
+  autoExtendPreview = null;
+  render();
 }
 
 function previewSegment() {
@@ -649,6 +694,14 @@ function previewSegment() {
 function updateEntryDisplay() {
   const v = $('entry-value');
   const p = $('entry-preview');
+  if (autoExtendPreview) {
+    const c = autoExtendPreview.candidates[autoExtendPreview.candIdx];
+    v.textContent = `↳ ${autoExtendPreview.dir.toUpperCase()} → ${formatLength(c.along)}`;
+    v.classList.remove('placeholder');
+    p.textContent = `candidate ${autoExtendPreview.candIdx + 1} of ${autoExtendPreview.candidates.length} · tap ${autoExtendPreview.dir.toUpperCase()} again to cycle, ✓ to commit`;
+    $('btn-add').classList.remove('disabled');
+    return;
+  }
   if (!entryText) {
     v.textContent = 'type length, then direction';
     v.classList.add('placeholder');
@@ -665,6 +718,16 @@ function updateEntryDisplay() {
 }
 
 function commitEntry() {
+  // Auto-extend preview commits the currently-selected candidate
+  if (autoExtendPreview) {
+    pushUndo();
+    state.segments.push(autoExtendPreview.candidates[autoExtendPreview.candIdx].segment);
+    autoExtendPreview = null;
+    entryText = '';
+    updateEntryDisplay();
+    render();
+    return;
+  }
   if (!entryText.trim()) return;
   const priorHeading = state.segments.length ? headingDeg(state.segments[state.segments.length - 1]) : null;
   let seg;
