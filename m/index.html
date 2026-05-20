@@ -217,6 +217,7 @@
   <button id="btn-menu" aria-label="Menu">☰</button>
   <div class="title" id="title-text"><span>CValRSketch</span><span class="ver" id="header-version"></span></div>
   <button id="btn-undo" aria-label="Undo">↶</button>
+  <button id="btn-fence-toggle" aria-label="Group select / fence">🔲</button>
   <button id="btn-close-shape" aria-label="Close Shape">✓</button>
 </header>
 
@@ -314,7 +315,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.9';  // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.10'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -594,35 +595,75 @@ function openVertexMenu(p, sh, vIdx, isGhost) {
     closeModal();
     setStartPoint(p, sh.label, isGhost);
   };
-  if (canMove) $('vm-move').onclick = () => openVertexMoveModal(sh, vIdx, p);
+  if (canMove) $('vm-move').onclick = () => openVertexMoveModal(sh, vIdx);
 }
 
-function openVertexMoveModal(sh, vIdx, p) {
-  showModal(`
-    <h3>Move vertex by offset</h3>
-    <p style="font-size:12px; color:#666; margin: 0;">From (${p.x.toFixed(2)}, ${p.y.toFixed(2)}) ft. Adjacent walls stretch automatically.</p>
-    <input id="vmove-input" type="text" inputmode="text" placeholder="e.g. 3'6 r, 6&quot; d, or 2'l 1'u"
-      style="padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;" autofocus>
-    <p style="font-size:11px; color:#888; margin: 0;">Diagonal offsets via rise/run: <code>2'l 1'u</code> moves 2' left and 1' up.</p>
-    <div class="modal-buttons">
-      <button onclick="closeModal()">Cancel</button>
-      <button class="primary" id="vmove-apply">Apply</button>
-    </div>
-  `);
-  const apply = () => {
-    const v = $('vmove-input').value.trim();
-    if (!v) { toast('Enter an offset like 3\'6 r'); return; }
-    let seg;
-    try { seg = parseSegment(v); } catch (err) { toast(err.message); return; }
-    if (seg.autoExtend) { toast('Need an explicit length'); return; }
-    pushUndo();
-    moveVertexByVector(sh, vIdx, seg.dx, seg.dy);
-    closeModal();
-    render();
-    toast(`Moved by ${formatLength(seg.length)} ${seg.dir}`);
+function openVertexMoveModal(sh, vIdx) {
+  const render_ = () => {
+    const p = sh.points[vIdx];
+    showModal(`
+      <h3>Move vertex on "${escapeHtml(sh.label)}"</h3>
+      <p style="font-size:13px; color:#222; margin: 0;">
+        Position: <b>(${p.x.toFixed(2)}, ${p.y.toFixed(2)}) ft</b>
+      </p>
+      <hr style="border:none; border-top:1px solid #eee; margin: 4px 0;">
+      <p style="font-size:11px; color:#888; margin: 0; text-transform:uppercase;">Snap to next aligned vertex</p>
+      <div class="row" style="display:flex; gap:6px;">
+        <button class="primary" data-snap="l" style="flex:1; padding:12px; font-weight:bold; font-size:16px;">← L</button>
+        <button class="primary" data-snap="u" style="flex:1; padding:12px; font-weight:bold; font-size:16px;">↑ U</button>
+        <button class="primary" data-snap="d" style="flex:1; padding:12px; font-weight:bold; font-size:16px;">↓ D</button>
+        <button class="primary" data-snap="r" style="flex:1; padding:12px; font-weight:bold; font-size:16px;">R →</button>
+      </div>
+      <p style="font-size:11px; color:#888; margin: 8px 0 0; text-transform:uppercase;">Or move by typed offset</p>
+      <div class="row" style="display:flex; gap:6px;">
+        <input id="vmove-input" type="text" inputmode="text" placeholder="e.g. 3'6 r, 6&quot; d, or 2'l 1'u"
+          style="flex:1; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">
+        <button class="primary" id="vmove-apply" style="padding:0 14px;">Apply</button>
+      </div>
+      <div class="modal-buttons">
+        <button onclick="closeModal()">Done</button>
+      </div>
+    `);
+    document.querySelectorAll('#modal [data-snap]').forEach(b => {
+      b.onclick = () => moveVertexToAligned(sh, vIdx, b.dataset.snap, render_);
+    });
+    const apply = () => {
+      const v = $('vmove-input').value.trim();
+      if (!v) { toast('Enter an offset like 3\'6 r'); return; }
+      let seg;
+      try { seg = parseSegment(v); } catch (err) { toast(err.message); return; }
+      if (seg.autoExtend) { toast('Need an explicit length'); return; }
+      pushUndo();
+      moveVertexByVector(sh, vIdx, seg.dx, seg.dy);
+      render();
+      render_();    // refresh modal with new position
+      toast(`Moved by ${formatLength(seg.length)} ${seg.dir}`);
+    };
+    $('vmove-apply').onclick = apply;
+    $('vmove-input').addEventListener('keydown', e => { if (e.key === 'Enter') apply(); });
   };
-  $('vmove-apply').onclick = apply;
-  $('vmove-input').addEventListener('keydown', e => { if (e.key === 'Enter') apply(); });
+  render_();
+}
+
+function moveVertexToAligned(sh, vIdx, dir, onDone) {
+  const p = sh.points[vIdx];
+  // Pretend the vertex is the "pen" and look forward in `dir` for aligned vertices.
+  // Skip the vertex itself (it'll be its own "start" point so its along-distance is 0).
+  let cands = findAlignedCandidates([], dir, { x: p.x, y: p.y }, state.shapes);
+  // Also filter out any candidate at this exact vertex (along ~= 0 is already filtered by minForward, but defensive)
+  cands = cands.filter(c => Math.hypot(c.point.x - p.x, c.point.y - p.y) > 0.01);
+  // Fall back to perpendicular projection if no direct alignment
+  if (!cands.length) cands = findProjectedCandidates([], dir, { x: p.x, y: p.y }, state.shapes);
+  if (!cands.length) { toast(`No vertex / projection to the ${dir}`); return; }
+  pushUndo();
+  const target = cands[0].point;
+  sh.points[vIdx].x = target.x;
+  sh.points[vIdx].y = target.y;
+  syncClosure(sh, vIdx);
+  rebuildSegments(sh);
+  render();
+  if (onDone) onDone();
+  toast(`Snapped ${dir} → (${target.x.toFixed(2)}, ${target.y.toFixed(2)})`);
 }
 
 function screenToWorld(clientX, clientY) {
@@ -642,6 +683,7 @@ function enterFenceMode() {
   cancelAutoExtend();
   document.body.classList.add('fence-active');
   $('controls').classList.add('fence-active');
+  const tog = $('btn-fence-toggle'); if (tog) { tog.textContent = '✗'; tog.title = 'Exit fence mode'; }
   updateFencePanel();
   render();
 }
@@ -651,8 +693,10 @@ function exitFenceMode() {
   fenceSelection = null;
   document.body.classList.remove('fence-active');
   $('controls').classList.remove('fence-active');
+  const tog = $('btn-fence-toggle'); if (tog) { tog.textContent = '🔲'; tog.title = 'Group select / fence'; }
   render();
 }
+function toggleFenceMode() { if (fenceMode) exitFenceMode(); else enterFenceMode(); }
 function updateFencePanel() {
   if (!fenceMode) return;
   const sel = fenceSelection;
@@ -1497,6 +1541,7 @@ $('drawer-bg').onclick = closeDrawer;
 $('btn-undo').onclick = undoHistory;
 $('btn-close-shape').onclick = closeShape;
 // Fence mode wiring
+$('btn-fence-toggle').onclick = toggleFenceMode;
 $('btn-fence-mode').onclick = () => { enterFenceMode(); closeDrawer(); };
 $('fence-done-btn').onclick  = exitFenceMode;
 $('fence-clear-btn').onclick = () => { fenceSelection = null; updateFencePanel(); render(); };

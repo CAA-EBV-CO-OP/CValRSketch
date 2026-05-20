@@ -15,6 +15,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.10] — 2026-05-19
+
+### Added
+- **Fence-mode toggle in the header (🔲).** One-tap access to enter / exit fence mode without opening the drawer. Toggles to ✗ while fence is active so you can clearly see (and cancel) the mode.
+- **Direction-snap buttons in the vertex move modal.** After tapping a vertex and choosing "Move", the modal now shows four big direction buttons (← L, ↑ U, ↓ D, → R) above the typed-offset input. Each tap moves the vertex to the **next aligned vertex** in that direction (using the same alignment logic as the pen's auto-extend, with perpendicular-projection fallback). Tap a direction repeatedly to walk the vertex along to further-aligned vertices. The modal stays open and shows the live position; tap **Done** when you're satisfied.
+- The typed-offset path is still available below the direction buttons for explicit nudges.
+
+### Why
+- Direction-snap is the most common move pattern — "this vertex needs to line up with that one over there" — and now takes two taps instead of typing an offset.
+- The drawer fence-mode button was hard to discover; the header toggle is always visible.
+
+---
+
 ## [0.11.9] — 2026-05-19
 
 ### Fixed
