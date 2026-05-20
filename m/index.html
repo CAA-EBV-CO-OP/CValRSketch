@@ -132,8 +132,10 @@
   .keypad button.dir  { background: #e8f0fa; color: #2b3a4a; font-size: 17px; }
   .keypad button.dir:active { background: #2b6cb0; color: #fff; }
   .keypad button.back { background: #f8d7da; color: #721c24; font-size: 22px; }
-  .keypad button.add  { background: #2e8b57; color: #fff; border-color: #1d6a3e; font-size: 17px; grid-column: span 4; min-height: 52px; }
+  .keypad button.add  { background: #2e8b57; color: #fff; border-color: #1d6a3e; font-size: 17px; grid-column: span 3; min-height: 52px; }
   .keypad button.add.disabled { background: #b9c7b8; border-color: #b9c7b8; color: #f0f0f0; }
+  .keypad button.connect { background: #d946ef; color: #fff; border-color: #a126b8; font-size: 14px; min-height: 52px; }
+  .keypad button.connect.hidden { background: #f0f0f0; color: #ccc; border-color: #e5e5e5; }
   .keypad button:active { transform: scale(0.96); }
   /* Drawer */
   .drawer-bg {
@@ -242,6 +244,7 @@
     <button data-k="0">0</button><button data-k="." aria-label="decimal"><span style="font-size:24px;line-height:1;">·</span></button><button data-k="+" class="unit">+</button><button data-k="clear" class="back" aria-label="clear entry">×</button>
     <button data-k="l" class="dir">L</button><button data-k="u" class="dir">U</button><button data-k="d" class="dir">D</button><button data-k="r" class="dir">R</button>
     <button data-k="add" id="btn-add" class="add">✓ Add Wall</button>
+    <button data-k="connect" id="btn-connect" class="connect hidden" title="Connect chain as one diagonal wall">↗</button>
   </div>
   <div class="fence-panel">
     <div class="status" id="fence-status">Drag on the canvas to select vertices inside a rectangle.</div>
@@ -315,7 +318,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.10'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.11'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -343,11 +346,15 @@ let state = {
 // chained `<len><dir><len><dir>` (rise/run), and angles like `r 45`.
 let entryText = '';
 
-// Auto-extend preview: when the user taps a direction with no length in the
-// entry, we don't commit immediately — we preview the snap point. Tapping the
-// SAME direction button again cycles through further-out aligned vertices.
-// Tap ✓ Add Wall to commit the current candidate; tap × or ⌫ to cancel.
-let autoExtendPreview = null;  // null | { dir, candIdx, candidates: [...] }
+// Chain preview: when the user taps a direction with no length in the entry,
+// the snap point is previewed (orange dashed line) instead of committed. Each
+// additional direction tap appends another leg starting from the previous leg's
+// endpoint, so you can navigate through a path of aligned vertices. Backspace
+// pops the last leg; × clears the chain. Then either:
+//   ✓ Add Wall(s) → commits each leg as its own cardinal wall, OR
+//   ↗ Connect    → commits the entire path as ONE diagonal wall from the pen
+//                  to the final endpoint (the in-between vertices are dropped).
+let chainPreview = null;  // null | { legs: [{along, point, segment, dir}, ...] }
 
 // Fence (group select / stretch) mode — toggled from drawer.
 let fenceMode = false;
@@ -486,20 +493,30 @@ function render() {
       fenceSelection.inProgVerts.forEach(i => { const p = W(wpts[i]); ring(p.x, p.y); });
     }
   }
-  // Auto-extend candidate preview (orange dashed line + ring at the target vertex)
-  if (autoExtendPreview) {
-    const startW = state.segments.length
+  // Chain preview — each leg drawn as an orange dashed line with the snap distance.
+  // If the chain has 2+ legs, also draw a faint magenta line from start of chain
+  // to final endpoint to show what "↗ Connect" would produce.
+  if (chainPreview && chainPreview.legs.length) {
+    const chainStartWorld = state.segments.length
       ? pathPoints(state.segments, getStart()).slice(-1)[0]
       : getStart();
-    const target = autoExtendPreview.candidates[autoExtendPreview.candIdx].point;
-    const a = W(startW), b = W(target);
-    addEl('path', { d: `M${a.x} ${a.y} L${b.x} ${b.y}`, fill: 'none', stroke: '#e57c00', 'stroke-width': 2, 'stroke-dasharray': '5,3' });
-    addEl('circle', { cx: b.x, cy: b.y, r: 9, fill: 'none', stroke: '#e57c00', 'stroke-width': 2 });
-    addEl('text', {
-      x: (a.x + b.x)/2, y: (a.y + b.y)/2 - 8,
-      'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold',
-      fill: '#e57c00', stroke: 'white', 'stroke-width': 3, 'paint-order': 'stroke fill'
-    }, `${formatLength(autoExtendPreview.candidates[autoExtendPreview.candIdx].along)} ${autoExtendPreview.dir}`);
+    let prev = chainStartWorld;
+    for (const leg of chainPreview.legs) {
+      const a = W(prev), b = W(leg.point);
+      addEl('path', { d: `M${a.x} ${a.y} L${b.x} ${b.y}`, fill: 'none', stroke: '#e57c00', 'stroke-width': 2, 'stroke-dasharray': '5,3' });
+      addEl('circle', { cx: b.x, cy: b.y, r: 6, fill: 'none', stroke: '#e57c00', 'stroke-width': 2 });
+      addEl('text', {
+        x: (a.x + b.x)/2, y: (a.y + b.y)/2 - 8,
+        'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold',
+        fill: '#e57c00', stroke: 'white', 'stroke-width': 3, 'paint-order': 'stroke fill'
+      }, `${formatLength(leg.along)} ${leg.dir}`);
+      prev = leg.point;
+    }
+    if (chainPreview.legs.length >= 2) {
+      const a = W(chainStartWorld);
+      const b = W(chainPreview.legs[chainPreview.legs.length - 1].point);
+      addEl('path', { d: `M${a.x} ${a.y} L${b.x} ${b.y}`, fill: 'none', stroke: '#d946ef', 'stroke-width': 2, 'stroke-dasharray': '2,4', opacity: 0.7 });
+    }
   }
   renderStatus();
 }
@@ -888,18 +905,19 @@ function clearEntry() {
 
 function pressKey(k) {
   switch (k) {
-    case 'back':  cancelAutoExtend(); backspaceEntry(); return;
-    case 'clear': cancelAutoExtend(); clearEntry();     return;
+    case 'back':  if (chainPreview) { popChainLeg(); return; } backspaceEntry(); return;
+    case 'clear': cancelChainPreview(); clearEntry();     return;
     case 'add':   commitEntry();    return;
-    case 'ft':    cancelAutoExtend(); appendEntry("'"); return;
-    case 'in':    cancelAutoExtend(); appendEntry('"'); return;
-    case '+':     cancelAutoExtend(); appendEntry('+'); return;
-    case '.':     cancelAutoExtend(); appendEntry('.'); return;
+    case 'connect': commitChainAsDiagonal(); return;
+    case 'ft':    cancelChainPreview(); appendEntry("'"); return;
+    case 'in':    cancelChainPreview(); appendEntry('"'); return;
+    case '+':     cancelChainPreview(); appendEntry('+'); return;
+    case '.':     cancelChainPreview(); appendEntry('.'); return;
     case 'l': case 'r': case 'u': case 'd':
       pressDirection(k);
       return;
     default:
-      if (/^\d$/.test(k)) { cancelAutoExtend(); appendEntry(k); }
+      if (/^\d$/.test(k)) { cancelChainPreview(); appendEntry(k); }
   }
 }
 
@@ -910,19 +928,23 @@ function pressDirection(d) {
     appendEntry(d, { spaceBefore: true });
     return;
   }
-  // Otherwise: enter / cycle the auto-extend preview for this direction.
-  if (autoExtendPreview && autoExtendPreview.dir === d) {
-    autoExtendPreview.candIdx = (autoExtendPreview.candIdx + 1) % autoExtendPreview.candidates.length;
-  } else {
-    // First pass: directly aligned vertices (same row/column as pen).
-    let cands = findAlignedCandidates(state.segments, d, getStart(), state.shapes);
-    // Fallback: walk to the perpendicular line of any vertex — i.e. "walk L until
-    // pen's X matches another vertex's X". Lets you navigate back toward a shape's
-    // column or row even when no vertex is directly aligned.
-    if (!cands.length) cands = findProjectedCandidates(state.segments, d, getStart(), state.shapes);
-    if (!cands.length) { toast(`No vertex or projection to the ${d}`); return; }
-    autoExtendPreview = { dir: d, candIdx: 0, candidates: cands };
-  }
+  // Append a snap-leg to the chain preview, starting from the end of any
+  // previously chained legs (or from the current pen if this is the first leg).
+  const chainSegs = chainPreview ? chainPreview.legs.map(l => l.segment) : [];
+  let cands = findAlignedCandidates([...state.segments, ...chainSegs], d, getStart(), state.shapes);
+  if (!cands.length) cands = findProjectedCandidates([...state.segments, ...chainSegs], d, getStart(), state.shapes);
+  if (!cands.length) { toast(`No vertex or projection to the ${d}`); return; }
+  const c = cands[0];
+  if (!chainPreview) chainPreview = { legs: [] };
+  chainPreview.legs.push({ along: c.along, point: c.point, segment: c.segment, dir: d });
+  updateEntryDisplay();
+  render();
+}
+
+function popChainLeg() {
+  if (!chainPreview) return;
+  chainPreview.legs.pop();
+  if (!chainPreview.legs.length) chainPreview = null;
   updateEntryDisplay();
   render();
 }
@@ -971,9 +993,42 @@ function findProjectedCandidates(priorSegments, dir, start, shapes) {
   return out;
 }
 
-function cancelAutoExtend() {
-  if (!autoExtendPreview) return;
-  autoExtendPreview = null;
+function cancelChainPreview() {
+  if (!chainPreview) return;
+  chainPreview = null;
+  updateEntryDisplay();
+  render();
+}
+
+// Pen position at the end of the chain (or current pen if no chain yet).
+function chainEndpoint() {
+  if (chainPreview && chainPreview.legs.length) {
+    return chainPreview.legs[chainPreview.legs.length - 1].point;
+  }
+  const wpts = pathPoints(state.segments, getStart());
+  return wpts[wpts.length - 1];
+}
+
+// Connect chain as ONE diagonal wall: build a single segment from current pen
+// to the chain's final endpoint, discarding intermediate vertices.
+function commitChainAsDiagonal() {
+  if (!chainPreview || chainPreview.legs.length < 2) {
+    toast('Chain needs 2+ legs to connect as one diagonal');
+    return;
+  }
+  const dx = chainPreview.legs.reduce((s, l) => s + l.segment.dx, 0);
+  const dy = chainPreview.legs.reduce((s, l) => s + l.segment.dy, 0);
+  const length = Math.hypot(dx, dy);
+  if (!(length > 0)) { toast('Chain has zero length'); return; }
+  const dir = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'r' : 'l') : (dy >= 0 ? 'd' : 'u');
+  pushUndo();
+  state.segments.push({
+    length, dir, angle: 0, dx, dy,
+    raw: `${formatLength(length)} (diagonal via ${chainPreview.legs.length} legs)`,
+  });
+  chainPreview = null;
+  entryText = '';
+  updateEntryDisplay();
   render();
 }
 
@@ -986,15 +1041,25 @@ function previewSegment() {
 function updateEntryDisplay() {
   const v = $('entry-value');
   const p = $('entry-preview');
-  if (autoExtendPreview) {
-    const c = autoExtendPreview.candidates[autoExtendPreview.candIdx];
-    const isProj = /\(proj\)/.test(c.segment.raw);
-    v.textContent = `↳ ${autoExtendPreview.dir.toUpperCase()} → ${formatLength(c.along)}${isProj ? ' (project)' : ''}`;
+  if (chainPreview) {
+    const legs = chainPreview.legs;
+    const summary = legs.map(l => `${l.dir.toUpperCase()} ${formatLength(l.along)}`).join(' · ');
+    v.textContent = `↳ ${summary}`;
     v.classList.remove('placeholder');
-    p.textContent = `candidate ${autoExtendPreview.candIdx + 1} of ${autoExtendPreview.candidates.length} · tap ${autoExtendPreview.dir.toUpperCase()} again to cycle, ✓ to commit`;
-    $('btn-add').classList.remove('disabled');
+    const btnAdd = $('btn-add');
+    btnAdd.classList.remove('disabled');
+    btnAdd.textContent = legs.length > 1 ? `✓ Add ${legs.length} Walls` : '✓ Add Wall';
+    // Show / hide the Connect button
+    const conn = $('btn-connect');
+    if (conn) conn.classList.toggle('hidden', legs.length < 2);
+    p.textContent = legs.length > 1
+      ? `${legs.length} legs · ⌫ undo last · ✓ adds as ${legs.length} walls · ↗ Connect = 1 diagonal`
+      : `1 leg · tap another direction to chain · ✓ commits as one wall`;
     return;
   }
+  const conn = $('btn-connect');
+  if (conn) conn.classList.add('hidden');
+  $('btn-add').textContent = '✓ Add Wall';
   if (!entryText) {
     v.textContent = 'type length, then direction';
     v.classList.add('placeholder');
@@ -1011,11 +1076,12 @@ function updateEntryDisplay() {
 }
 
 function commitEntry() {
-  // Auto-extend preview commits the currently-selected candidate
-  if (autoExtendPreview) {
+  // Chain preview commits each leg as its own wall
+  if (chainPreview) {
+    if (!chainPreview.legs.length) { chainPreview = null; return; }
     pushUndo();
-    state.segments.push(autoExtendPreview.candidates[autoExtendPreview.candIdx].segment);
-    autoExtendPreview = null;
+    chainPreview.legs.forEach(l => state.segments.push(l.segment));
+    chainPreview = null;
     entryText = '';
     updateEntryDisplay();
     render();

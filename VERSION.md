@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.10`
+**Current version:** `0.11.11`
 **Released:** 2026-05-19
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.11 | 2026-05-19 | patch  | Mobile: chain auto-extend. Tap L/U/D/R repeatedly to chain together direction-snaps (each starts from the previous endpoint). Commit as separate walls with ✓ or as one diagonal wall with ↗ Connect. |
 | 0.11.10 | 2026-05-19 | patch  | Mobile: fence-mode toggle button (🔲) added to header for one-tap access. Vertex move modal gains direction-snap buttons (L/U/D/R) that move the vertex to the next aligned vertex on each tap. |
 | 0.11.9  | 2026-05-19 | patch  | Mobile fix: tapping a vertex or wall now reliably triggers its click handler. Pointer capture was being set on every touch, which redirected click events away from child hit-circles on iOS. |
 | 0.11.8  | 2026-05-19 | patch  | Mobile: fence tool (group select / stretch) ported from desktop. Toggle from drawer; one-finger drag draws rectangle; pinch still zooms. Apply typed offset to move selected vertices; walls crossing the fence stretch automatically. |

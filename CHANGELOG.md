@@ -15,6 +15,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.11] — 2026-05-19
+
+### Added
+- **Chain auto-extend on mobile.** Tap L/U/D/R with no length to preview a snap to the next aligned vertex (existing). Now tap a **different** direction button to chain another leg from that endpoint — and another, and another. Each leg is drawn as an orange dashed line with its snap distance.
+- **↗ Connect button** (magenta) next to ✓ Add Wall. Visible when the chain has 2+ legs. Commits the entire chain as **one diagonal wall** from the pen to the chain's final endpoint, discarding the intermediate waypoints. A faint magenta line on the canvas previews where the diagonal would go.
+- ✓ Add Wall button label now reflects chain length: `✓ Add 1 Wall`, `✓ Add 2 Walls`, etc. Commits each leg as its own cardinal wall.
+- **⌫ backspace pops the last chain leg** instead of clearing the whole preview. **× clear** wipes the chain.
+
+### Removed
+- The single-direction cycle behaviour from earlier auto-extend — tapping the same direction twice now appends a second leg instead of cycling to a further candidate on the same line. Chained navigation through closer waypoints replaces the cycle UX.
+
+### Why
+- Lets you visually navigate to a destination vertex that isn't directly aligned with the pen by snapping leg-by-leg, then either keep that L-shaped path or collapse it into a single angled wall — exactly the same as drawing a diagonal wall to a far vertex you can't easily measure.
+
+---
+
 ## [0.11.10] — 2026-05-19
 
 ### Added
