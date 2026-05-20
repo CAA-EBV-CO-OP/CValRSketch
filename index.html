@@ -1866,16 +1866,17 @@ function saveSettings() {
 // =============================================================================
 // EXPORT
 // =============================================================================
-function exportSVG() {
+function exportFilename(ext) {
+  return (state.subject || 'sketch').replace(/[^\w\-]/g, '_') + '.' + ext;
+}
+async function exportSVG() {
   const clone = svgForExport();
   const xml = new XMLSerializer().serializeToString(clone);
-  triggerDownload(new Blob(['<?xml version="1.0"?>\n', xml], { type: 'image/svg+xml' }), 'sketch.svg');
+  await saveBlob(new Blob(['<?xml version="1.0"?>\n', xml], { type: 'image/svg+xml' }), exportFilename('svg'), 'image/svg+xml');
 }
 function exportPNG() {
   const clone = svgForExport();
   const w = parseFloat(clone.getAttribute('width')), h = parseFloat(clone.getAttribute('height'));
-  // For page-fit exports, set viewport width/height on the source SVG too so the
-  // browser rasterizes at the page size (Image() honors width/height attrs).
   const xml = new XMLSerializer().serializeToString(clone);
   const url = URL.createObjectURL(new Blob([xml], { type:'image/svg+xml;charset=utf-8' }));
   const img = new Image();
@@ -1885,7 +1886,7 @@ function exportPNG() {
     const ctx = c.getContext('2d');
     ctx.fillStyle = '#fff'; ctx.fillRect(0,0,c.width,c.height);
     ctx.drawImage(img,0,0,c.width,c.height);
-    c.toBlob(b => triggerDownload(b,'sketch.png'));
+    c.toBlob(async b => { await saveBlob(b, exportFilename('png'), 'image/png'); });
     URL.revokeObjectURL(url);
   };
   img.src = url;
@@ -2067,9 +2068,9 @@ function svgForExport() {
   return out;
 }
 
-function saveJSON() {
+async function saveJSON() {
   const data = { ...state };
-  triggerDownload(new Blob([JSON.stringify(data,null,2)], { type:'application/json' }), 'sketch.json');
+  await saveBlob(new Blob([JSON.stringify(data,null,2)], { type:'application/json' }), exportFilename('json'), 'application/json');
 }
 document.getElementById('load-json').addEventListener('change', (e) => {
   const f = e.target.files[0]; if (!f) return;
@@ -2093,6 +2094,39 @@ function triggerDownload(blob, filename) {
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+// Best-available "save this blob" path:
+//   1) File System Access API (Chrome/Edge/Opera) — real Save As dialog with
+//      folder navigation + Create New Folder. Browser remembers the last folder
+//      for this app + file type, so the next save defaults there.
+//   2) Web Share API with files (mobile) — share sheet incl. "Save to Files".
+//   3) Fallback: direct download to the browser's default Downloads folder.
+async function saveBlob(blob, filename, mime) {
+  if (window.showSaveFilePicker) {
+    try {
+      const ext = '.' + (filename.split('.').pop() || 'bin');
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        startIn: 'documents',
+        types: [{ description: ext.slice(1).toUpperCase() + ' file', accept: { [mime]: [ext] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  if (typeof File !== 'undefined') {
+    try {
+      const file = new File([blob], filename, { type: mime });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: state.subject || filename });
+        return;
+      }
+    } catch (e) { /* fall through */ }
+  }
+  triggerDownload(blob, filename);
 }
 
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

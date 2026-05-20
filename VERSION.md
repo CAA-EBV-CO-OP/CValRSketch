@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.16`
+**Current version:** `0.11.17`
 **Released:** 2026-05-20
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.17 | 2026-05-20 | patch  | Save / Export now uses File System Access API on desktop (real Save As dialog with folder navigation + Create New Folder) and Web Share with files on mobile (iOS Share sheet → Save to Files). Falls back to direct download where neither is supported. |
 | 0.11.16 | 2026-05-20 | minor  | Mobile: self-intersection detection on every move (vertex / wall / fence / length). Modal offers to split into two separate areas, keep as one, or undo — important for appraisal GLA where self-crossed shapes wouldn't count as continuous space. |
 | 0.11.15 | 2026-05-19 | patch  | Mobile: fence panel gains L/U/D/R snap buttons. Each tap moves the selection toward the closest aligned vertex from the selection's centroid in that direction — same pattern as vertex / wall snap. Closes gaps in one tap when you've fence-selected the pen vertex. |
 | 0.11.14 | 2026-05-19 | patch  | Mobile: vertex/wall edit controls now slide INTO the keypad area (replacing entry+keypad) instead of opening a modal that hides the sketch. Canvas stays visible while snapping/moving so you can see the result live. |

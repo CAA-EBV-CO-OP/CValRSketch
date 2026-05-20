@@ -15,6 +15,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.17] — 2026-05-20
+
+### Changed
+- **Save and Export now use the best available file-picker API for the platform.** New `saveBlob(blob, filename, mime)` helper applied to both desktop (`index.html`) and mobile (`m/index.html`) for **Save JSON**, **Export PNG**, **Export SVG**:
+  1. **`window.showSaveFilePicker`** (desktop Chrome / Edge / Opera / Brave) — a real native **Save As** dialog with folder navigation and a Create New Folder button. The browser remembers the last folder you saved to *for this app + file type*, so the second save defaults there automatically. `startIn: 'documents'` is the initial hint before the first save.
+  2. **`navigator.share({files})`** (iOS Safari 15+, Android Chrome) — the system share sheet, which includes **Save to Files** so you can navigate to any folder, including creating new ones.
+  3. **Direct download fallback** — for Firefox / older browsers / unsupported MIME types, behaviour is unchanged (file lands in the browser's default Downloads folder).
+- Export filenames now derive from the **Subject** (sanitized: non-word characters replaced with `_`) instead of being hardcoded to `sketch.svg` / `sketch.png` / `sketch.json`. So `295 Browns Rd, Nakusp` saves as `295_Browns_Rd__Nakusp.svg`.
+
+### Notes
+- **Browsers don't let web apps set a default folder programmatically.** The two APIs above are the closest available: they let the user navigate and create folders themselves, with `showSaveFilePicker` remembering the last location across sessions.
+
+---
+
 ## [0.11.16] — 2026-05-20
 
 ### Added

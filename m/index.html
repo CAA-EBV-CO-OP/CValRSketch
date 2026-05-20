@@ -351,7 +351,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.16'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.17'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -1912,14 +1912,7 @@ async function exportPNG() {
     URL.revokeObjectURL(url);
     c.toBlob(async (png) => {
       const filename = (state.subject || 'sketch').replace(/[^\w\-]/g, '_') + '.png';
-      try {
-        const file = new File([png], filename, { type: 'image/png' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: state.subject || 'Sketch' });
-          return;
-        }
-      } catch (e) { /* fall through */ }
-      triggerDownload(png, filename);
+      await saveBlob(png, filename, 'image/png');
     }, 'image/png');
   };
   img.src = url;
@@ -1930,14 +1923,7 @@ async function exportSVGfile() {
   const xml = new XMLSerializer().serializeToString(out);
   const blob = new Blob(['<?xml version="1.0"?>\n', xml], { type: 'image/svg+xml' });
   const filename = (state.subject || 'sketch').replace(/[^\w\-]/g, '_') + '.svg';
-  try {
-    const file = new File([blob], filename, { type: 'image/svg+xml' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: state.subject || 'Sketch' });
-      return;
-    }
-  } catch (e) {}
-  triggerDownload(blob, filename);
+  await saveBlob(blob, filename, 'image/svg+xml');
 }
 
 function triggerDownload(blob, name) {
@@ -1948,12 +1934,53 @@ function triggerDownload(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function saveJSON() {
+// Best-available "save this blob" path:
+//   1) File System Access API (desktop Chrome/Edge/Opera) — real Save As dialog
+//      with folder navigation + Create New Folder. Browser remembers the last
+//      folder for this app + file type, so the second save defaults there.
+//   2) Web Share API with files (iOS Safari 15+, Android Chrome) — share sheet
+//      including "Save to Files" so the user can navigate / create folders.
+//   3) Fallback: direct download to the browser's default Downloads folder.
+async function saveBlob(blob, filename, mime) {
+  // 1) File System Access
+  if (window.showSaveFilePicker) {
+    try {
+      const ext = '.' + (filename.split('.').pop() || 'bin');
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        startIn: 'documents',
+        types: [{ description: ext.slice(1).toUpperCase() + ' file', accept: { [mime]: [ext] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      toast('Saved to ' + handle.name);
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;  // user cancelled — don't fall through
+      // Other errors (browser doesn't fully support, etc.) → fall through to next path
+    }
+  }
+  // 2) Web Share with files
+  if (typeof File !== 'undefined') {
+    try {
+      const file = new File([blob], filename, { type: mime });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: state.subject || filename });
+        return;
+      }
+    } catch (e) { /* user cancelled or share failed — fall through */ }
+  }
+  // 3) Direct download
+  triggerDownload(blob, filename);
+}
+
+async function saveJSON() {
   const data = { ...state };
   delete data.undoStack; delete data.redoStack; delete data.selection;
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const filename = (state.subject || 'sketch').replace(/[^\w\-]/g, '_') + '.json';
-  triggerDownload(blob, filename);
+  await saveBlob(blob, filename, 'application/json');
 }
 
 function loadJSON(file) {
