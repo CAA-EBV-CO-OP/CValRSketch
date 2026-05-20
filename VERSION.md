@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.18`
+**Current version:** `0.11.19`
 **Released:** 2026-05-20
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.19 | 2026-05-20 | patch  | Mobile: persistent ⚠ self-intersection badge — every render now flags any shape whose walls cross each other with a red badge above its centroid. Tap it to open the split / keep / undo modal. Catches state-on-load and any move the live check missed. |
 | 0.11.18 | 2026-05-20 | patch  | Mobile: wall-delete modal adds a third option — "Detach for re-walking" — which removes the shape and converts the remaining walls into an in-progress walk so you can replace the deleted wall with a new path (notch, bay, chamfer, etc.) and close again. |
 | 0.11.17 | 2026-05-20 | patch  | Save / Export now uses File System Access API on desktop (real Save As dialog with folder navigation + Create New Folder) and Web Share with files on mobile (iOS Share sheet → Save to Files). Falls back to direct download where neither is supported. |
 | 0.11.16 | 2026-05-20 | minor  | Mobile: self-intersection detection on every move (vertex / wall / fence / length). Modal offers to split into two separate areas, keep as one, or undo — important for appraisal GLA where self-crossed shapes wouldn't count as continuous space. |

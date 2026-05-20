@@ -351,7 +351,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.18'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.19'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -610,6 +610,25 @@ function renderShape(sh, W, isGhost) {
     const area = polygonArea(sh.points);
     addEl('text', { x: c.x, y: c.y-6, 'text-anchor':'middle', 'font-size': 13, 'font-weight':'bold', class: cls }, sh.label);
     addEl('text', { x: c.x, y: c.y+10, 'text-anchor':'middle', 'font-size': 11, fill: '#555', class: cls }, `${Math.round(area)} sq ft`);
+  }
+  // ⚠ self-intersection warning badge — drawn at the centroid for any shape
+  // whose walls cross each other. Tap to open the split / keep / undo modal.
+  if (!isGhost) {
+    const ix = findShapeIntersection(sh);
+    if (ix) {
+      const c = W(polygonCentroid(sh.points));
+      const bx = c.x, by = c.y - 32;
+      addEl('circle', { cx: bx, cy: by, r: 14, fill: '#dc3545', stroke: '#fff', 'stroke-width': 2 });
+      addEl('text', {
+        x: bx, y: by + 1, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        'font-size': 17, 'font-weight': 'bold', fill: '#fff'
+      }, '⚠');
+      const hit = addEl('circle', { cx: bx, cy: by, r: 22, fill: 'transparent' });
+      hit.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        showIntersectionModal(sh, ix, 'shape state');
+      });
+    }
   }
   // Pickable vertex dots — only when no in-progress walk. Tap to anchor start here.
   if (canPickStart) {

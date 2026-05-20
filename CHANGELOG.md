@@ -15,6 +15,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.19] — 2026-05-20
+
+### Added
+- **Persistent self-intersection warning badge.** Every render now checks each shape on the active floor for self-intersection (any two non-adjacent walls crossing). Broken shapes get a red ⚠ badge drawn above their centroid. Tap the badge to open the same split / keep / undo modal that the live-move detection uses.
+- The badge catches cases that the post-move detection misses: shapes loaded from JSON that were already broken, shapes that became broken through in-progress segment moves, and any geometry the live check happened to miss.
+
+### Notes
+- Detection is still per-shape only (no cross-shape overlap check). If you walk a new shape that overlaps an existing shape's walls, that's not flagged — it's two separate polygons that happen to share space. Genuine self-intersection (one polygon's walls crossing itself) does get flagged.
+
+---
+
 ## [0.11.18] — 2026-05-20
 
 ### Added
