@@ -315,6 +315,7 @@
 
   <h2>Actions</h2>
   <button id="btn-cancel-walk" class="danger">Cancel current walk</button>
+  <button id="btn-new-project">🗋 New project (clear all)</button>
   <button id="btn-save-json">💾 Save sketch (JSON)</button>
   <button id="btn-load-json">📂 Load sketch (JSON)</button>
   <input type="file" id="file-input" accept=".json" style="display:none">
@@ -351,7 +352,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.19'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.20'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -1782,6 +1783,37 @@ function cancelWalk() {
   render();
 }
 
+// Start fresh: clear all shapes, in-progress walk, annotations, subject, etc.
+// Pushed to undo so the user can recover with Ctrl+Z (desktop) or Undo (mobile).
+function newProject() {
+  const hasWork = state.shapes.length || state.segments.length || state.annotations.length || (state.subject || '').trim();
+  if (hasWork) {
+    if (!confirm('Discard the current sketch and start a new project? (Use Undo / ↶ to recover.)')) return;
+  }
+  pushUndo();
+  state.shapes = [];
+  state.segments = [];
+  state.startPoint = null;
+  state.annotations = [];
+  state.subject = '';
+  state.subtitle = '';
+  state.floors = ['basement', 'main', 'upper'];
+  state.activeFloor = 'main';
+  state.nextShapeId = 1;
+  state.selection = null;
+  state.fenceSelection = null;
+  state.fenceDraw = null;
+  if (editTarget) { editTarget = null; $('controls').classList.remove('editing'); }
+  if (fenceMode) exitFenceMode();
+  cancelChainPreview();
+  clearEntry();
+  const subjInp = $('subject-input'); if (subjInp) subjInp.value = '';
+  closeDrawer();
+  render();
+  renderDrawer();
+  toast('New project — clean slate');
+}
+
 // =============================================================================
 // DRAWER
 // =============================================================================
@@ -2226,6 +2258,7 @@ $('start-offset-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') $('btn-offset-start').click();
 });
 $('btn-cancel-walk').onclick = () => { cancelWalk(); closeDrawer(); };
+$('btn-new-project').onclick = () => { newProject(); };
 $('btn-save-json').onclick = () => { saveJSON(); closeDrawer(); };
 $('btn-load-json').onclick = () => $('file-input').click();
 $('file-input').onchange = (e) => { if (e.target.files[0]) { loadJSON(e.target.files[0]); closeDrawer(); } };

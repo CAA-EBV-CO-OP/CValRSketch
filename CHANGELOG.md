@@ -15,6 +15,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.20] — 2026-05-20
+
+### Added
+- **🗋 New project** button. One-tap clean slate when you want to start a fresh sketch without manually deleting everything from a loaded one:
+  - **Desktop**: header button between *Export PNG* and *Save*.
+  - **Mobile**: drawer button between *Cancel current walk* and *Save sketch (JSON)*.
+- Behaviour: confirms first when there's work to discard (shapes, in-progress walk, annotations, or a non-empty subject). Resets shapes, in-progress segments, start point, annotations, subject, floors (back to `basement` / `main` / `upper`), active floor, selection, and all transient picks. Pushed to undo so Ctrl+Z / ↶ recovers if you click it by accident.
+
+### Notes
+- Existing in-progress walks get discarded along with everything else — no separate confirm for those.
+- Settings (ghost opacity, export page size, etc.) are *not* cleared — those are user preferences, not project content.
+
+---
+
 ## [0.11.19] — 2026-05-20
 
 ### Added

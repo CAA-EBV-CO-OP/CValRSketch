@@ -107,6 +107,7 @@
   <button onclick="openSettings()">⚙ Settings</button>
   <button onclick="exportSVG()">Export SVG</button>
   <button onclick="exportPNG()">Export PNG</button>
+  <button onclick="newProject()" title="Clear current sketch and start a new project (Ctrl+Z to recover)">🗋 New</button>
   <button onclick="saveJSON()">Save</button>
   <label class="btn">Load
     <input type="file" id="load-json" accept=".json" style="display:none">
@@ -2071,6 +2072,33 @@ function svgForExport() {
 async function saveJSON() {
   const data = { ...state };
   await saveBlob(new Blob([JSON.stringify(data,null,2)], { type:'application/json' }), exportFilename('json'), 'application/json');
+}
+
+function newProject() {
+  const hasWork = state.shapes.length || state.segments.length || state.annotations.length || (state.subject || '').trim();
+  if (hasWork) {
+    if (!confirm('Discard the current sketch and start a new project?\n\n(Use Undo / Ctrl+Z to recover if you change your mind.)')) return;
+  }
+  pushUndo();
+  state.shapes = [];
+  state.segments = [];
+  state.startPoint = null;
+  state.annotations = [];
+  state.subject = '';
+  state.subtitle = '';
+  state.floors = ['basement', 'main', 'upper'];
+  state.activeFloor = 'main';
+  state.nextShapeId = 1;
+  state.selection = null;
+  state.splitSelection = null;
+  state.preview = null;
+  state.splitPreview = null;
+  state.fenceSelection = null;
+  state.fenceDraw = null;
+  state.offsetPick = null;
+  state.mode = 'walk';
+  const subjInp = document.getElementById('subject-input'); if (subjInp) subjInp.value = '';
+  render();
 }
 document.getElementById('load-json').addEventListener('change', (e) => {
   const f = e.target.files[0]; if (!f) return;
