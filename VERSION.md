@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.1`
+**Current version:** `0.11.2`
 **Released:** 2026-05-19
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.2  | 2026-05-19 | patch  | Mobile: collapse / expand toggle for the entry tools so the canvas can use the full screen. |
 | 0.11.1  | 2026-05-19 | patch  | Mobile input flow flipped to length-then-direction (matches desktop). Diagonals via chained rise/run like `2'6 r 1'6 d`. Drops the diagonal-corner buttons. |
 | 0.11.0  | 2026-05-19 | minor  | Mobile-first page at `m/index.html` with touch direction pad + numeric keypad. Shares `core.js` with desktop. Installable PWA at `/CValRSketch/m/`. |
 | 0.10.0  | 2026-05-19 | minor  | Refactor: extract pure parser + geometry + edit ops into `core.js` shared by desktop and (upcoming) mobile pages. Behaviour unchanged. |

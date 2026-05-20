@@ -15,6 +15,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.2] — 2026-05-19
+
+### Added
+- **Mobile collapse / expand toggle** for the entry tools so the canvas can use the full screen for review.
+  - Tap the `▼` button on the entry row to slide the entry display + keypad down out of view.
+  - When collapsed, a floating `▲ Show keypad` button appears in the bottom-right of the canvas. Tap it to bring the entry tools back.
+  - The canvas re-fits after the transition so your sketch reflows to use the new space.
+
+---
+
 ## [0.11.1] — 2026-05-19
 
 ### Changed

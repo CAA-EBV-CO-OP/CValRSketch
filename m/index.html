@@ -56,7 +56,31 @@
   .status.gap { color: #c44; font-weight: bold; }
   .status.closed { color: #2e8b57; }
   /* Bottom controls */
-  .controls { flex: 0 0 auto; background: #fafafa; border-top: 1px solid #ccc; }
+  .controls {
+    flex: 0 0 auto;
+    background: #fafafa;
+    border-top: 1px solid #ccc;
+    overflow: hidden;
+    transition: max-height 0.18s ease-out;
+    max-height: 70vh;
+  }
+  .controls.collapsed { max-height: 0; border-top-width: 0; }
+  /* Floating "expand" button shown only when controls are collapsed */
+  .fab-expand {
+    position: absolute; right: 12px; bottom: 12px;
+    z-index: 50;
+    background: #2b3a4a; color: #fff;
+    border: none; border-radius: 24px;
+    padding: 10px 16px; font-size: 14px; font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    display: none;
+  }
+  body.collapsed .fab-expand { display: block; }
+  /* In-row collapse button */
+  .entry .toggle-btn {
+    background: transparent; border: 1px solid #ddd; border-radius: 6px;
+    width: 36px; height: 32px; font-size: 14px; color: #888; padding: 0;
+  }
   /* Entry display — shows the segment expression as the user builds it */
   .entry {
     background: #fff; padding: 8px 12px;
@@ -177,15 +201,17 @@
 
 <div class="canvas-wrap">
   <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+  <button class="fab-expand" id="btn-expand" aria-label="Show keypad">▲ Show keypad</button>
 </div>
 
 <div class="status" id="status">Pen at start. Pick a direction and a distance.</div>
 
-<div class="controls">
+<div class="controls" id="controls">
   <div class="entry">
     <span class="label">ENTRY</span>
     <span class="value placeholder" id="entry-value">type length, then direction</span>
     <span class="preview" id="entry-preview"></span>
+    <button class="toggle-btn" id="btn-collapse" aria-label="Hide keypad">▼</button>
   </div>
   <div class="keypad" id="keypad">
     <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="back" class="back" aria-label="backspace">⌫</button>
@@ -1047,6 +1073,16 @@ svg.addEventListener('pointerdown', (e) => {
 document.querySelectorAll('#keypad button').forEach(b => {
   b.addEventListener('click', () => pressKey(b.dataset.k));
 });
+// Collapse / expand the bottom controls so the canvas can use the full screen
+function setControlsCollapsed(collapsed) {
+  document.body.classList.toggle('collapsed', collapsed);
+  $('controls').classList.toggle('collapsed', collapsed);
+  // Canvas dimensions changed — re-fit after the CSS transition settles
+  setTimeout(render, 200);
+}
+$('btn-collapse').onclick = () => setControlsCollapsed(true);
+$('btn-expand').onclick = () => setControlsCollapsed(false);
+
 $('btn-menu').onclick = openDrawer;
 $('drawer-bg').onclick = closeDrawer;
 $('btn-undo').onclick = undoHistory;
