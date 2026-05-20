@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.12`
+**Current version:** `0.11.13`
 **Released:** 2026-05-19
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.13 | 2026-05-19 | patch  | Mobile: fence-tool re-entry fix (clear stuck pointer state on enter/exit). Wall editor expanded — change length, move by typed offset, or snap-move with L/U/D/R buttons (same pattern as vertex editor). |
 | 0.11.12 | 2026-05-19 | patch  | Mobile snap fix: direct alignments no longer always beat projections. Both are merged into a single sorted-by-distance candidate list, so the truly-closest target wins. Affects chain auto-extend, vertex direction-snap, and bare-direction auto-extend. |
 | 0.11.11 | 2026-05-19 | patch  | Mobile: chain auto-extend. Tap L/U/D/R repeatedly to chain together direction-snaps (each starts from the previous endpoint). Commit as separate walls with ✓ or as one diagonal wall with ↗ Connect. |
 | 0.11.10 | 2026-05-19 | patch  | Mobile: fence-mode toggle button (🔲) added to header for one-tap access. Vertex move modal gains direction-snap buttons (L/U/D/R) that move the vertex to the next aligned vertex on each tap. |

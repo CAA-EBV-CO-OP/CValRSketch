@@ -15,6 +15,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.13] — 2026-05-19
+
+### Fixed
+- **Mobile fence tool "works once per session" bug.** iOS occasionally drops `pointerup` events, leaving a stale entry in the active-pointers map. Subsequent single-finger taps then look like a 2-finger gesture, so the 1-finger fence-drag branch never fires. Now `enterFenceMode()` and `exitFenceMode()` clear the active-pointers map and any pending gesture-start state, so fence drags work reliably every time you toggle the mode.
+
+### Added
+- **Wall editor expansion.** Tapping a wall now opens a modal with three move/snap options, in the same length + snap + offset pattern as the vertex editor:
+  - **Change length** — text input with Apply button (same as before).
+  - **Snap-move to next aligned vertex (from start endpoint)** — four big direction buttons (← L, ↑ U, ↓ D, R →). Each tap moves the whole wall by the distance from the wall's start endpoint to the next aligned target in that direction; uses the same `findSnapCandidates` (direct + projection, closest wins) as the pen and vertex tools. The modal stays open so you can keep tapping a direction to walk the wall along through further aligned positions.
+  - **Move whole wall by typed offset** — text input (e.g. `3'6 r`, `5'd 2'l`) with Apply. Uses `moveWallByVector`.
+- **Delete wall** and **Done** buttons remain at the bottom of the modal.
+
+---
+
 ## [0.11.12] — 2026-05-19
 
 ### Fixed
