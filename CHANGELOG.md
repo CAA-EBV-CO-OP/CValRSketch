@@ -15,6 +15,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.8] — 2026-05-19
+
+### Added
+- **Fence tool on mobile** (group select + stretch). Drawer → **🔲 Group select / move…** enters fence mode:
+  - Header switches to an orange tint, the entry/keypad is replaced by a small fence panel.
+  - **One-finger drag** on the canvas draws an orange-dashed selection rectangle.
+  - **Two-finger pinch still zooms** during fence mode, so you can frame the area before selecting.
+  - On release, every vertex inside the rectangle on the **active floor** gets a blue ring. In-progress walk vertices are picked up too.
+  - Type an offset like `3'6 r` in the fence panel and tap **↔ Move** to translate all selected vertices. Walls fully inside the fence translate as a block; walls crossing the boundary stretch (one end moves, the other doesn't) — same behaviour as the desktop fence.
+  - **Clear** drops the selection without exiting; **Done** exits fence mode.
+
+### Notes
+- Vertex-tap menus and the start-point picker are disabled while fence mode is active so a one-finger touch becomes the drag-start unambiguously.
+- Fence selection is intentionally limited to the **active floor** — ghost-floor vertices are not selectable from fence mode.
+
+---
+
 ## [0.11.7] — 2026-05-19
 
 ### Added

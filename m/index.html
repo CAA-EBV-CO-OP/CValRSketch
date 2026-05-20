@@ -87,6 +87,21 @@
     background: transparent; border: 1px solid #ddd; border-radius: 6px;
     width: 36px; height: 32px; font-size: 14px; color: #888; padding: 0;
   }
+  /* Fence mode swaps the keypad for a small panel */
+  .fence-panel { display: none; padding: 10px 12px; background: #fff4e6; border-top: 2px solid #e57c00; }
+  .controls.fence-active .entry,
+  .controls.fence-active .keypad { display: none; }
+  .controls.fence-active .fence-panel { display: flex; flex-direction: column; gap: 8px; }
+  .fence-panel .status { font-size: 12px; color: #6b3410; font-family: ui-monospace, monospace; }
+  .fence-panel input[type="text"] {
+    width: 100%; padding: 10px; font-size: 16px;
+    border: 1px solid #c79a6a; border-radius: 8px; background: #fff;
+  }
+  .fence-panel .row { display: flex; gap: 6px; }
+  .fence-panel .row button { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #c79a6a; background: #fff; font-size: 13px; font-weight: bold; }
+  .fence-panel .row button.primary { background: #e57c00; color: #fff; border-color: #c66a00; }
+  .fence-panel .row button.danger  { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+  body.fence-active header { background: #c66a00; }
   /* Entry display — shows the segment expression as the user builds it */
   .entry {
     background: #fff; padding: 8px 12px;
@@ -227,6 +242,15 @@
     <button data-k="l" class="dir">L</button><button data-k="u" class="dir">U</button><button data-k="d" class="dir">D</button><button data-k="r" class="dir">R</button>
     <button data-k="add" id="btn-add" class="add">✓ Add Wall</button>
   </div>
+  <div class="fence-panel">
+    <div class="status" id="fence-status">Drag on the canvas to select vertices inside a rectangle.</div>
+    <input type="text" id="fence-move-input" placeholder="Move selected by, e.g. 3'6 r">
+    <div class="row">
+      <button id="fence-move-btn" class="primary">↔ Move</button>
+      <button id="fence-clear-btn">Clear</button>
+      <button id="fence-done-btn" class="danger">Done</button>
+    </div>
+  </div>
 </div>
 
 <div class="drawer-bg" id="drawer-bg"></div>
@@ -259,6 +283,7 @@
   <input type="file" id="file-input" accept=".json" style="display:none">
   <button id="btn-export-png" class="primary">📷 Export PNG</button>
   <button id="btn-export-svg">📷 Export SVG</button>
+  <button id="btn-fence-mode">🔲 Group select / move…</button>
 
   <h2>Display</h2>
   <label style="display:flex; align-items:center; gap:8px; padding: 4px 0;">
@@ -289,7 +314,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.7';  // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.8';  // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -322,6 +347,11 @@ let entryText = '';
 // SAME direction button again cycles through further-out aligned vertices.
 // Tap ✓ Add Wall to commit the current candidate; tap × or ⌫ to cancel.
 let autoExtendPreview = null;  // null | { dir, candIdx, candidates: [...] }
+
+// Fence (group select / stretch) mode — toggled from drawer.
+let fenceMode = false;
+let fenceDraw = null;          // { start: {x,y}, end: {x,y} } in WORLD coords (during one-finger drag)
+let fenceSelection = null;     // { shapeVerts: [{shapeId,idx}], inProgVerts: [idx] }
 
 // ----- View transform (screen ↔ world) -----
 let view = { tx: 0, ty: 0, scale: 1 };
@@ -435,6 +465,26 @@ function render() {
     addEl('circle', { cx: sp.x, cy: sp.y, r: 6, fill: '#2e8b57' });
     addEl('text', { x: sp.x + 10, y: sp.y + 4, 'font-size': 11, fill: '#666' }, 'start');
   }
+  // Fence rectangle (live) + selection highlight rings
+  if (fenceDraw) {
+    const a = W(fenceDraw.start), b = W(fenceDraw.end);
+    const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+    const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+    addEl('rect', { x, y, width: w, height: h, fill: 'rgba(229,124,0,0.10)', stroke: '#e57c00', 'stroke-width': 1.5, 'stroke-dasharray': '4,3' });
+  }
+  if (fenceSelection) {
+    const ring = (sx, sy) => addEl('circle', { cx: sx, cy: sy, r: 7, fill: 'none', stroke: '#2b6cb0', 'stroke-width': 2.5 });
+    fenceSelection.shapeVerts.forEach(({ shapeId, idx }) => {
+      const sh = state.shapes.find(s => s.id === shapeId);
+      if (!sh) return;
+      const p = W(sh.points[idx]);
+      ring(p.x, p.y);
+    });
+    if (state.segments.length) {
+      const wpts = pathPoints(state.segments, getStart());
+      fenceSelection.inProgVerts.forEach(i => { const p = W(wpts[i]); ring(p.x, p.y); });
+    }
+  }
   // Auto-extend candidate preview (orange dashed line + ring at the target vertex)
   if (autoExtendPreview) {
     const startW = state.segments.length
@@ -523,6 +573,7 @@ function renderShape(sh, W, isGhost) {
 }
 
 function openVertexMenu(p, sh, vIdx, isGhost) {
+  if (fenceMode) return; // fence-drag intercepts vertex taps
   const canBeStart = state.segments.length === 0;
   const canMove    = !isGhost;
   const lines = [];
@@ -572,6 +623,102 @@ function openVertexMoveModal(sh, vIdx, p) {
   };
   $('vmove-apply').onclick = apply;
   $('vmove-input').addEventListener('keydown', e => { if (e.key === 'Enter') apply(); });
+}
+
+function screenToWorld(clientX, clientY) {
+  const rect = svg.getBoundingClientRect();
+  const vbW = svg.viewBox.baseVal.width  || rect.width;
+  const vbH = svg.viewBox.baseVal.height || rect.height;
+  const sx = (clientX - rect.left) * (vbW / rect.width);
+  const sy = (clientY - rect.top)  * (vbH / rect.height);
+  return { x: (sx - view.tx) / view.scale, y: (sy - view.ty) / view.scale };
+}
+
+// ----- Fence mode -----
+function enterFenceMode() {
+  fenceMode = true;
+  fenceDraw = null;
+  fenceSelection = null;
+  cancelAutoExtend();
+  document.body.classList.add('fence-active');
+  $('controls').classList.add('fence-active');
+  updateFencePanel();
+  render();
+}
+function exitFenceMode() {
+  fenceMode = false;
+  fenceDraw = null;
+  fenceSelection = null;
+  document.body.classList.remove('fence-active');
+  $('controls').classList.remove('fence-active');
+  render();
+}
+function updateFencePanel() {
+  if (!fenceMode) return;
+  const sel = fenceSelection;
+  $('fence-status').textContent = sel
+    ? `Selected: ${sel.shapeVerts.length} shape vertices · ${sel.inProgVerts.length} in-progress vertices. Walls fully inside translate; walls crossing the fence stretch.`
+    : 'Drag on the canvas to select vertices inside a rectangle. (Pinch to zoom still works.)';
+}
+
+function finalizeFenceSelection(a, b) {
+  const x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x);
+  const y1 = Math.min(a.y, b.y), y2 = Math.max(a.y, b.y);
+  const inside = p => p.x >= x1 && p.x <= x2 && p.y >= y1 && p.y <= y2;
+  const sel = { shapeVerts: [], inProgVerts: [] };
+  state.shapes.filter(s => s.floor === state.activeFloor).forEach(sh => {
+    for (let i = 0; i < sh.points.length - 1; i++) {
+      if (inside(sh.points[i])) sel.shapeVerts.push({ shapeId: sh.id, idx: i });
+    }
+  });
+  if (state.segments.length) {
+    pathPoints(state.segments, getStart()).forEach((p, i) => {
+      if (inside(p)) sel.inProgVerts.push(i);
+    });
+  }
+  fenceSelection = sel;
+  updateFencePanel();
+  render();
+}
+
+function applyFenceMove() {
+  if (!fenceSelection) { toast('Drag a rectangle first'); return; }
+  const total = fenceSelection.shapeVerts.length + fenceSelection.inProgVerts.length;
+  if (!total) { toast('Selection is empty'); return; }
+  const raw = $('fence-move-input').value.trim();
+  if (!raw) { toast('Enter an offset like 3\'6 r'); return; }
+  let seg;
+  try { seg = parseSegment(raw); } catch (err) { toast(err.message); return; }
+  if (seg.autoExtend) { toast('Need an explicit length'); return; }
+  pushUndo();
+  const affected = new Set();
+  fenceSelection.shapeVerts.forEach(({ shapeId, idx }) => {
+    const sh = state.shapes.find(s => s.id === shapeId);
+    if (!sh) return;
+    sh.points[idx].x += seg.dx;
+    sh.points[idx].y += seg.dy;
+    syncClosure(sh, idx);
+    affected.add(shapeId);
+  });
+  affected.forEach(id => { const sh = state.shapes.find(s => s.id === id); if (sh) rebuildSegments(sh); });
+  if (fenceSelection.inProgVerts.length && state.segments.length) {
+    const wpts = pathPoints(state.segments, getStart()).map(p => ({ x: p.x, y: p.y }));
+    const idxSet = new Set(fenceSelection.inProgVerts);
+    wpts.forEach((p, i) => { if (idxSet.has(i)) { p.x += seg.dx; p.y += seg.dy; } });
+    if (idxSet.has(0)) state.startPoint = { x: wpts[0].x, y: wpts[0].y };
+    state.segments.forEach((s, i) => {
+      const dx = wpts[i+1].x - wpts[i].x, dy = wpts[i+1].y - wpts[i].y;
+      s.dx = dx; s.dy = dy; s.length = Math.hypot(dx, dy);
+      s.dir = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'r' : 'l') : (dy >= 0 ? 'd' : 'u');
+      s.angle = 0;
+      s.raw = `${formatLength(s.length)} ${s.dir} (adj)`;
+    });
+  }
+  $('fence-move-input').value = '';
+  fenceSelection = null;
+  updateFencePanel();
+  render();
+  toast(`Moved by ${formatLength(seg.length)} ${seg.dir}`);
 }
 
 function setStartPoint(p, shapeLabel, isGhost) {
@@ -1264,6 +1411,12 @@ svg.addEventListener('pointerdown', (e) => {
       cy: (pts[0].y + pts[1].y) / 2,
       view: { ...view },
     };
+    fenceDraw = null;  // pinch wins over fence-drag
+  } else if (fenceMode && activePointers.size === 1) {
+    const p = screenToWorld(e.clientX, e.clientY);
+    fenceDraw = { start: p, end: p };
+    fenceSelection = null;
+    render();
   }
 });
 svg.addEventListener('pointermove', (e) => {
@@ -1276,7 +1429,6 @@ svg.addEventListener('pointermove', (e) => {
     const cy = (pts[0].y + pts[1].y) / 2;
     const factor = d / Math.max(1, gestureStart.d);
     const newScale = gestureStart.view.scale * factor;
-    // Translate so the gesture's start midpoint stays under the new midpoint
     const rect = svg.getBoundingClientRect();
     const sx = gestureStart.cx - rect.left, sy = gestureStart.cy - rect.top;
     const wx = (sx - gestureStart.view.tx) / gestureStart.view.scale;
@@ -1285,11 +1437,22 @@ svg.addEventListener('pointermove', (e) => {
     const ty = (cy - rect.top) - wy * newScale;
     userView = { tx, ty, scale: newScale };
     render();
+  } else if (fenceMode && fenceDraw && activePointers.size === 1) {
+    fenceDraw.end = screenToWorld(e.clientX, e.clientY);
+    render();
   }
 });
 function clearPointer(e) {
   activePointers.delete(e.pointerId);
   if (activePointers.size < 2) gestureStart = null;
+  if (fenceMode && fenceDraw && activePointers.size === 0) {
+    const d = fenceDraw; fenceDraw = null;
+    if (Math.abs(d.end.x - d.start.x) >= 0.05 || Math.abs(d.end.y - d.start.y) >= 0.05) {
+      finalizeFenceSelection(d.start, d.end);
+    } else {
+      render();
+    }
+  }
 }
 svg.addEventListener('pointerup', clearPointer);
 svg.addEventListener('pointercancel', clearPointer);
@@ -1326,6 +1489,13 @@ $('btn-menu').onclick = openDrawer;
 $('drawer-bg').onclick = closeDrawer;
 $('btn-undo').onclick = undoHistory;
 $('btn-close-shape').onclick = closeShape;
+// Fence mode wiring
+$('btn-fence-mode').onclick = () => { enterFenceMode(); closeDrawer(); };
+$('fence-done-btn').onclick  = exitFenceMode;
+$('fence-clear-btn').onclick = () => { fenceSelection = null; updateFencePanel(); render(); };
+$('fence-move-btn').onclick  = applyFenceMove;
+$('fence-move-input').addEventListener('keydown', e => { if (e.key === 'Enter') applyFenceMove(); });
+
 // Force-reload that bypasses all caches (HTTP cache + any active service worker)
 async function forceReload() {
   try {
