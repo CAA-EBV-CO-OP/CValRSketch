@@ -318,7 +318,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.11'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.12'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -664,13 +664,11 @@ function openVertexMoveModal(sh, vIdx) {
 
 function moveVertexToAligned(sh, vIdx, dir, onDone) {
   const p = sh.points[vIdx];
-  // Pretend the vertex is the "pen" and look forward in `dir` for aligned vertices.
-  // Skip the vertex itself (it'll be its own "start" point so its along-distance is 0).
-  let cands = findAlignedCandidates([], dir, { x: p.x, y: p.y }, state.shapes);
-  // Also filter out any candidate at this exact vertex (along ~= 0 is already filtered by minForward, but defensive)
+  // Pretend the vertex is the "pen" and look forward in `dir` for the closest
+  // snap target — direct alignment or perpendicular projection, whichever wins.
+  let cands = findSnapCandidates([], dir, { x: p.x, y: p.y }, state.shapes);
+  // Defensive: drop any candidate at this exact vertex.
   cands = cands.filter(c => Math.hypot(c.point.x - p.x, c.point.y - p.y) > 0.01);
-  // Fall back to perpendicular projection if no direct alignment
-  if (!cands.length) cands = findProjectedCandidates([], dir, { x: p.x, y: p.y }, state.shapes);
   if (!cands.length) { toast(`No vertex / projection to the ${dir}`); return; }
   pushUndo();
   const target = cands[0].point;
@@ -931,14 +929,29 @@ function pressDirection(d) {
   // Append a snap-leg to the chain preview, starting from the end of any
   // previously chained legs (or from the current pen if this is the first leg).
   const chainSegs = chainPreview ? chainPreview.legs.map(l => l.segment) : [];
-  let cands = findAlignedCandidates([...state.segments, ...chainSegs], d, getStart(), state.shapes);
-  if (!cands.length) cands = findProjectedCandidates([...state.segments, ...chainSegs], d, getStart(), state.shapes);
+  const cands = findSnapCandidates([...state.segments, ...chainSegs], d, getStart(), state.shapes);
   if (!cands.length) { toast(`No vertex or projection to the ${d}`); return; }
   const c = cands[0];
   if (!chainPreview) chainPreview = { legs: [] };
   chainPreview.legs.push({ along: c.along, point: c.point, segment: c.segment, dir: d });
   updateEntryDisplay();
   render();
+}
+
+// Combined snap candidates: directly-aligned vertices AND perpendicular-line
+// projections, merged and sorted by distance. So the CLOSEST snap target wins,
+// regardless of whether it's a direct alignment or a column/row projection.
+function findSnapCandidates(priorSegments, dir, start, shapes) {
+  const aligned = findAlignedCandidates(priorSegments, dir, start, shapes);
+  const projected = findProjectedCandidates(priorSegments, dir, start, shapes);
+  const merged = [...aligned, ...projected].sort((a, b) => a.along - b.along);
+  const seen = new Set();
+  return merged.filter(c => {
+    const k = `${c.point.x.toFixed(3)},${c.point.y.toFixed(3)}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 function popChainLeg() {
@@ -1094,7 +1107,7 @@ function commitEntry() {
   catch (err) { toast(err.message); return; }
   pushUndo();
   if (seg.autoExtend) {
-    const cands = findAlignedCandidates(state.segments, seg.dir, getStart(), state.shapes);
+    const cands = findSnapCandidates(state.segments, seg.dir, getStart(), state.shapes);
     if (!cands.length) { toast('No aligned vertex to snap to'); state.undoStack.pop(); return; }
     state.segments.push(cands[0].segment);
   } else {

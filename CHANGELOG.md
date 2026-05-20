@@ -15,6 +15,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.12] — 2026-05-19
+
+### Fixed
+- **Mobile direction-snap could skip closer waypoints.** When a directly-aligned vertex existed in the chosen direction (even one far away), the snap would always prefer it over closer perpendicular-line projections. So tapping `U` from the bottom of a staircase shape could jump 20' all the way to the start vertex's Y rather than stopping at the first 5' or 10' staircase corner. Fixed by merging both candidate sources into one list sorted by distance, so the truly-closest target wins regardless of whether it's a direct alignment or a column/row projection.
+
+### Changed
+- Direct-alignment + projection candidate combination now lives in a single `findSnapCandidates()` helper used by chain auto-extend, the bare-direction auto-extend, and the vertex direction-snap modal.
+
+---
+
 ## [0.11.11] — 2026-05-19
 
 ### Added
