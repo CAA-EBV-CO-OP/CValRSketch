@@ -351,7 +351,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.15'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.16'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -700,6 +700,7 @@ function renderEditPanel() {
       moveVertexByVector(sh, editTarget.idx, seg.dx, seg.dy);
       render();
       renderEditPanel();
+      if (maybeHandleIntersection([sh.id], 'vertex move')) return;
       toast(`Moved ${formatLength(seg.length)} ${seg.dir}`);
     };
     $('edit-set-start').onclick = () => {
@@ -751,6 +752,7 @@ function renderEditPanel() {
       setWallLength(sh, editTarget.idx, newLen, state.settings.defaultLengthEditMode);
       render();
       renderEditPanel();
+      if (maybeHandleIntersection([sh.id], 'length change')) return;
       toast(`Length ${formatLength(newLen)}`);
     };
     document.querySelectorAll('#edit-panel [data-snap]').forEach(btn => {
@@ -767,6 +769,7 @@ function renderEditPanel() {
       $('edit-offset').value = '';
       render();
       renderEditPanel();
+      if (maybeHandleIntersection([sh.id], 'wall move')) return;
       toast(`Moved ${formatLength(seg.length)} ${seg.dir}`);
     };
     $('edit-delete').onclick = () => {
@@ -871,10 +874,7 @@ function openVertexMoveModal(sh, vIdx) {
 
 function moveVertexToAligned(sh, vIdx, dir, onDone) {
   const p = sh.points[vIdx];
-  // Pretend the vertex is the "pen" and look forward in `dir` for the closest
-  // snap target — direct alignment or perpendicular projection, whichever wins.
   let cands = findSnapCandidates([], dir, { x: p.x, y: p.y }, state.shapes);
-  // Defensive: drop any candidate at this exact vertex.
   cands = cands.filter(c => Math.hypot(c.point.x - p.x, c.point.y - p.y) > 0.01);
   if (!cands.length) { toast(`No vertex / projection to the ${dir}`); return; }
   pushUndo();
@@ -885,6 +885,7 @@ function moveVertexToAligned(sh, vIdx, dir, onDone) {
   rebuildSegments(sh);
   render();
   if (onDone) onDone();
+  if (maybeHandleIntersection([sh.id], 'vertex snap')) return;
   toast(`Snapped ${dir} → (${target.x.toFixed(2)}, ${target.y.toFixed(2)})`);
 }
 
@@ -1020,10 +1021,12 @@ function snapFenceMove(dir) {
   const cands = findSnapCandidates([], dir, ref, state.shapes);
   if (!cands.length) { toast(`No snap target to the ${dir}`); return; }
   const target = cands[0].point;
+  const shapeIds = [...new Set(fenceSelection.shapeVerts.map(v => v.shapeId))];
   pushUndo();
   applyFenceMoveBy(target.x - ref.x, target.y - ref.y);
   render();
   updateFencePanel();
+  if (maybeHandleIntersection(shapeIds, 'fence snap')) return;
   toast(`Snapped selection ${dir} → (${target.x.toFixed(2)}, ${target.y.toFixed(2)})`);
 }
 
@@ -1036,12 +1039,139 @@ function applyFenceMove() {
   let seg;
   try { seg = parseSegment(raw); } catch (err) { toast(err.message); return; }
   if (seg.autoExtend) { toast('Need an explicit length'); return; }
+  const shapeIds = [...new Set(fenceSelection.shapeVerts.map(v => v.shapeId))];
   pushUndo();
   applyFenceMoveBy(seg.dx, seg.dy);
   $('fence-move-input').value = '';
   updateFencePanel();
   render();
+  if (maybeHandleIntersection(shapeIds, 'fence move')) return;
   toast(`Moved by ${formatLength(seg.length)} ${seg.dir}`);
+}
+
+// ----- Self-intersection detection + split -----
+
+// Check whether `shape` self-intersects (any two non-adjacent walls cross).
+// Returns { wallA, wallB, point } for the first intersection found, or null.
+function findShapeIntersection(shape) {
+  const n = shape.points.length - 1; // wall count (last point is closing duplicate)
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue; // skip the wrap-around adjacent pair
+      const a = shape.points[i], b = shape.points[i+1];
+      const c = shape.points[j], d = shape.points[j+1];
+      const x = segmentIntersect(a, b, c, d);
+      if (x) return { wallA: i, wallB: j, point: x };
+    }
+  }
+  return null;
+}
+
+// Strict interior intersection of two line segments; returns null if collinear,
+// parallel, or only touching at an endpoint.
+function segmentIntersect(p1, p2, p3, p4) {
+  const x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
+  const x3 = p3.x, y3 = p3.y, x4 = p4.x, y4 = p4.y;
+  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(denom) < 1e-9) return null;
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+  const eps = 1e-6;
+  if (t <= eps || t >= 1 - eps || u <= eps || u >= 1 - eps) return null;
+  return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
+}
+
+// Split a self-intersecting polygon into two simple polygons at the
+// intersection point. The original shape becomes "Polygon A" (the outer loop);
+// a new shape is added for "Polygon B" (the inner loop).
+function splitShapeAtIntersection(sh, intersection) {
+  const { wallA, wallB, point } = intersection;
+  const pts = sh.points.slice(0, -1); // drop closing duplicate
+  const ptsA = [
+    ...pts.slice(0, wallA + 1).map(p => ({ ...p })),
+    { x: point.x, y: point.y },
+    ...pts.slice(wallB + 1).map(p => ({ ...p })),
+  ];
+  ptsA.push({ ...ptsA[0] });
+  const ptsB = [
+    { x: point.x, y: point.y },
+    ...pts.slice(wallA + 1, wallB + 1).map(p => ({ ...p })),
+  ];
+  ptsB.push({ ...ptsB[0] });
+  if (ptsA.length < 4 || ptsB.length < 4) {
+    toast('Cannot split — one piece has too few vertices');
+    return false;
+  }
+  sh.points = ptsA;
+  rebuildSegments(sh);
+  const newShape = {
+    id: state.nextShapeId++,
+    label: sh.label + ' (split)',
+    type: sh.type,
+    floor: sh.floor,
+    points: ptsB,
+    segments: [],
+  };
+  rebuildSegments(newShape);
+  state.shapes.push(newShape);
+  return true;
+}
+
+// Show the intersection modal. The user can split, keep as-is, or undo.
+// Assumes the caller already pushUndo()'d before mutating, so undoHistory()
+// will revert the move.
+function showIntersectionModal(sh, intersection, label) {
+  showModal(`
+    <h3>⚠ Walls crossed</h3>
+    <p style="font-size:13px; color:#222; margin:0;">
+      That ${label} makes walls <b>${intersection.wallA + 1}</b> and <b>${intersection.wallB + 1}</b>
+      of "<b>${escapeHtml(sh.label)}</b>" cross each other.
+    </p>
+    <p style="font-size:12px; color:#666; margin:4px 0 0;">
+      A self-crossed shape is usually <b>two separate areas</b>. For appraisal uses like
+      Gross Living Area (GLA), the spaces wouldn't be considered continuous.
+    </p>
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+      <button class="primary" id="isect-split">✂ Split into 2 separate areas</button>
+      <button id="isect-keep" style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;">⚠ Keep as one shape anyway</button>
+      <button class="danger" id="isect-undo">↶ Undo the ${label}</button>
+    </div>
+    <div class="modal-buttons"></div>
+  `);
+  $('isect-split').onclick = () => {
+    closeModal();
+    if (splitShapeAtIntersection(sh, intersection)) {
+      // The original shape now has the outer loop's points; the edit target's
+      // vertex/wall index is probably invalid against the new layout.
+      if (editTarget) exitEdit();
+      render();
+      renderDrawer();
+      toast('Split into 2 areas');
+    }
+  };
+  $('isect-keep').onclick = () => {
+    closeModal();
+    toast('Kept as single shape (may render oddly)');
+  };
+  $('isect-undo').onclick = () => {
+    closeModal();
+    undoHistory();
+    if (editTarget) renderEditPanel();
+    toast('Move undone');
+  };
+}
+
+// Check the affected shapes for self-intersection. If any is intersecting,
+// surface the intersection modal and return true (caller should skip its own
+// success toast). Caller is responsible for pushUndo() before mutating.
+function maybeHandleIntersection(shapeIds, label) {
+  for (const id of shapeIds) {
+    const sh = state.shapes.find(s => s.id === id);
+    if (!sh) continue;
+    const ix = findShapeIntersection(sh);
+    if (ix) { showIntersectionModal(sh, ix, label); return true; }
+  }
+  return false;
 }
 
 function setStartPoint(p, shapeLabel, isGhost) {
@@ -1481,6 +1611,7 @@ function snapMoveWall(sh, wallIdx, dir, onDone) {
   moveWallByVector(sh, wallIdx, target.x - startP.x, target.y - startP.y);
   render();
   if (onDone) onDone();
+  if (maybeHandleIntersection([sh.id], 'wall snap')) return;
   toast(`Wall snapped ${dir}`);
 }
 

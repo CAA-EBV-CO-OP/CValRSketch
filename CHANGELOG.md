@@ -15,6 +15,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.16] — 2026-05-20
+
+### Added
+- **Self-intersection detection on mobile move operations.** When any vertex / wall / fence / length-change move would cause a shape's walls to cross each other (figure-8 geometry), a modal pops up before the toast:
+  - **✂ Split into 2 separate areas** — splits the polygon at the intersection point into two simple polygons. The original shape keeps the outer loop; a new shape ("<original> (split)") gets the inner loop, with the same type and floor. Important for appraisal use cases like Gross Living Area (GLA) where a self-crossed shape really represents two non-contiguous spaces that shouldn't be counted together.
+  - **⚠ Keep as one shape anyway** — applies the move as-is. The polygon will render oddly (the SVG fill will treat the inner loop as a hole due to the even-odd fill rule) and area calculations may be off, but you can clean it up later.
+  - **↶ Undo the move** — reverts the change. Same as Ctrl+Z. The shape is restored exactly as it was.
+- Detection is interior-strict (segment crossings only, not endpoint touches) so adjacent walls and concave corners don't false-positive.
+- Detection runs after each: `vertex snap`, `vertex move` (typed offset), `wall snap`, `wall move` (typed offset), `length change`, `fence snap`, `fence move`.
+
+---
+
 ## [0.11.15] — 2026-05-19
 
 ### Added
