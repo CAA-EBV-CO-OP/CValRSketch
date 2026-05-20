@@ -45,6 +45,8 @@
   .ghost { opacity: var(--ghost-opacity, 0.45); }
   .vertex-dot { fill: #fff; stroke: #444; stroke-width: 1.5; }
   .vertex-dot.selected { fill: #2b6cb0; stroke: #fff; }
+  .vertex-pickable { fill: #d4edda; stroke: #2e8b57; stroke-width: 2; }
+  .vertex-pickable.is-start { fill: #2e8b57; stroke: #fff; }
   /* Status line */
   .status {
     flex: 0 0 auto;
@@ -238,6 +240,14 @@
   <h2>Areas on this Floor</h2>
   <div class="shape-list" id="shape-list"></div>
 
+  <h2>Start Point</h2>
+  <div style="font-size:12px; color:#666;" id="drawer-start-info"></div>
+  <div class="row">
+    <input type="text" id="start-offset-input" placeholder="offset, e.g. 3'6 r">
+    <button id="btn-offset-start">Offset</button>
+  </div>
+  <button id="btn-reset-start">Reset start to origin</button>
+
   <h2>Actions</h2>
   <button id="btn-cancel-walk" class="danger">Cancel current walk</button>
   <button id="btn-save-json">💾 Save sketch (JSON)</button>
@@ -420,8 +430,10 @@ function renderShape(sh, W, isGhost) {
   const screenPts = sh.points.map(W);
   const d = screenPts.map((p,i)=> (i===0?'M':'L') + p.x + ' ' + p.y).join(' ') + ' Z';
   const cls = isGhost ? 'ghost' : '';
+  const canPickStart = state.segments.length === 0;
   const fillPoly = addEl('path', { d, fill: t.fill, stroke: 'none', class: cls });
-  if (!isGhost) fillPoly.addEventListener('click', (ev) => {
+  // Suppress shape-editor click when picking start so taps land on vertices, not the body
+  if (!isGhost && !canPickStart) fillPoly.addEventListener('click', (ev) => {
     ev.stopPropagation();
     state.selection = { kind: 'shape', shapeId: sh.id };
     openShapeEditor(sh);
@@ -466,6 +478,48 @@ function renderShape(sh, W, isGhost) {
     addEl('text', { x: c.x, y: c.y-6, 'text-anchor':'middle', 'font-size': 13, 'font-weight':'bold', class: cls }, sh.label);
     addEl('text', { x: c.x, y: c.y+10, 'text-anchor':'middle', 'font-size': 11, fill: '#555', class: cls }, `${Math.round(area)} sq ft`);
   }
+  // Pickable vertex dots — only when no in-progress walk. Tap to anchor start here.
+  if (canPickStart) {
+    const startP = getStart();
+    sh.points.slice(0, -1).forEach((p, i) => {
+      const sp = W(p);
+      const isStart = Math.abs(p.x - startP.x) < 1e-4 && Math.abs(p.y - startP.y) < 1e-4;
+      addEl('circle', { cx: sp.x, cy: sp.y, r: 6, class: 'vertex-pickable' + (isStart ? ' is-start' : '') });
+      const hit = addEl('circle', { cx: sp.x, cy: sp.y, r: 18, fill: 'transparent' });
+      hit.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        setStartPoint({ x: p.x, y: p.y }, sh.label, isGhost);
+      });
+    });
+  }
+}
+
+function setStartPoint(p, shapeLabel, isGhost) {
+  pushUndo();
+  state.startPoint = { x: p.x, y: p.y };
+  const where = shapeLabel ? ` (vertex on "${shapeLabel}"${isGhost ? ', other floor' : ''})` : '';
+  toast(`Start moved to (${p.x.toFixed(2)}, ${p.y.toFixed(2)}) ft${where}`);
+  render();
+}
+
+function resetStart() {
+  if (state.startPoint === null) { toast('Start is already at origin'); return; }
+  pushUndo();
+  state.startPoint = null;
+  toast('Start reset to origin (0, 0)');
+  render();
+}
+
+function offsetStartBy(text) {
+  if (!text || !text.trim()) return;
+  let seg;
+  try { seg = parseSegment(text.trim()); } catch (err) { toast(err.message); return; }
+  if (seg.autoExtend) { toast('Need an explicit length, e.g. 3\'6 r'); return; }
+  pushUndo();
+  const cur = getStart();
+  state.startPoint = { x: cur.x + seg.dx, y: cur.y + seg.dy };
+  toast(`Start offset by ${formatLength(seg.length)} ${seg.dir}`);
+  render();
 }
 
 function renderInProgress(W) {
@@ -503,7 +557,14 @@ function renderInProgress(W) {
 function renderStatus() {
   const el = $('status');
   if (!state.segments.length) {
-    el.textContent = 'Pen at start. Type a length and direction.';
+    const sp = getStart();
+    const where = state.startPoint
+      ? `Start at (${sp.x.toFixed(1)}, ${sp.y.toFixed(1)}) ft — picked`
+      : 'Start at origin (0, 0)';
+    const hint = state.shapes.some(s => s.floor === state.activeFloor || state.settings.showFloorGhosts)
+      ? '. Tap any green vertex to change start.'
+      : '.';
+    el.textContent = where + hint;
     el.className = 'status';
     return;
   }
@@ -779,6 +840,12 @@ function renderDrawer() {
   });
   // Subject
   $('subject-input').value = state.subject || '';
+  // Start info
+  const sp = getStart();
+  const info = state.startPoint
+    ? `Picked at (${sp.x.toFixed(2)}, ${sp.y.toFixed(2)}) ft. Walk segments start here.`
+    : `Origin (0, 0). Tap a green vertex on the canvas to anchor the start elsewhere.`;
+  $('drawer-start-info').textContent = info;
   // Ghost slider
   $('ghost-slider').value = state.settings.ghostOpacity;
   $('ghost-val').textContent = Math.round(state.settings.ghostOpacity * 100) + '%';
@@ -1087,6 +1154,17 @@ $('btn-menu').onclick = openDrawer;
 $('drawer-bg').onclick = closeDrawer;
 $('btn-undo').onclick = undoHistory;
 $('btn-close-shape').onclick = closeShape;
+$('btn-reset-start').onclick = () => { resetStart(); renderDrawer(); };
+$('btn-offset-start').onclick = () => {
+  const v = $('start-offset-input').value;
+  if (!v.trim()) { toast('Enter offset like 3\'6 r'); return; }
+  offsetStartBy(v);
+  $('start-offset-input').value = '';
+  renderDrawer();
+};
+$('start-offset-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('btn-offset-start').click();
+});
 $('btn-cancel-walk').onclick = () => { cancelWalk(); closeDrawer(); };
 $('btn-save-json').onclick = () => { saveJSON(); closeDrawer(); };
 $('btn-load-json').onclick = () => $('file-input').click();

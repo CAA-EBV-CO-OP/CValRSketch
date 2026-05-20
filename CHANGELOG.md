@@ -15,6 +15,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.3] — 2026-05-19
+
+### Added
+- **Mobile start-point picker.** When no walk is in progress, every vertex of every shape on the active floor (and ghosted other floors) becomes a small green tappable dot. Tap one and the next walk starts from there. The current start vertex shows as a solid green dot.
+- **Drawer → Start Point** section with:
+  - Current start info ("Picked at (x, y) ft" or "Origin (0, 0)").
+  - **Offset** input — type something like `3'6 r` to nudge the start along a direction from its current position. Useful when you want to start partway along an existing wall.
+  - **Reset start to origin** button.
+- Status line now shows the current start coords and a hint to tap a green vertex to change them.
+
+---
+
 ## [0.11.2] — 2026-05-19
 
 ### Added
