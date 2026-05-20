@@ -3,7 +3,7 @@
 **A browser-based floor plan sketching tool for residential property appraisal.**
 Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
 
-**Version:** 0.11.21 (2026-05-20)
+**Version:** 0.11.22 (2026-05-20)
 **License:** [AGPL-3.0](./LICENSE)
 **Repo:** https://github.com/CAA-EBV-CO-OP/CValRSketch
 

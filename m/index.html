@@ -329,6 +329,8 @@
   <button id="btn-save-json">💾 Save sketch (JSON)</button>
   <button id="btn-load-json">📂 Load sketch (JSON)</button>
   <input type="file" id="file-input" accept=".json" style="display:none">
+  <button id="btn-copy-json">📋 Copy sketch to clipboard</button>
+  <button id="btn-paste-json">📋 Paste sketch from clipboard</button>
   <button id="btn-export-png" class="primary">📷 Export PNG</button>
   <button id="btn-export-svg">📷 Export SVG</button>
   <button id="btn-fence-mode">🔲 Group select / move…</button>
@@ -362,7 +364,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.21'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.22'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -2218,6 +2220,54 @@ async function saveJSON() {
   renderDrawer();  // refresh recents list
 }
 
+// Workarounds when the iOS share sheet won't show OneDrive (a common, brittle
+// File Provider Extension issue). Both bypass the file system entirely.
+async function copyJSONToClipboard() {
+  saveToRecents();
+  const data = { ...state };
+  delete data.undoStack; delete data.redoStack; delete data.selection;
+  delete data.fenceSelection; delete data.fenceDraw; delete data.offsetPick;
+  const json = JSON.stringify(data, null, 2);
+  try {
+    await navigator.clipboard.writeText(json);
+    const kb = Math.max(1, Math.round(json.length / 1024));
+    toast(`Sketch JSON copied to clipboard (${kb} KB) — paste anywhere`);
+  } catch (e) {
+    toast('Clipboard copy failed: ' + (e.message || 'unknown'));
+  }
+}
+
+async function pasteJSONFromClipboard() {
+  if (state.shapes.length || state.segments.length) {
+    if (!confirm('Discard the current sketch and paste from clipboard?')) return;
+  }
+  let text;
+  try { text = await navigator.clipboard.readText(); }
+  catch (e) { toast('Clipboard read denied — iOS sometimes blocks it; try opening drawer and tapping again'); return; }
+  if (!text || !text.trim()) { toast('Clipboard is empty'); return; }
+  let d;
+  try { d = JSON.parse(text); }
+  catch (e) { toast('Clipboard is not a valid sketch JSON'); return; }
+  if (!d || typeof d !== 'object' || !Array.isArray(d.shapes)) {
+    toast('That clipboard text is not a CValRSketch sketch'); return;
+  }
+  Object.assign(state, d);
+  state.undoStack = []; state.redoStack = [];
+  state.selection = null; state.fenceSelection = null; state.fenceDraw = null;
+  state.offsetPick = null; state.preview = null;
+  state.splitSelection = null; state.splitPreview = null;
+  if (editTarget) { editTarget = null; $('controls').classList.remove('editing'); }
+  if (fenceMode) exitFenceMode();
+  cancelChainPreview();
+  clearEntry();
+  const subjInp = $('subject-input'); if (subjInp) subjInp.value = state.subject || '';
+  saveToRecents();
+  closeDrawer();
+  render();
+  renderDrawer();
+  toast(`Pasted "${state.subject || 'Untitled'}"`);
+}
+
 function loadJSON(file) {
   const r = new FileReader();
   r.onload = () => {
@@ -2384,6 +2434,8 @@ $('btn-new-project').onclick = () => { newProject(); };
 $('btn-save-json').onclick = () => { saveJSON(); closeDrawer(); };
 $('btn-load-json').onclick = () => $('file-input').click();
 $('file-input').onchange = (e) => { if (e.target.files[0]) { loadJSON(e.target.files[0]); closeDrawer(); } };
+$('btn-copy-json').onclick = () => { copyJSONToClipboard(); };
+$('btn-paste-json').onclick = () => { pasteJSONFromClipboard(); };
 $('btn-export-png').onclick = () => { exportPNG(); closeDrawer(); };
 $('btn-export-svg').onclick = () => { exportSVGfile(); closeDrawer(); };
 $('btn-add-floor').onclick = () => {

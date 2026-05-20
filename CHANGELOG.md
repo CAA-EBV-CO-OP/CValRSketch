@@ -15,6 +15,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.22] — 2026-05-20
+
+### Added
+- **📋 Copy sketch to clipboard** and **📋 Paste sketch from clipboard** in the mobile drawer. Workaround for iOS File Provider Extensions (especially OneDrive's) silently dropping out of the Save to Files dialog. Both bypass the file system entirely:
+  - **Copy** writes the current sketch JSON to the system clipboard. Toast confirms the size.
+  - **Paste** reads the clipboard, validates it's a sketch JSON, and loads it.
+- Suggested workflow when OneDrive isn't appearing in the share sheet: tap **Copy**, switch to Safari, paste into a OneDrive web page (or any text-syncing app like Notes), or paste straight into a desktop browser's URL/text field via Universal Clipboard / Handoff.
+
+### Notes
+- iOS sometimes blocks clipboard reads from non-user-initiated contexts. If Paste fails silently, close the drawer, tap **Paste** again from a fresh tap — that satisfies the user-gesture requirement.
+- Clipboard is text-only here; PNG/SVG exports still use the share sheet.
+
+---
+
 ## [0.11.21] — 2026-05-20
 
 ### Added
