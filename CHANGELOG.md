@@ -15,6 +15,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.6] — 2026-05-19
+
+### Added
+- **Perpendicular-line projection fallback for mobile auto-extend.** When no directly-aligned vertex exists in the chosen direction, the preview now offers candidates from the **perpendicular projection** of every vertex — that is, "walk L until the pen's X matches another vertex's X" (and the mirror for R/U/D). Lets you navigate back toward a shape's column or row even when no vertex is directly aligned with the current pen.
+- Projected candidates are marked `(project)` in the entry display so you can tell them apart from direct alignments.
+
+### Why
+- Earlier, if you walked 10' right then 5' down and tapped L hoping to head back toward the start, you'd get "No aligned vertex" because the start is up-AND-left, not directly left. The projection fallback now lets L walk you to the start's column; tap U from there to close the shape.
+
+---
+
 ## [0.11.5] — 2026-05-19
 
 ### Added

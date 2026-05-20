@@ -289,7 +289,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.5';  // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.6';  // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -671,12 +671,61 @@ function pressDirection(d) {
   if (autoExtendPreview && autoExtendPreview.dir === d) {
     autoExtendPreview.candIdx = (autoExtendPreview.candIdx + 1) % autoExtendPreview.candidates.length;
   } else {
-    const cands = findAlignedCandidates(state.segments, d, getStart(), state.shapes);
-    if (!cands.length) { toast(`No aligned vertex to the ${d}`); return; }
+    // First pass: directly aligned vertices (same row/column as pen).
+    let cands = findAlignedCandidates(state.segments, d, getStart(), state.shapes);
+    // Fallback: walk to the perpendicular line of any vertex — i.e. "walk L until
+    // pen's X matches another vertex's X". Lets you navigate back toward a shape's
+    // column or row even when no vertex is directly aligned.
+    if (!cands.length) cands = findProjectedCandidates(state.segments, d, getStart(), state.shapes);
+    if (!cands.length) { toast(`No vertex or projection to the ${d}`); return; }
     autoExtendPreview = { dir: d, candIdx: 0, candidates: cands };
   }
   updateEntryDisplay();
   render();
+}
+
+// Walking-to-perpendicular-line candidates. For a horizontal direction (L/R),
+// finds vertices whose X is reachable by walking that way and produces a
+// segment that lands at (vertex.x, pen.y). Vertical directions (U/D) mirror.
+function findProjectedCandidates(priorSegments, dir, start, shapes) {
+  const isHoriz = dir === 'r' || dir === 'l';
+  const sign    = dir === 'r' || dir === 'd' ? 1 : -1;
+  let x = start.x, y = start.y;
+  for (const s of priorSegments) { x += s.dx; y += s.dy; }
+  const out = [];
+  const seen = new Set();
+  const pushIf = (coord) => {
+    const along = (coord - (isHoriz ? x : y)) * sign;
+    if (along < 0.05) return;
+    const target = isHoriz ? { x: coord, y } : { x, y: coord };
+    const key = `${target.x.toFixed(3)},${target.y.toFixed(3)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      along,
+      point: target,
+      segment: {
+        length: along, dir, angle: 0,
+        dx: isHoriz ? (coord - x) : 0,
+        dy: isHoriz ? 0 : (coord - y),
+        raw: `${formatLength(along)} ${dir} (proj)`,
+      },
+    });
+  };
+  for (const sh of shapes) {
+    for (let i = 0; i < sh.points.length - 1; i++) {
+      pushIf(isHoriz ? sh.points[i].x : sh.points[i].y);
+    }
+  }
+  // Also project from in-progress walk vertices (incl. start)
+  let px = start.x, py = start.y;
+  pushIf(isHoriz ? px : py);
+  for (const s of priorSegments) {
+    px += s.dx; py += s.dy;
+    pushIf(isHoriz ? px : py);
+  }
+  out.sort((a, b) => a.along - b.along);
+  return out;
 }
 
 function cancelAutoExtend() {
@@ -696,7 +745,8 @@ function updateEntryDisplay() {
   const p = $('entry-preview');
   if (autoExtendPreview) {
     const c = autoExtendPreview.candidates[autoExtendPreview.candIdx];
-    v.textContent = `↳ ${autoExtendPreview.dir.toUpperCase()} → ${formatLength(c.along)}`;
+    const isProj = /\(proj\)/.test(c.segment.raw);
+    v.textContent = `↳ ${autoExtendPreview.dir.toUpperCase()} → ${formatLength(c.along)}${isProj ? ' (project)' : ''}`;
     v.classList.remove('placeholder');
     p.textContent = `candidate ${autoExtendPreview.candIdx + 1} of ${autoExtendPreview.candidates.length} · tap ${autoExtendPreview.dir.toUpperCase()} again to cycle, ✓ to commit`;
     $('btn-add').classList.remove('disabled');
