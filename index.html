@@ -109,6 +109,7 @@
   <button onclick="exportPNG()">Export PNG</button>
   <button onclick="newProject()" title="Clear current sketch and start a new project (Ctrl+Z to recover)">🗋 New</button>
   <button onclick="saveJSON()">Save</button>
+  <button onclick="openRecentsModal()" title="Open from recent projects (stored in this browser)">📂 Recent</button>
   <label class="btn">Load
     <input type="file" id="load-json" accept=".json" style="display:none">
   </label>
@@ -2069,7 +2070,107 @@ function svgForExport() {
   return out;
 }
 
+// ----- Recent projects (localStorage-backed) -----
+const RECENTS_INDEX_KEY = 'cvalrsketch:recents';
+const RECENT_PROJECT_PREFIX = 'cvalrsketch:project:';
+const MAX_RECENTS = 12;
+
+function getRecents() {
+  try { return JSON.parse(localStorage.getItem(RECENTS_INDEX_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+function setRecents(arr) {
+  try { localStorage.setItem(RECENTS_INDEX_KEY, JSON.stringify(arr)); } catch (e) {}
+}
+function saveToRecents() {
+  const subjRaw = (state.subject || '').trim();
+  const subject = subjRaw || 'Untitled';
+  const key = subject.replace(/[^\w\- ]/g, '_').slice(0, 60) + '_' + Date.now();
+  const data = { ...state };
+  delete data.undoStack; delete data.redoStack; delete data.selection;
+  delete data.fenceSelection; delete data.fenceDraw; delete data.offsetPick;
+  delete data.preview; delete data.splitSelection; delete data.splitPreview;
+  try { localStorage.setItem(RECENT_PROJECT_PREFIX + key, JSON.stringify(data)); }
+  catch (e) { /* may be quota */ }
+  const recents = getRecents();
+  recents.unshift({
+    key, subject,
+    savedAt: new Date().toISOString(),
+    shapes: state.shapes.length,
+    floors: [...new Set(state.shapes.map(s => s.floor))],
+  });
+  while (recents.length > MAX_RECENTS) {
+    const old = recents.pop();
+    try { localStorage.removeItem(RECENT_PROJECT_PREFIX + old.key); } catch (e) {}
+  }
+  setRecents(recents);
+}
+function loadFromRecents(key) {
+  const raw = localStorage.getItem(RECENT_PROJECT_PREFIX + key);
+  if (!raw) { alert('Project not found in recents'); return; }
+  if (state.shapes.length || state.segments.length) {
+    if (!confirm('Discard current sketch and load this recent project?')) return;
+  }
+  try {
+    const d = JSON.parse(raw);
+    Object.assign(state, d);
+    state.undoStack = []; state.redoStack = [];
+    state.selection = null; state.fenceSelection = null; state.fenceDraw = null;
+    state.offsetPick = null; state.preview = null;
+    state.splitSelection = null; state.splitPreview = null;
+    const subjInp = document.getElementById('subject-input'); if (subjInp) subjInp.value = state.subject || '';
+    closeModal();
+    render();
+  } catch (e) { alert('Load failed: ' + e.message); }
+}
+function deleteFromRecents(key) {
+  if (!confirm('Remove this project from recents? (Your saved file is unaffected.)')) return;
+  const recents = getRecents().filter(r => r.key !== key);
+  setRecents(recents);
+  try { localStorage.removeItem(RECENT_PROJECT_PREFIX + key); } catch (e) {}
+  openRecentsModal();
+}
+function formatRecentDate(iso) {
+  const d = new Date(iso);
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  if (diff < 604800) return Math.floor(diff/86400) + 'd ago';
+  return d.toLocaleDateString();
+}
+function openRecentsModal() {
+  const m = createModal();
+  const recents = getRecents();
+  const rows = recents.length
+    ? recents.map(r => `
+        <div style="display:flex; align-items:center; gap:8px; padding:8px; border:1px solid #ddd; border-radius:6px;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${(r.subject || 'Untitled').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}</div>
+            <div style="font-size:11px; color:#666;">${r.shapes} shape${r.shapes === 1 ? '' : 's'} · ${formatRecentDate(r.savedAt)}</div>
+          </div>
+          <button data-recent-load="${r.key.replace(/"/g, '&quot;')}" class="primary">Load</button>
+          <button data-recent-del="${r.key.replace(/"/g, '&quot;')}" class="danger">×</button>
+        </div>`).join('')
+    : '<div style="color:#999; padding:8px;">No recent projects yet. Save a sketch first.</div>';
+  m.innerHTML = `
+    <div class="modal" style="min-width:480px; max-width:560px;">
+      <h3>📂 Recent projects</h3>
+      <p style="font-size:12px; color:#666; margin:0 0 8px;">Stored in this browser only — independent of any files you saved.</p>
+      <div style="display:flex; flex-direction:column; gap:6px; max-height:60vh; overflow-y:auto;">
+        ${rows}
+      </div>
+      <div class="modal-buttons">
+        <button onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  `;
+  m.querySelectorAll('[data-recent-load]').forEach(b => b.onclick = () => loadFromRecents(b.dataset.recentLoad));
+  m.querySelectorAll('[data-recent-del]').forEach(b => b.onclick = () => deleteFromRecents(b.dataset.recentDel));
+}
+
 async function saveJSON() {
+  saveToRecents();
   const data = { ...state };
   await saveBlob(new Blob([JSON.stringify(data,null,2)], { type:'application/json' }), exportFilename('json'), 'application/json');
 }
@@ -2110,6 +2211,7 @@ document.getElementById('load-json').addEventListener('change', (e) => {
       state.selection = null; state.splitSelection = null;
       const subjInp = document.getElementById('subject-input');
       if (subjInp) subjInp.value = state.subject || '';
+      saveToRecents();  // also add loaded sketch to recents so it's reloadable
       render();
     } catch (err) { alert('Load failed: '+err.message); }
   };

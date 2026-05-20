@@ -15,6 +15,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.21] — 2026-05-20
+
+### Added
+- **Recent projects** list — saves a copy of every sketch you save (or load from file) into `localStorage`, indexed by Subject + timestamp. Browse and reload past projects without re-navigating the file picker.
+  - **Desktop**: header → **📂 Recent** button opens a modal listing the last 12 projects with subject, shape count, and time-since-save. Each row has **Load** and **×** (remove from recents).
+  - **Mobile**: drawer's new **Recent Projects** section at the top, same UI.
+- The recents list automatically prunes to **12** to keep within reasonable localStorage quota (~5 MB total). Oldest entries' full data is also evicted when pruned.
+- Removing a recent entry doesn't touch your saved file — the file (in OneDrive / iCloud / wherever) is independent. The "remove from recents" only deletes the localStorage copy.
+
+### Notes
+- Recents are stored per browser. Switching browsers / devices doesn't carry the list — that's still what your saved JSON files are for.
+- If the recents list seems empty after upgrading, that's expected: the list only includes projects saved AFTER v0.11.21. Older saves aren't retroactively imported.
+- Untitled sketches (no Subject set) save as "Untitled" — set a Subject before saving for cleaner labels in the recents list.
+
+---
+
 ## [0.11.20] — 2026-05-20
 
 ### Added

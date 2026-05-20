@@ -204,6 +204,13 @@
     padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px;
     display: flex; justify-content: space-between; font-size: 13px;
   }
+  .drawer .recent-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; }
+  .drawer .recent-item .recent-info { flex: 1; min-width: 0; padding: 0; }
+  .drawer .recent-item .recent-subject { font-size: 13px; font-weight: bold; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .drawer .recent-item .recent-meta { font-size: 11px; color: #666; }
+  .drawer .recent-item button { padding: 6px 10px; min-height: 32px; font-size: 12px; }
+  .drawer .recent-item .recent-load { background: #2b6cb0; color: #fff; border-color: #1b4a7a; }
+  .drawer .recent-item .recent-delete { background: #f8d7da; color: #721c24; border-color: #f5c6cb; padding: 6px 8px; font-weight: bold; }
   /* Modal */
   .modal-bg {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200;
@@ -302,6 +309,9 @@
     <button id="btn-rename-floor" style="flex:1;">Rename</button>
   </div>
 
+  <h2>Recent Projects</h2>
+  <div class="shape-list" id="recents-list"></div>
+
   <h2>Areas on this Floor</h2>
   <div class="shape-list" id="shape-list"></div>
 
@@ -352,7 +362,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.20'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.21'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -1833,6 +1843,26 @@ function renderDrawer() {
       render();
     };
   });
+  // Recent projects (localStorage)
+  const recents = getRecents();
+  $('recents-list').innerHTML = recents.length
+    ? recents.map(r => `
+        <div class="recent-item">
+          <div class="recent-info">
+            <div class="recent-subject">${escapeHtml(r.subject || 'Untitled')}</div>
+            <div class="recent-meta">${r.shapes} shape${r.shapes === 1 ? '' : 's'} · ${formatRecentDate(r.savedAt)}</div>
+          </div>
+          <button class="recent-load" data-key="${escapeHtml(r.key)}">Load</button>
+          <button class="recent-delete" data-key="${escapeHtml(r.key)}" aria-label="Remove">×</button>
+        </div>`).join('')
+    : '<div style="font-size:12px; color:#999; padding:8px;">No recent projects yet. Tap 💾 Save to add one.</div>';
+  document.querySelectorAll('#recents-list .recent-load').forEach(b => {
+    b.onclick = () => loadFromRecents(b.dataset.key);
+  });
+  document.querySelectorAll('#recents-list .recent-delete').forEach(b => {
+    b.onclick = (ev) => { ev.stopPropagation(); deleteFromRecents(b.dataset.key); };
+  });
+
   // Shape list
   const shapes = shapesOnFloor(state.activeFloor);
   $('shape-list').innerHTML = shapes.length
@@ -2089,12 +2119,103 @@ async function saveBlob(blob, filename, mime) {
   triggerDownload(blob, filename);
 }
 
+// ----- Recent projects (localStorage-backed) -----
+const RECENTS_INDEX_KEY = 'cvalrsketch:recents';
+const RECENT_PROJECT_PREFIX = 'cvalrsketch:project:';
+const MAX_RECENTS = 12;
+
+function getRecents() {
+  try { return JSON.parse(localStorage.getItem(RECENTS_INDEX_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+function setRecents(arr) {
+  try { localStorage.setItem(RECENTS_INDEX_KEY, JSON.stringify(arr)); } catch (e) {}
+}
+
+function saveToRecents() {
+  const subjRaw = (state.subject || '').trim();
+  const subject = subjRaw || 'Untitled';
+  const key = subject.replace(/[^\w\- ]/g, '_').slice(0, 60) + '_' + Date.now();
+  const data = { ...state };
+  delete data.undoStack; delete data.redoStack; delete data.selection;
+  delete data.fenceSelection; delete data.fenceDraw; delete data.offsetPick;
+  delete data.preview; delete data.splitSelection; delete data.splitPreview;
+  try {
+    localStorage.setItem(RECENT_PROJECT_PREFIX + key, JSON.stringify(data));
+  } catch (e) {
+    toast('Recents: localStorage full, oldest pruned');
+  }
+  const recents = getRecents();
+  recents.unshift({
+    key,
+    subject,
+    savedAt: new Date().toISOString(),
+    shapes: state.shapes.length,
+    floors: [...new Set(state.shapes.map(s => s.floor))],
+  });
+  // Prune to MAX_RECENTS, deleting old projects' full data to free quota
+  while (recents.length > MAX_RECENTS) {
+    const old = recents.pop();
+    try { localStorage.removeItem(RECENT_PROJECT_PREFIX + old.key); } catch (e) {}
+  }
+  setRecents(recents);
+}
+
+function loadFromRecents(key) {
+  const raw = localStorage.getItem(RECENT_PROJECT_PREFIX + key);
+  if (!raw) { toast('Project not found in recents'); return; }
+  if (state.shapes.length || state.segments.length) {
+    if (!confirm('Discard the current sketch and load this recent project?')) return;
+  }
+  try {
+    const d = JSON.parse(raw);
+    Object.assign(state, d);
+    state.undoStack = []; state.redoStack = [];
+    state.selection = null; state.fenceSelection = null; state.fenceDraw = null;
+    state.offsetPick = null; state.preview = null;
+    state.splitSelection = null; state.splitPreview = null;
+    if (editTarget) { editTarget = null; $('controls').classList.remove('editing'); }
+    if (fenceMode) exitFenceMode();
+    cancelChainPreview();
+    clearEntry();
+    const subjInp = $('subject-input'); if (subjInp) subjInp.value = state.subject || '';
+    closeDrawer();
+    render();
+    renderDrawer();
+    toast('Loaded "' + (state.subject || 'Untitled') + '"');
+  } catch (e) {
+    toast('Load failed: ' + e.message);
+  }
+}
+
+function deleteFromRecents(key) {
+  if (!confirm('Remove this project from recents? Your saved file (if any) is unaffected.')) return;
+  const recents = getRecents().filter(r => r.key !== key);
+  setRecents(recents);
+  try { localStorage.removeItem(RECENT_PROJECT_PREFIX + key); } catch (e) {}
+  renderDrawer();
+}
+
+function formatRecentDate(iso) {
+  const d = new Date(iso);
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  if (diff < 604800) return Math.floor(diff/86400) + 'd ago';
+  return d.toLocaleDateString();
+}
+
 async function saveJSON() {
+  // Always snapshot to localStorage recents so the user can hop back here later
+  // without re-navigating the file system. Then save the actual file too.
+  saveToRecents();
   const data = { ...state };
   delete data.undoStack; delete data.redoStack; delete data.selection;
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const filename = (state.subject || 'sketch').replace(/[^\w\-]/g, '_') + '.json';
   await saveBlob(blob, filename, 'application/json');
+  renderDrawer();  // refresh recents list
 }
 
 function loadJSON(file) {
@@ -2107,6 +2228,7 @@ function loadJSON(file) {
       state.undoStack = []; state.redoStack = [];
       $('subject-input').value = state.subject || '';
       clearEntry();
+      saveToRecents();   // also add this loaded sketch to recents so it's reloadable
       render();
       renderDrawer();
       toast('Sketch loaded');
