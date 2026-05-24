@@ -8,10 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Planned
-- Voice-to-text segment entry (Web Speech API) with a grammar-first parser and verbal confirmation
 - Touch gestures (pinch-zoom, two-finger pan) for tablet/phone use
 - "Snap-to-close" one-click button when gap is small but non-zero
 - Diagnose hint: "wall N may be X too long/short" suggestions based on gap direction
+
+---
+
+## [0.11.23] — 2026-05-24
+
+### Added
+- **🎤 Voice dictation for segment entry** (desktop). New **Dictate** button next to *Add* uses the Web Speech API to turn spoken measurements into the parser's grammar:
+  - "five foot seven right" → `5'7 right`
+  - "five foot seven right, two foot zero down, twenty-five foot six right enter" → three segments drawn (comma = separate walls).
+  - "four foot right and four foot down enter" → one diagonal segment (`and` = `&`, the existing combined-component syntax).
+  - Trailing **"enter"** in the utterance commits the input via the normal `addCmd()` path.
+- Status caption below the input shows the latest heard phrase and its transform — e.g. `Heard: "10 ft 6 right" → 10'6 right`. Persistent (won't get clobbered by other UI updates).
+- Spelled-out numbers 0–99 are converted to digits ("twenty seven" → `27`).
+- Common direction mishears mapped to canonical words ("rate / rite / write" → `right`, "dawn" → `down`, etc.).
+- Web Speech often splits one spoken line into multiple final results; the dictation handler appends and re-normalizes the combined value so `<dir> and <num>` still becomes `&` even when split across utterances.
+
+### Changed
+- `parseSegment` in `core.js` now also accepts the full direction words `right | left | up | down` (in addition to the existing `r | l | u | d`). Backward compatible — short forms still work.
+
+### Notes
+- Best experience is over HTTPS (or installed as a PWA). Browsers don't reliably persist mic permission for `file://` origins — if you open the local HTML directly you may be re-prompted. Installing as a PWA or hosting via GitHub Pages avoids this.
+- Hardcoded `en-US` for now.
+- Mobile (`m/index.html`) does NOT include the mic button in this release — the touch keypad is still the primary entry method there.
 
 ---
 

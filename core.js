@@ -97,6 +97,8 @@ function parseSegment(text, priorHeadingDeg = null) {
 
   let s = text.trim().toLowerCase()
     .replace(/→/g,' r').replace(/←/g,' l').replace(/↑/g,' u').replace(/↓/g,' d')
+    .replace(/\bright\b/g, 'r').replace(/\bleft\b/g, 'l')   // accept full direction words
+    .replace(/\bup\b/g, 'u').replace(/\bdown\b/g, 'd')
     .replace(/\s*\+\s*/g, '+')              // collapse spaces around + so "2'6 + 3'0" → "2'6+3'0"
     .replace(/([\d'"])([rlud])/g, '$1 $2')  // split length from direction: "3'0r" → "3'0 r"
     .replace(/([rlud])(-?\d)/g, '$1 $2');   // split direction from angle: "r90" → "r 90"

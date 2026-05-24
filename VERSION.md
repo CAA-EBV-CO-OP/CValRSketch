@@ -1,7 +1,7 @@
 # Version
 
-**Current version:** `0.11.22`
-**Released:** 2026-05-20
+**Current version:** `0.11.23`
+**Released:** 2026-05-24
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 While the project is below 1.0, the public "API" (segment syntax, JSON save format) may still change between minor versions; breaking changes will be called out in [CHANGELOG.md](./CHANGELOG.md).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.23 | 2026-05-24 | minor  | Desktop: 🎤 voice dictation for segment entry — Dictate button next to Add, Web Speech API, natural-language measurements ("five foot seven right"), spoken `enter` commits, `and` between two directional clauses → diagonal `&`. Also `parseSegment` now accepts full direction words (`right`/`left`/`up`/`down`). |
 | 0.11.22 | 2026-05-20 | patch  | Mobile: 📋 Copy / Paste sketch via clipboard. Workaround for the OneDrive iOS File Provider being unreliable — gets sketch JSON in/out without depending on Save to Files. |
 | 0.11.21 | 2026-05-20 | minor  | Recent projects list — every Save/Load also stores a copy in `localStorage`; mobile drawer surfaces them at the top; desktop adds a 📂 Recent header button. Up to 12 entries; tap to load, × to remove. Lets you hop between sketches without re-navigating the file picker. |
 | 0.11.20 | 2026-05-20 | patch  | "New project" / "🗋 New" button added to both desktop header and mobile drawer. Clears shapes, in-progress walk, annotations, subject, floors, etc. for a clean slate. Confirms first when there's work to discard; pushed to undo for recovery. |

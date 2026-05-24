@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
 <script src="core.js"></script>
+<script src="dictation.js"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -971,7 +972,9 @@ function sidebarWalk() {
       <div class="input-row">
         <input id="cmd" placeholder="e.g. 16'4 u   or   3'6 r 45" autofocus>
         <button data-act="addCmd">Add</button>
+        <button id="btnMic" type="button" title="Dictate measurements">Dictate</button>
       </div>
+      <div id="micStatus" style="font-size:11px;color:#666;margin-top:4px;min-height:14px;"></div>
       <div class="row-buttons">
         <button data-act="undo">↶ Undo</button>
         <button data-act="closeShape" class="primary">Close Shape</button>
@@ -1197,6 +1200,7 @@ function attachSidebarHandlers() {
     if (e.key === 'Enter') splitProject();
     else if (e.key === 'Escape') { cancelSplitProject(); sdir.value = ''; }
   });
+  if (window.Dictation && typeof Dictation.init === 'function') Dictation.init();
 }
 
 function sidebarAction(e) {
