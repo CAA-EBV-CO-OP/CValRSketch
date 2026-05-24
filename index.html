@@ -18,6 +18,7 @@
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
   header { background: #2b3a4a; color: #fff; padding: 8px 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   header h1 { font-size: 15px; margin: 0; }
+  header .version-chip { font-size: 11px; color: #9fb0c2; font-family: ui-monospace, monospace; }
   header button, header label.btn { background: #4a6377; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
   header button:hover, header label.btn:hover { background: #5a7388; }
   header button:disabled { background: #3a4554; color: #6a7484; cursor: not-allowed; }
@@ -95,6 +96,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
+  <span class="version-chip" id="app-version">v0.11.26</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>

@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.26] — 2026-05-24
+
+### Added
+- **Desktop version chip in the header** — small `v0.11.26` text next to the "Sketch Walker" title. Mobile already had a version stamp; this brings desktop to parity so you can confirm at a glance which build is running after a refresh.
+
+---
+
 ## [0.11.25] — 2026-05-24
 
 ### Fixed
