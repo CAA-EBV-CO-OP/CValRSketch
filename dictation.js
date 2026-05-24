@@ -43,6 +43,11 @@
     let s = String(text || '').toLowerCase().trim();
     if (!s) return { text: '', submit: false };
 
+    // 0. Web Speech often emits the literal '-' character for the spoken word
+    //    "minus" between numbers ("20 ft 6 - 10 ft"). Convert it to the word
+    //    BEFORE wordsToDigits, which strips hyphens to handle "twenty-seven".
+    s = s.replace(/([\d'"])\s*-\s*(?=\d)/g, '$1 minus ');
+
     // 1. Spelled numbers → digits.
     s = wordsToDigits(s);
 

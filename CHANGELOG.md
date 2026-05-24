@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.25] — 2026-05-24
+
+### Fixed
+- **Dictation arithmetic now recognizes the `-` character** that Web Speech often emits in place of the spoken word "minus". Saying "twenty foot six minus ten foot right" was being transcribed as `20 ft 6 - 10 ft right`; the prior version of `wordsToDigits()` stripped the dash (to handle hyphenated number words like "twenty-seven"), so arithmetic never fired and the dictation produced `20'6 10' right` — which the parser then rejected as not a valid segment. Now the dash is converted to the word "minus" up front, before the hyphen strip runs.
+
+---
+
 ## [0.11.24] — 2026-05-24
 
 ### Added

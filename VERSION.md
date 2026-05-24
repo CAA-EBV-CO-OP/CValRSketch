@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.24`
+**Current version:** `0.11.25`
 **Released:** 2026-05-24
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.25 | 2026-05-24 | patch  | Dictation: recognize the `-` character emitted by Web Speech for the spoken word "minus" (engines often render "minus" as a literal dash between numbers). Fixes arithmetic silently being dropped when the engine chose the symbol over the word. |
 | 0.11.24 | 2026-05-24 | patch  | Dictation: arithmetic on measurements — say `20 foot 6 minus 10 feet right enter` to compute `10'6 right` (laser-measure workflow: shoot past the wall, subtract the extra). Also accepts `plus`. Strips verbal confirmation "is X" and connector "then". |
 | 0.11.23 | 2026-05-24 | minor  | Desktop: 🎤 voice dictation for segment entry — Dictate button next to Add, Web Speech API, natural-language measurements ("five foot seven right"), spoken `enter` commits, `and` between two directional clauses → diagonal `&`. Also `parseSegment` now accepts full direction words (`right`/`left`/`up`/`down`). |
 | 0.11.22 | 2026-05-20 | patch  | Mobile: 📋 Copy / Paste sketch via clipboard. Workaround for the OneDrive iOS File Provider being unreliable — gets sketch JSON in/out without depending on Save to Files. |
