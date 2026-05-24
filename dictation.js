@@ -238,6 +238,11 @@
                  && typeof findAlignedCandidatesHere === 'function'
                  && typeof state === 'object';
     let staged = cmd.value.trim().toLowerCase();
+    // "last" / "far" / "farthest" / "end" → jump straight to the farthest aligned
+    // candidate in one word. More reliable than repeated "next" because Chrome's
+    // recognizer often drops the 2nd of two short words said as separate utterances.
+    const jumpLast = /\b(last|farthest|far|end)\b/.test(staged);
+    staged = staged.replace(/\b(last|farthest|far|end)\b/g, ' ');
     let nextCount = 0;
     const stagedNoNext = staged.replace(/\bnext\b/g, () => { nextCount++; return ' '; })
                                .replace(/\s+/g, ' ').trim();
@@ -250,7 +255,7 @@
         cmd.value = '';
         return;
       }
-      const idx = nextCount % cands.length;                // wrap, matching keyboard cycling
+      const idx = jumpLast ? cands.length - 1 : nextCount % cands.length;
       state.preview = { dir: bare, candIdx: idx, candidates: cands, jump: false };
       if (typeof render === 'function') render();          // show the preview live
       if (submit) commitWalkPreview();                     // "enter" commits it
@@ -260,15 +265,15 @@
       return;
     }
 
-    if (canAuto && stagedNoNext === '' && nextCount > 0) {
-      // "next" on its own — extend an existing preview to a farther candidate.
+    if (canAuto && stagedNoNext === '' && (nextCount > 0 || jumpLast)) {
+      // "next" / "last" on its own — extend an existing preview.
       if (state.preview && state.preview.candidates) {
         const n = state.preview.candidates.length;
-        state.preview.candIdx = (state.preview.candIdx + nextCount) % n;   // wrap: cycle through all candidates
+        state.preview.candIdx = jumpLast ? n - 1 : (state.preview.candIdx + nextCount) % n;
         if (typeof render === 'function') render();
         if (submit) { commitWalkPreview(); }
       } else {
-        setStatus('Say a direction first (e.g. "up"), then "next" to extend.');
+        setStatus('Say a direction first (e.g. "up"), then "next" / "last" to extend.');
       }
       cmd.value = '';
       return;

@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.37] — 2026-05-24
+
+### Added
+- **"last" / "far" / "farthest" jump for auto-extend.** Say "left last" (or "far"/"farthest"/"end") to snap straight to the *farthest* aligned candidate in a single word, instead of stepping with repeated "next". The on-screen diagnostic log proved why this was needed: when you say two separate "next"s, Chrome's recognizer reliably captures only the first — after emitting one result the continuous session went quiet for ~17s (a known Web Speech flaw with repeated short utterances) and the second "next" was never transcribed. Single-word "last" sidesteps that. One-breath "left next next" also still counts both "next"s.
+
+---
+
 ## [0.11.36] — 2026-05-24
 
 ### Fixed
