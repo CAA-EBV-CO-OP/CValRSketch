@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.33] — 2026-05-24
+
+### Added
+- **Dictation training mode.** A new **Train** button next to *Dictate* teaches the app to fix a mishearing. When the engine mis-transcribes (e.g. "five foot right" → "private right"), click **Train**: it shows what was heard and asks what you meant. It auto-derives the minimal correction by stripping the words that already match and keeping only the part that differs ("private" → "five foot"), then stores it. Corrections persist in `localStorage` (`cvalr-dictation-corrections`) and are applied at the very start of every future transform, so the rest of the pipeline (numbers → measurements → directions) sees the corrected words. Re-teaching the same misheard phrase overwrites the old rule.
+
+---
+
 ## [0.11.32] — 2026-05-24
 
 ### Changed

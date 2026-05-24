@@ -39,11 +39,52 @@
     dawn: 'down', doubt: 'down'
   };
 
+  // ---- User-trained corrections (persisted) ----
+  // Map of misheard phrase → intended phrase, learned via the Train button.
+  // Applied at the very start of transform() so the rest of the pipeline
+  // (numbers, measurements, directions) sees the corrected words.
+  const CORRECTIONS_KEY = 'cvalr-dictation-corrections';
+  let corrections = [];
+
+  function loadCorrections() {
+    try {
+      const raw = localStorage.getItem(CORRECTIONS_KEY);
+      corrections = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(corrections)) corrections = [];
+    } catch (e) { corrections = []; }
+  }
+  function saveCorrections() {
+    try { localStorage.setItem(CORRECTIONS_KEY, JSON.stringify(corrections)); } catch (e) {}
+  }
+  function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function applyCorrections(s) {
+    for (const c of corrections) {
+      if (!c || !c.from) continue;
+      s = s.replace(new RegExp('\\b' + escapeRegex(c.from) + '\\b', 'gi'), c.to);
+    }
+    return s;
+  }
+  // Derive a {from,to} mapping from a misheard transcript + the intended phrase,
+  // by stripping the common leading/trailing words and keeping only the part that
+  // actually differs. "private right" vs "five foot right" → {from:"private", to:"five foot"}.
+  function deriveCorrection(heard, meant) {
+    const h = heard.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const m = meant.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    let i = 0;
+    while (i < h.length && i < m.length && h[i] === m[i]) i++;
+    let j = 0;
+    while (j < h.length - i && j < m.length - i && h[h.length - 1 - j] === m[m.length - 1 - j]) j++;
+    return { from: h.slice(i, h.length - j).join(' '), to: m.slice(i, m.length - j).join(' ') };
+  }
+
   // Pure: speech transcript → sketch-parser input string + submit flag.
   // Exposed for console testing: Dictation.transform("five foot seven right enter")
   function transform(text) {
     let s = String(text || '').toLowerCase().trim();
     if (!s) return { text: '', submit: false };
+
+    // -1. Apply user-trained corrections first (misheard phrase → intended).
+    s = applyCorrections(s);
 
     // 0. Web Speech often emits the literal '-' / '+' characters for the spoken
     //    words "minus" / "plus" between numbers ("20 ft 6 - 10 ft", "5 ft + 3 ft").
@@ -133,6 +174,7 @@
   let listening = false;
   let wantListening = false;   // sticky: continuous mode auto-restarts on onend until user toggles off
   let suppressListeningStatus = false;   // on auto-restart, keep the prior "Heard:" line visible
+  let lastHeardRaw = '';       // raw transcript of the most recent dictation (for Train)
 
   function $(id) { return document.getElementById(id); }
 
@@ -154,6 +196,7 @@
   }
 
   function handleFinalResult(transcript) {
+    lastHeardRaw = transcript.trim();
     const { text, submit } = transform(transcript);
     setStatus('Heard: "' + transcript.trim() + '" → ' + (text || '(empty)') + (submit ? '  [enter]' : ''));
     const cmd = $('cmd');
@@ -289,14 +332,44 @@
     }
   }
 
-  function init() {
-    const btn = $('btnMic');
-    if (!btn) return;
-    if (btn.dataset.dictationBound === '1') return;   // attachSidebarHandlers may rebind on every render
-    btn.dataset.dictationBound = '1';
-    btn.addEventListener('click', toggleMic);
-    setButtonState();
+  // Teach a correction for the last mishearing. Shows what was heard, asks what
+  // you meant, then auto-derives the differing words and stores them as a rule.
+  function trainCorrection() {
+    if (!lastHeardRaw) {
+      setStatus('Dictate something first, then Train to fix a mishearing.');
+      return;
+    }
+    const meant = window.prompt(
+      'Heard: "' + lastHeardRaw + '"\n\nType what you actually said (spoken form, e.g. "five foot right"):',
+      '');
+    if (meant == null) return;            // cancelled
+    const trimmed = meant.trim();
+    if (!trimmed) return;
+    const corr = deriveCorrection(lastHeardRaw, trimmed);
+    if (!corr.from || !corr.to) {
+      setStatus('No difference detected between heard and meant — nothing to learn.');
+      return;
+    }
+    const existing = corrections.findIndex(c => c.from === corr.from);
+    if (existing >= 0) corrections[existing] = corr; else corrections.push(corr);
+    saveCorrections();
+    setStatus('Learned: "' + corr.from + '" → "' + corr.to + '". Re-dictate to use it.');
   }
 
-  window.Dictation = { init, transform };
+  function init() {
+    loadCorrections();
+    const btn = $('btnMic');
+    if (btn && btn.dataset.dictationBound !== '1') {   // attachSidebarHandlers may rebind on every render
+      btn.dataset.dictationBound = '1';
+      btn.addEventListener('click', toggleMic);
+      setButtonState();
+    }
+    const train = $('btnTrain');
+    if (train && train.dataset.dictationBound !== '1') {
+      train.dataset.dictationBound = '1';
+      train.addEventListener('click', trainCorrection);
+    }
+  }
+
+  window.Dictation = { init, transform, trainCorrection };
 })();

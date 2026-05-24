@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.32`
+**Current version:** `0.11.33`
 **Released:** 2026-05-24
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.33 | 2026-05-24 | minor  | Dictation training: a **Train** button next to Dictate teaches a correction for the last mishearing. Shows what was heard ("private right"), you type what you meant ("five foot right"), and it auto-derives the differing words ("private" → "five foot") and stores them. Corrections persist in localStorage and are applied to all future dictation. |
 | 0.11.32 | 2026-05-24 | patch  | Dictation auto-extend now previews live: a bare direction ("up") shows the snap preview without committing; "enter" commits; "next" (even spoken alone) extends the preview to a farther vertex. Fixes "next" on its own throwing a "need length and direction" parser error. Both "up"→"next"→"enter" (separate) and "up next enter" (one breath) work. |
 | 0.11.31 | 2026-05-24 | minor  | Dictation: spoken "next" extends a bare-direction auto-extend to a farther aligned vertex, drawn as one dimensioned segment. "up" snaps to the nearest aligned vertex; "up next" reaches the one beyond it; repeat "next" to go farther (clamped to the farthest). Lets you skip intermediate step vertices and draw one combined wall. |
 | 0.11.30 | 2026-05-24 | minor  | Snap-to-vertex now has a perpendicular-projection fallback (desktop + voice). When no vertex sits directly on the ray, saying/typing a bare direction walks until the pen's moving coordinate lines up with another vertex (e.g. "left" walks until your X equals the start's X) — so you can square up a closing corner that wasn't already axis-aligned. Applies to keyboard preview and one-step voice. |
