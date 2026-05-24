@@ -368,28 +368,30 @@ function findAlignedCandidates(priorSegments, dir, start, shapes) {
   for (const sh of shapes) for (let i = 0; i < sh.points.length - 1; i++) add(sh.points[i]);
   for (const p of pts) add(p);
 
-  // Fallback: perpendicular projection. When no vertex sits directly on the ray,
-  // offer landing points where walking in `dir` brings the pen's MOVING coordinate
-  // in line with another vertex — i.e. "walk left until my X equals that vertex's X".
-  // Lets you close a shape whose closing corner isn't already axis-aligned with the pen.
-  if (out.length === 0) {
-    const isHoriz = Math.abs(dx) > Math.abs(dy);   // r/l move X; u/d move Y
-    function addProj(p) {
-      const landing = isHoriz ? { x: p.x, y: pen.y } : { x: pen.x, y: p.y };
-      const along = (landing.x - pen.x) * dx + (landing.y - pen.y) * dy;
-      if (along <= minForward) return;             // must be a forward walk in `dir`
-      const key = `${landing.x.toFixed(3)},${landing.y.toFixed(3)}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      out.push({
-        along,
-        point: landing,
-        segment: { length: along, dir, angle: 0, dx: dx * along, dy: dy * along, raw: `${formatLength(along)} ${dir} (align)` },
-      });
-    }
-    for (const sh of shapes) for (let i = 0; i < sh.points.length - 1; i++) addProj(sh.points[i]);
-    for (const p of pts) addProj(p);
+  // Perpendicular-projection candidates, ALWAYS merged in (not just a fallback).
+  // A landing point where walking in `dir` brings the pen's MOVING coordinate in line
+  // with another vertex — i.e. "walk up until my Y matches that vertex's Y". This gives
+  // the nearer alignment options (e.g. line up with each step of a staircase) in addition
+  // to any vertex sitting directly on the ray, so there's more than one candidate to
+  // cycle through. On-ray hits already added above are de-duped by landing-point key.
+  const isHoriz = Math.abs(dx) > Math.abs(dy);   // r/l move X; u/d move Y
+  function addProj(p) {
+    const perp = Math.abs((p.x - pen.x) * (-dy) + (p.y - pen.y) * dx);
+    if (perp < tol) return;                      // already added as an on-ray candidate
+    const landing = isHoriz ? { x: p.x, y: pen.y } : { x: pen.x, y: p.y };
+    const along = (landing.x - pen.x) * dx + (landing.y - pen.y) * dy;
+    if (along <= minForward) return;             // must be a forward walk in `dir`
+    const key = `${landing.x.toFixed(3)},${landing.y.toFixed(3)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      along,
+      point: landing,
+      segment: { length: along, dir, angle: 0, dx: dx * along, dy: dy * along, raw: `${formatLength(along)} ${dir} (align)` },
+    });
   }
+  for (const sh of shapes) for (let i = 0; i < sh.points.length - 1; i++) addProj(sh.points[i]);
+  for (const p of pts) addProj(p);
 
   out.sort((a, b) => a.along - b.along);
   return out;

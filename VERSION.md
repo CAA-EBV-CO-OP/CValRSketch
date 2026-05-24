@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.37`
+**Current version:** `0.11.38`
 **Released:** 2026-05-24
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.38 | 2026-05-24 | minor  | Snap-to-vertex: perpendicular-projection alignments are now ALWAYS offered (merged with on-ray hits, sorted by distance), not just when nothing's directly on the ray. So a bare direction gives the nearer alignment options too (e.g. line up with each step's height) and there's more than one candidate to cycle through. Fixes both "up only offers the far vertex" and "cycling stops at one" when only one vertex sat directly on the ray. Affects keyboard + voice + mobile. |
 | 0.11.37 | 2026-05-24 | minor  | Dictation: "last" / "far" / "farthest" jumps straight to the farthest aligned candidate in one word ("left last"). Added because Chrome's recognizer reliably drops the 2nd of two short words said as separate utterances — the diagnostic log proved a second separate "next" was never transcribed (engine went quiet for 17s mid-session). One-breath "left next next" also counts both. |
 | 0.11.36 | 2026-05-24 | patch  | **Cache-bust fix.** `core.js` and `dictation.js` are now loaded with a `?v=<version>` query that bumps every release. Root cause of "I refreshed but it still fails": the browser/HTTP cache was serving a stale `dictation.js` while `index.html` (and its version chip) updated — so the version number changed but the logic didn't. The query forces the JS to refresh in lockstep with the HTML. |
 | 0.11.35 | 2026-05-24 | patch  | Dictation: temporary on-screen diagnostic log (below the mic status) showing recent speech-recognition lifecycle events (onstart / onresult / onerror / onend / auto-restart). No DevTools needed — reproduce an issue and screenshot the log. Will be removed once the mic-drop issue is diagnosed. |

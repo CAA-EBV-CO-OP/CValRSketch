@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.38] — 2026-05-24
+
+### Changed
+- **Snap-to-vertex always offers perpendicular-projection alignments**, merged with the on-ray hits and sorted by distance — previously projection was only a fallback used when *nothing* sat directly on the ray. Now a bare direction gives the nearer alignment options too: e.g. going "up" past a staircase, you can line up with each step's height, not just the one vertex directly overhead. This fixes two reports at once: "up jumps straight to the far vertex instead of offering the first alignment", and "cycling stops at one" — both happened when only a single vertex sat exactly on the ray, leaving nothing to cycle to. On-ray vertices are de-duped against their own projection so they aren't listed twice. Applies to keyboard, voice, and mobile (shared `core.js`).
+
+---
+
 ## [0.11.37] — 2026-05-24
 
 ### Added
