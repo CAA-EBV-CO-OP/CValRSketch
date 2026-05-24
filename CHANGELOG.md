@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.36] — 2026-05-24
+
+### Fixed
+- **Stale JavaScript after refresh (cache skew).** `core.js` and `dictation.js` are now loaded with a `?v=<version>` cache-busting query that changes on every release. This was almost certainly behind the recurring "I refreshed and it still fails" reports this session: the browser HTTP cache (and/or service worker) was serving an old `dictation.js` while `index.html` — including the version chip — loaded fresh. So the displayed version number advanced but the actual logic didn't. Tying the JS URL to the version forces the HTML and JS to update together. The service worker's pre-cache list now references the versioned URLs too.
+
+---
+
 ## [0.11.35] — 2026-05-24
 
 ### Added (temporary, diagnostic)

@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.35`
+**Current version:** `0.11.36`
 **Released:** 2026-05-24
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.36 | 2026-05-24 | patch  | **Cache-bust fix.** `core.js` and `dictation.js` are now loaded with a `?v=<version>` query that bumps every release. Root cause of "I refreshed but it still fails": the browser/HTTP cache was serving a stale `dictation.js` while `index.html` (and its version chip) updated — so the version number changed but the logic didn't. The query forces the JS to refresh in lockstep with the HTML. |
 | 0.11.35 | 2026-05-24 | patch  | Dictation: temporary on-screen diagnostic log (below the mic status) showing recent speech-recognition lifecycle events (onstart / onresult / onerror / onend / auto-restart). No DevTools needed — reproduce an issue and screenshot the log. Will be removed once the mic-drop issue is diagnosed. |
 | 0.11.34 | 2026-05-24 | patch  | Dictation: "next" now cycles through ALL aligned candidates (wraps 1→2→3→1) instead of clamping at the last. Also, the mic survives transient errors (network / service-not-allowed, common on file://) by auto-retrying instead of dying, with a throttle (gives up after 6 drops in 10s). The earlier "stops at one next" was the mic dropping out, not the cycling. |
 | 0.11.33 | 2026-05-24 | minor  | Dictation training: a **Train** button next to Dictate teaches a correction for the last mishearing. Shows what was heard ("private right"), you type what you meant ("five foot right"), and it auto-derives the differing words ("private" → "five foot") and stores them. Corrections persist in localStorage and are applied to all future dictation. |
