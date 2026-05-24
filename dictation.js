@@ -172,23 +172,27 @@
       cmd.value = transform(combined).text;
     }
     if (submit) {
-      // Voice single-step auto-extend: if the staged value is just a bare direction,
-      // preview + commit in one go. (The keyboard flow is two Enters — first previews,
-      // second commits — to allow cycling candidates; voice users want the closest
-      // aligned vertex drawn immediately.)
-      const bare = BARE_DIR[cmd.value.trim().toLowerCase()];
-      if (bare && typeof handleAutoExtendKey === 'function' && typeof commitWalkPreview === 'function') {
-        // Check for a target first so we can report "none" in the status caption
-        // instead of letting handleAutoExtendKey fire a blocking alert().
-        const cands = (typeof findAlignedCandidatesHere === 'function' && typeof state === 'object')
-          ? findAlignedCandidatesHere(state.segments, bare) : null;
-        if (cands && !cands.length) {
+      // Voice auto-extend: if the staged value is just a bare direction (optionally
+      // with "next" tokens), snap to an aligned vertex and commit in one step. The
+      // keyboard flow is two Enters (preview, then commit, so you can cycle); voice
+      // commits immediately. Each spoken "next" steps to a FARTHER aligned candidate,
+      // drawn as a single dimensioned segment — so "up" snaps to the nearest aligned
+      // vertex, "up next" reaches the one beyond it, etc.
+      let staged = cmd.value.trim().toLowerCase();
+      let nextCount = 0;
+      staged = staged.replace(/\bnext\b/g, () => { nextCount++; return ' '; }).replace(/\s+/g, ' ').trim();
+      const bare = BARE_DIR[staged];
+      if (bare && typeof commitWalkPreview === 'function'
+          && typeof findAlignedCandidatesHere === 'function' && typeof state === 'object') {
+        const cands = findAlignedCandidatesHere(state.segments, bare);
+        if (!cands.length) {
           setStatus('No vertex aligned ' + bare.toUpperCase() + ' of the pen — say a length, or try another direction.');
           cmd.value = '';
           return;
         }
-        handleAutoExtendKey(bare);   // builds preview at the closest aligned vertex
-        commitWalkPreview();         // commits it
+        const idx = Math.min(nextCount, cands.length - 1);   // clamp: extra "next"s stop at the farthest
+        state.preview = { dir: bare, candIdx: idx, candidates: cands, jump: false };
+        commitWalkPreview();
         cmd.value = '';
         return;
       }

@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.31] — 2026-05-24
+
+### Added
+- **Spoken "next" extends auto-extend to a farther vertex.** When you dictate a bare direction, "up" snaps to the *nearest* aligned vertex. Adding "next" — "up next" — reaches the vertex *beyond* it instead, drawn as a single dimensioned segment (so you skip the intermediate step vertices rather than getting several short walls). Each additional "next" steps one farther, clamped to the farthest aligned candidate. Works for all directions and for both on-ray vertices and projection-aligned ones.
+
+---
+
 ## [0.11.30] — 2026-05-24
 
 ### Added

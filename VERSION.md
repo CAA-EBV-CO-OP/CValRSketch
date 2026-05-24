@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.30`
+**Current version:** `0.11.31`
 **Released:** 2026-05-24
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.31 | 2026-05-24 | minor  | Dictation: spoken "next" extends a bare-direction auto-extend to a farther aligned vertex, drawn as one dimensioned segment. "up" snaps to the nearest aligned vertex; "up next" reaches the one beyond it; repeat "next" to go farther (clamped to the farthest). Lets you skip intermediate step vertices and draw one combined wall. |
 | 0.11.30 | 2026-05-24 | minor  | Snap-to-vertex now has a perpendicular-projection fallback (desktop + voice). When no vertex sits directly on the ray, saying/typing a bare direction walks until the pen's moving coordinate lines up with another vertex (e.g. "left" walks until your X equals the start's X) — so you can square up a closing corner that wasn't already axis-aligned. Applies to keyboard preview and one-step voice. |
 | 0.11.29 | 2026-05-24 | minor  | Dictation: one-step auto-extend. Say just a direction + "enter" ("right enter" / "left enter") to draw a wall to the next 90°-aligned vertex. Keyboard still takes two Enters (preview, then commit, to allow cycling); voice commits the closest candidate immediately. Includes single-letter mishears ("are/our"→R, "you"→U, "el"→L). No aligned vertex → non-blocking status message (no alert dialog). |
 | 0.11.28 | 2026-05-24 | patch  | Dictation: also recognize the `+` character (engines emit it for spoken "plus" the same way they emit `-` for "minus"). Plus: the "Heard:" status line now persists across silence-triggered auto-restarts of recognition — previously "Listening…" overwrote it during pauses, so you couldn't verify what the engine captured. |
