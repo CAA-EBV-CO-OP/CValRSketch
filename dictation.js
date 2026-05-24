@@ -13,11 +13,13 @@
   const TENS = { twenty:20, thirty:30, forty:40, fifty:50, sixty:60, seventy:70, eighty:80, ninety:90 };
 
   // Collapse spelled-out numbers 0–99 into digits in-place.
-  // Handles "twenty seven" → "27" and "twenty-seven" → "27" without touching unrelated words.
+  // Handles "twenty seven" → "27" and "twenty-seven" → "27" without touching
+  // unrelated words OR standalone hyphens (which the speech engine may emit for
+  // spoken "minus" between two measurements — those are handled in step 0 of
+  // transform(), and need to survive this function intact).
   function wordsToDigits(s) {
-    s = s.replace(/-/g, ' ');
-    // Compound tens+ones: "twenty seven" → "27"
-    s = s.replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\s+(one|two|three|four|five|six|seven|eight|nine)\b/gi,
+    // Compound tens+ones: "twenty seven" or "twenty-seven" → "27"
+    s = s.replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[-\s]+(one|two|three|four|five|six|seven|eight|nine)\b/gi,
       (_, t, o) => String(TENS[t.toLowerCase()] + ONES[o.toLowerCase()]));
     // Single tens or ones words
     s = s.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b/gi,

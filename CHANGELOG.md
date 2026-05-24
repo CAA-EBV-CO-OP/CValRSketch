@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.27] — 2026-05-24
+
+### Fixed
+- **Pause-split dictation lost the minus operator.** When a spoken arithmetic phrase was split across two final results by a pause — e.g. "twenty foot six" / [pause] / "minus ten foot right enter" — the dash the engine emitted at the end of the first chunk was being stripped by `wordsToDigits()` before the second chunk arrived. The combined value then had no operator and addCmd rejected it. `wordsToDigits()` now only consumes hyphens that sit between spelled-number words (e.g. "twenty-seven"); standalone dashes survive into the re-normalize pass where they're converted to "minus".
+
+---
+
 ## [0.11.26] — 2026-05-24
 
 ### Added

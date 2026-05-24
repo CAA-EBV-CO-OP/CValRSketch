@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.26`
+**Current version:** `0.11.27`
 **Released:** 2026-05-24
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.27 | 2026-05-24 | patch  | Dictation: stop stripping standalone hyphens in `wordsToDigits()`. When a pause split a spoken arithmetic phrase across two finals ("twenty foot six" / pause / "minus ten foot right"), the dash the engine emitted at the end of the first chunk was being wiped before the re-normalize step could see it — so the combined value had no operator and the parser rejected the input. Only hyphens between spelled-number words are still consumed. |
 | 0.11.26 | 2026-05-24 | patch  | Desktop: version chip in the header next to the title (matches the stamp the mobile UI already had). Quick visual confirmation of which build is running after a refresh. |
 | 0.11.25 | 2026-05-24 | patch  | Dictation: recognize the `-` character emitted by Web Speech for the spoken word "minus" (engines often render "minus" as a literal dash between numbers). Fixes arithmetic silently being dropped when the engine chose the symbol over the word. |
 | 0.11.24 | 2026-05-24 | patch  | Dictation: arithmetic on measurements — say `20 foot 6 minus 10 feet right enter` to compute `10'6 right` (laser-measure workflow: shoot past the wall, subtract the extra). Also accepts `plus`. Strips verbal confirmation "is X" and connector "then". |
