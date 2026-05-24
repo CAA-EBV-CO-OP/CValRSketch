@@ -119,6 +119,16 @@
 
   // ---- DOM wiring ----
 
+  // A staged value that is JUST a direction (with no length) means "auto-extend to
+  // the next aligned vertex". Includes common single-letter mishears: "R"→"are/our",
+  // "U"→"you", "L"→"el". Only applied when it's the WHOLE staged value, so these
+  // everyday words never affect normal measurement dictation.
+  const BARE_DIR = {
+    right: 'r', left: 'l', up: 'u', down: 'd',
+    r: 'r', l: 'l', u: 'u', d: 'd',
+    are: 'r', our: 'r', el: 'l', you: 'u'
+  };
+
   let recognition = null;
   let listening = false;
   let wantListening = false;   // sticky: continuous mode auto-restarts on onend until user toggles off
@@ -161,7 +171,29 @@
       const combined = current ? (current + ' ' + text) : text;
       cmd.value = transform(combined).text;
     }
-    if (submit && typeof addCmd === 'function') addCmd();
+    if (submit) {
+      // Voice single-step auto-extend: if the staged value is just a bare direction,
+      // preview + commit in one go. (The keyboard flow is two Enters — first previews,
+      // second commits — to allow cycling candidates; voice users want the closest
+      // aligned vertex drawn immediately.)
+      const bare = BARE_DIR[cmd.value.trim().toLowerCase()];
+      if (bare && typeof handleAutoExtendKey === 'function' && typeof commitWalkPreview === 'function') {
+        // Check for a target first so we can report "none" in the status caption
+        // instead of letting handleAutoExtendKey fire a blocking alert().
+        const cands = (typeof findAlignedCandidatesHere === 'function' && typeof state === 'object')
+          ? findAlignedCandidatesHere(state.segments, bare) : null;
+        if (cands && !cands.length) {
+          setStatus('No vertex aligned ' + bare.toUpperCase() + ' of the pen — say a length, or try another direction.');
+          cmd.value = '';
+          return;
+        }
+        handleAutoExtendKey(bare);   // builds preview at the closest aligned vertex
+        commitWalkPreview();         // commits it
+        cmd.value = '';
+        return;
+      }
+      if (typeof addCmd === 'function') addCmd();
+    }
   }
 
   function startRecognition() {

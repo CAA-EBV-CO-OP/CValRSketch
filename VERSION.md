@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.28`
+**Current version:** `0.11.29`
 **Released:** 2026-05-24
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.29 | 2026-05-24 | minor  | Dictation: one-step auto-extend. Say just a direction + "enter" ("right enter" / "left enter") to draw a wall to the next 90°-aligned vertex. Keyboard still takes two Enters (preview, then commit, to allow cycling); voice commits the closest candidate immediately. Includes single-letter mishears ("are/our"→R, "you"→U, "el"→L). No aligned vertex → non-blocking status message (no alert dialog). |
 | 0.11.28 | 2026-05-24 | patch  | Dictation: also recognize the `+` character (engines emit it for spoken "plus" the same way they emit `-` for "minus"). Plus: the "Heard:" status line now persists across silence-triggered auto-restarts of recognition — previously "Listening…" overwrote it during pauses, so you couldn't verify what the engine captured. |
 | 0.11.27 | 2026-05-24 | patch  | Dictation: stop stripping standalone hyphens in `wordsToDigits()`. When a pause split a spoken arithmetic phrase across two finals ("twenty foot six" / pause / "minus ten foot right"), the dash the engine emitted at the end of the first chunk was being wiped before the re-normalize step could see it — so the combined value had no operator and the parser rejected the input. Only hyphens between spelled-number words are still consumed. |
 | 0.11.26 | 2026-05-24 | patch  | Desktop: version chip in the header next to the title (matches the stamp the mobile UI already had). Quick visual confirmation of which build is running after a refresh. |

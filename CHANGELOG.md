@@ -14,6 +14,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.29] — 2026-05-24
+
+### Added
+- **One-step voice auto-extend (snap-to-vertex).** Say just a direction and "enter" — "right enter", "left enter" — to draw a wall from the pen to the next 90°-aligned vertex in that direction. The keyboard flow is unchanged (type `r` + Enter to *preview*, Enter again to *commit*, so you can cycle through candidates); voice commits the closest candidate in one step since cycling by voice is awkward.
+- Single-letter direction mishears handled when the whole utterance is just that word: "are"/"our" → R, "you" → U, "el" → L. (Only as a complete bare-direction value, so these everyday words never affect normal measurement dictation.)
+- When there's no vertex aligned in the requested direction, the voice path shows a **non-blocking status message** ("No vertex aligned R of the pen — …") instead of the blocking `alert()` the keyboard path uses.
+
+---
+
 ## [0.11.28] — 2026-05-24
 
 ### Added
