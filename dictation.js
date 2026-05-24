@@ -59,6 +59,37 @@
       s = s.replace(new RegExp('\\b' + wrong + '\\b', 'g'), MISHEARS[wrong]);
     }
 
+    // 3b. Arithmetic on measurements: "20'6 minus 10'" → "10'6", "10' plus 6\"" → "10'6".
+    //     Runs after measurement collapse so operands are already in X'Y form.
+    //     Uses core.js parseLength + formatLength (loaded globally before this script).
+    if (typeof parseLength === 'function' && typeof formatLength === 'function') {
+      const MEAS = '\\d+(?:\'(?:\\d+)?"?)?|\\d+"|\\d+(?:\\.\\d+)?';
+      const arithRe = new RegExp('(' + MEAS + ')\\s+(minus|plus)\\s+(' + MEAS + ')', 'g');
+      // Apply repeatedly so chained "a minus b plus c" collapses left-to-right.
+      let prev;
+      do {
+        prev = s;
+        s = s.replace(arithRe, (match, a, op, b) => {
+          const av = parseLength(a);
+          const bv = parseLength(b);
+          if (isNaN(av) || isNaN(bv)) return match;
+          const result = op === 'minus' ? av - bv : av + bv;
+          if (result < 0) return match;   // negative result is nonsense for a length; leave the raw expr so user sees the problem
+          return formatLength(result);
+        });
+      } while (s !== prev);
+    }
+
+    // 3c. Strip "is <measurement>" verbal confirmation that follows a measurement
+    //     (e.g. "20'6 minus 10' is 10'6" → after arith, "10'6 is 10'6"). The user
+    //     spoke the expected answer aloud as a sanity check; the computed answer
+    //     is already in place from step 3b, so we drop the spoken one. Requiring
+    //     a measurement before "is" avoids stripping unrelated phrases like
+    //     "this is 10 right".
+    s = s.replace(/(\d+'(?:\d+)?"?|\d+")\s+is\s+\d+(?:'(?:\d+)?"?)?/g, '$1');
+    // Drop the verbal connector "then" used between the arithmetic answer and "enter".
+    s = s.replace(/\s+\bthen\b/g, '');
+
     // 4. Diagonal connector: spoken "and" between two directional clauses → "&".
     //    "4'r and 4'd" → "4'r & 4'd"   (one diagonal segment per core.js:81)
     s = s.replace(/\b(right|left|up|down|r|l|u|d)\s+and\s+(?=\d|\.?\d)/g, '$1 & ');

@@ -14,6 +14,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.24] — 2026-05-24
+
+### Added
+- **Arithmetic on dictated measurements**. Built for the laser-measure workflow: shoot past your wall to a far target, then subtract the overshoot.
+  - `"20 foot 6 minus 10 feet right enter"` → computes `10'6` and commits `10'6 right`.
+  - `plus` works the same way: `"5 foot plus 3 foot right enter"` → `8'0 right`. (Note: the parser already supports `+` between length tokens like `2'6+3'0`; spoken `plus` now matches.)
+  - Chained arithmetic resolves left-to-right: `"a minus b plus c"` collapses repeatedly until one measurement remains.
+- **Verbal confirmation strip**. If you speak the expected answer aloud as a sanity check — `"20'6 minus 10' is 10'6 then enter"` — the `is 10'6` confirmation is stripped (only when it follows a measurement, so unrelated phrases like "this is 10 right" are untouched). The verbal connector "then" between the answer and `enter` is also dropped.
+
+### Notes
+- Negative results (smaller-minus-larger) are left unevaluated so you can see the bad input and re-dictate, rather than producing a nonsensical negative length.
+
+---
+
 ## [0.11.23] — 2026-05-24
 
 ### Added
