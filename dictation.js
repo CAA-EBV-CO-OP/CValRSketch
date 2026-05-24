@@ -196,6 +196,18 @@
     if (el) el.textContent = msg;
   }
 
+  // On-screen diagnostic log (no DevTools needed). Shows recent recognition
+  // lifecycle events so mic-drop issues can be diagnosed from a screenshot.
+  const logLines = [];
+  function logEvent(msg) {
+    const t = new Date();
+    const stamp = t.toLocaleTimeString() + '.' + String(t.getMilliseconds()).padStart(3, '0');
+    logLines.unshift(stamp + '  ' + msg);
+    if (logLines.length > 14) logLines.pop();
+    const el = $('micLog');
+    if (el) el.textContent = logLines.join('\n');
+  }
+
   function handleFinalResult(transcript) {
     lastHeardRaw = transcript.trim();
     const { text, submit } = transform(transcript);
@@ -278,10 +290,12 @@
     recognition.onstart = () => {
       listening = true;
       setButtonState();
+      logEvent('onstart');
       if (!suppressListeningStatus) setStatus('Listening…');
       suppressListeningStatus = false;
     };
     recognition.onerror = (e) => {
+      logEvent('onerror: ' + e.error);
       if (e.error === 'no-speech') { setStatus('No speech yet — keep going.'); return; }
       if (e.error === 'aborted') return;                  // user-initiated stop
       if (e.error === 'not-allowed') {                    // hard permission denial — give up
@@ -299,12 +313,14 @@
       restartTimes = [];   // a real result means the mic is working — clear the failure counter
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const r = event.results[i];
+        if (r.isFinal) logEvent('result(final): "' + r[0].transcript.trim() + '"');
         if (r.isFinal) handleFinalResult(r[0].transcript);
       }
     };
     recognition.onend = () => {
       listening = false;
       setButtonState();
+      logEvent('onend (wantListening=' + wantListening + ')');
       if (!wantListening) { setStatus('Stopped.'); return; }
       // Engine ended on its own (silence/timeout/transient error) — restart to keep
       // continuous behavior. Throttle so a persistently failing service can't spin-loop:
@@ -315,13 +331,15 @@
       if (restartTimes.length > 6) {
         wantListening = false;
         restartTimes = [];
+        logEvent('GAVE UP (6 restarts in 10s)');
         setStatus('Mic kept dropping — click Dictate to retry. For reliable speech use the HTTPS/PWA version, not a local file.');
         return;
       }
       // Suppress the next onstart's "Listening…" so the previous "Heard:" line stays
       // visible across the pause — the user can verify the last capture at leisure.
       suppressListeningStatus = true;
-      try { recognition.start(); } catch (e) { /* a fresh start() may race */ }
+      logEvent('auto-restart (#' + restartTimes.length + ')');
+      try { recognition.start(); } catch (e) { logEvent('restart threw: ' + e.message); }
     };
     try {
       recognition.start();

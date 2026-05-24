@@ -96,7 +96,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.11.34</span>
+  <span class="version-chip" id="app-version">v0.11.35</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -978,6 +978,7 @@ function sidebarWalk() {
         <button id="btnTrain" type="button" title="Teach a correction for the last mishearing">Train</button>
       </div>
       <div id="micStatus" style="font-size:11px;color:#666;margin-top:4px;min-height:14px;"></div>
+      <pre id="micLog" style="font-size:10px;color:#777;background:#f4f7fa;border:1px solid #e0e6ec;border-radius:4px;margin-top:4px;padding:4px 6px;max-height:120px;overflow:auto;white-space:pre-wrap;line-height:1.35;"></pre>
       <div class="row-buttons">
         <button data-act="undo">↶ Undo</button>
         <button data-act="closeShape" class="primary">Close Shape</button>

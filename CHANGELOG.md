@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.35] — 2026-05-24
+
+### Added (temporary, diagnostic)
+- **On-screen mic event log** below the dictation status, showing the recent speech-recognition lifecycle (`onstart`, `result(final)`, `onerror: <type>`, `onend`, `auto-restart`, `GAVE UP`). This is a debugging aid so the mic-drop issue can be diagnosed from a screenshot without DevTools (which don't work in app-mode windows). It will be removed once the root cause is confirmed.
+
+---
+
 ## [0.11.34] — 2026-05-24
 
 ### Changed
