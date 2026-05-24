@@ -14,6 +14,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.34] — 2026-05-24
+
+### Changed
+- **"next" cycles through all aligned candidates.** It now wraps (1 → 2 → 3 → 1) like the keyboard's repeat-direction cycling, instead of clamping at the farthest. So you can keep saying "next" to step through every candidate the preview panel lists ("Candidate X of N").
+
+### Fixed
+- **Mic no longer dies on transient errors.** `network` and `service-not-allowed` errors (common on `file://` origins) used to permanently stop the session — which is why "next" appeared to "only work once" (the mic had dropped before the second "next"). These are now treated as transient: the session stays alive and auto-restarts. A throttle gives up only after 6 drops within 10 seconds, with a message suggesting the HTTPS/PWA build for reliable speech. Only a hard `not-allowed` (permission denied) stops the session outright.
+
+---
+
 ## [0.11.33] — 2026-05-24
 
 ### Added

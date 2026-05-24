@@ -175,6 +175,7 @@
   let wantListening = false;   // sticky: continuous mode auto-restarts on onend until user toggles off
   let suppressListeningStatus = false;   // on auto-restart, keep the prior "Heard:" line visible
   let lastHeardRaw = '';       // raw transcript of the most recent dictation (for Train)
+  let restartTimes = [];       // timestamps of recent auto-restarts (throttle runaway loops)
 
   function $(id) { return document.getElementById(id); }
 
@@ -237,7 +238,7 @@
         cmd.value = '';
         return;
       }
-      const idx = Math.min(nextCount, cands.length - 1);   // clamp: extra "next"s stop at the farthest
+      const idx = nextCount % cands.length;                // wrap, matching keyboard cycling
       state.preview = { dir: bare, candIdx: idx, candidates: cands, jump: false };
       if (typeof render === 'function') render();          // show the preview live
       if (submit) commitWalkPreview();                     // "enter" commits it
@@ -251,7 +252,7 @@
       // "next" on its own — extend an existing preview to a farther candidate.
       if (state.preview && state.preview.candidates) {
         const n = state.preview.candidates.length;
-        state.preview.candIdx = Math.min(state.preview.candIdx + nextCount, n - 1);
+        state.preview.candIdx = (state.preview.candIdx + nextCount) % n;   // wrap: cycle through all candidates
         if (typeof render === 'function') render();
         if (submit) { commitWalkPreview(); }
       } else {
@@ -282,12 +283,20 @@
     };
     recognition.onerror = (e) => {
       if (e.error === 'no-speech') { setStatus('No speech yet — keep going.'); return; }
-      if (e.error === 'not-allowed') { setStatus('Mic permission denied — enable in browser settings.'); wantListening = false; }
-      else if (e.error === 'service-not-allowed') { setStatus('Speech service unavailable — check OS speech settings.'); wantListening = false; }
-      else if (e.error === 'aborted') { /* user-initiated stop, no message */ }
-      else { setStatus('Mic error: ' + e.error); }
+      if (e.error === 'aborted') return;                  // user-initiated stop
+      if (e.error === 'not-allowed') {                    // hard permission denial — give up
+        setStatus('Mic permission denied — enable it in the browser/site settings.');
+        wantListening = false;
+        return;
+      }
+      // network / service-not-allowed / other: usually transient (common on file://).
+      // Keep the session alive and let onend's throttled auto-restart retry.
+      if (e.error === 'service-not-allowed') setStatus('Speech service hiccup — retrying… (HTTPS/PWA is more reliable than file://)');
+      else if (e.error === 'network') setStatus('Network hiccup — retrying…');
+      else setStatus('Mic error: ' + e.error + ' — retrying…');
     };
     recognition.onresult = (event) => {
+      restartTimes = [];   // a real result means the mic is working — clear the failure counter
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const r = event.results[i];
         if (r.isFinal) handleFinalResult(r[0].transcript);
@@ -296,15 +305,23 @@
     recognition.onend = () => {
       listening = false;
       setButtonState();
-      if (wantListening) {
-        // Engine ended on its own (silence/timeout) — restart to keep continuous behavior.
-        // Suppress the next onstart's "Listening…" so the previous "Heard:" line stays
-        // visible across the pause — the user can verify the last capture at leisure.
-        suppressListeningStatus = true;
-        try { recognition.start(); } catch (e) { /* ignored: a fresh start() may race */ }
-      } else {
-        setStatus('Stopped.');
+      if (!wantListening) { setStatus('Stopped.'); return; }
+      // Engine ended on its own (silence/timeout/transient error) — restart to keep
+      // continuous behavior. Throttle so a persistently failing service can't spin-loop:
+      // more than 6 restarts within 10s → give up with a helpful message.
+      const now = Date.now();
+      restartTimes = restartTimes.filter(t => now - t < 10000);
+      restartTimes.push(now);
+      if (restartTimes.length > 6) {
+        wantListening = false;
+        restartTimes = [];
+        setStatus('Mic kept dropping — click Dictate to retry. For reliable speech use the HTTPS/PWA version, not a local file.');
+        return;
       }
+      // Suppress the next onstart's "Listening…" so the previous "Heard:" line stays
+      // visible across the pause — the user can verify the last capture at leisure.
+      suppressListeningStatus = true;
+      try { recognition.start(); } catch (e) { /* a fresh start() may race */ }
     };
     try {
       recognition.start();
