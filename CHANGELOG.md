@@ -14,6 +14,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.32] — 2026-05-24
+
+### Changed
+- **Voice auto-extend now previews live, like the keyboard.** A bare direction ("up") shows the snap preview on the canvas without committing; "enter" commits it; "next" steps the preview to a farther aligned vertex. This makes the spoken interaction match the keyboard's preview→commit model and supports both phrasings: "up" → "next" → "enter" as separate utterances, or "up next enter" in one breath.
+
+### Fixed
+- **"next" spoken on its own no longer throws "need length and direction".** Previously a standalone "next" fell through to the segment parser and errored (a blocking alert). Now it extends an active preview to a farther candidate, or — if there's no active preview — shows a non-blocking hint ("Say a direction first…").
+
+---
+
 ## [0.11.31] — 2026-05-24
 
 ### Added

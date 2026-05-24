@@ -171,33 +171,54 @@
       const combined = current ? (current + ' ' + text) : text;
       cmd.value = transform(combined).text;
     }
-    if (submit) {
-      // Voice auto-extend: if the staged value is just a bare direction (optionally
-      // with "next" tokens), snap to an aligned vertex and commit in one step. The
-      // keyboard flow is two Enters (preview, then commit, so you can cycle); voice
-      // commits immediately. Each spoken "next" steps to a FARTHER aligned candidate,
-      // drawn as a single dimensioned segment — so "up" snaps to the nearest aligned
-      // vertex, "up next" reaches the one beyond it, etc.
-      let staged = cmd.value.trim().toLowerCase();
-      let nextCount = 0;
-      staged = staged.replace(/\bnext\b/g, () => { nextCount++; return ' '; }).replace(/\s+/g, ' ').trim();
-      const bare = BARE_DIR[staged];
-      if (bare && typeof commitWalkPreview === 'function'
-          && typeof findAlignedCandidatesHere === 'function' && typeof state === 'object') {
-        const cands = findAlignedCandidatesHere(state.segments, bare);
-        if (!cands.length) {
-          setStatus('No vertex aligned ' + bare.toUpperCase() + ' of the pen — say a length, or try another direction.');
-          cmd.value = '';
-          return;
-        }
-        const idx = Math.min(nextCount, cands.length - 1);   // clamp: extra "next"s stop at the farthest
-        state.preview = { dir: bare, candIdx: idx, candidates: cands, jump: false };
-        commitWalkPreview();
+    // --- Voice auto-extend (snap-to-vertex) ---
+    // A bare direction PREVIEWS the aligned candidate live on the canvas (like the
+    // keyboard flow); "enter" commits it. Spoken "next" steps to a FARTHER aligned
+    // candidate (drawn as one dimensioned segment), and can be said on its own to
+    // extend an existing preview. So both of these work:
+    //   "up" → "next" → "enter"   (separate utterances: preview, extend, commit)
+    //   "up next enter"           (one utterance)
+    const canAuto = typeof commitWalkPreview === 'function'
+                 && typeof findAlignedCandidatesHere === 'function'
+                 && typeof state === 'object';
+    let staged = cmd.value.trim().toLowerCase();
+    let nextCount = 0;
+    const stagedNoNext = staged.replace(/\bnext\b/g, () => { nextCount++; return ' '; })
+                               .replace(/\s+/g, ' ').trim();
+    const bare = BARE_DIR[stagedNoNext];
+
+    if (canAuto && bare) {
+      const cands = findAlignedCandidatesHere(state.segments, bare);
+      if (!cands.length) {
+        setStatus('No vertex aligned ' + bare.toUpperCase() + ' of the pen — say a length, or try another direction.');
         cmd.value = '';
         return;
       }
-      if (typeof addCmd === 'function') addCmd();
+      const idx = Math.min(nextCount, cands.length - 1);   // clamp: extra "next"s stop at the farthest
+      state.preview = { dir: bare, candIdx: idx, candidates: cands, jump: false };
+      if (typeof render === 'function') render();          // show the preview live
+      if (submit) commitWalkPreview();                     // "enter" commits it
+      // Always clear #cmd: the preview is now the active object. A following
+      // "next" extends it; a following "enter" (empty input) commits it via addCmd.
+      cmd.value = '';
+      return;
     }
+
+    if (canAuto && stagedNoNext === '' && nextCount > 0) {
+      // "next" on its own — extend an existing preview to a farther candidate.
+      if (state.preview && state.preview.candidates) {
+        const n = state.preview.candidates.length;
+        state.preview.candIdx = Math.min(state.preview.candIdx + nextCount, n - 1);
+        if (typeof render === 'function') render();
+        if (submit) { commitWalkPreview(); }
+      } else {
+        setStatus('Say a direction first (e.g. "up"), then "next" to extend.');
+      }
+      cmd.value = '';
+      return;
+    }
+
+    if (submit && typeof addCmd === 'function') addCmd();
   }
 
   function startRecognition() {
