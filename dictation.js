@@ -45,10 +45,11 @@
     let s = String(text || '').toLowerCase().trim();
     if (!s) return { text: '', submit: false };
 
-    // 0. Web Speech often emits the literal '-' character for the spoken word
-    //    "minus" between numbers ("20 ft 6 - 10 ft"). Convert it to the word
-    //    BEFORE wordsToDigits, which strips hyphens to handle "twenty-seven".
+    // 0. Web Speech often emits the literal '-' / '+' characters for the spoken
+    //    words "minus" / "plus" between numbers ("20 ft 6 - 10 ft", "5 ft + 3 ft").
+    //    Convert to the words so the arithmetic step (3b) sees them uniformly.
     s = s.replace(/([\d'"])\s*-\s*(?=\d)/g, '$1 minus ');
+    s = s.replace(/([\d'"])\s*\+\s*(?=\d)/g, '$1 plus ');
 
     // 1. Spelled numbers → digits.
     s = wordsToDigits(s);
@@ -121,6 +122,7 @@
   let recognition = null;
   let listening = false;
   let wantListening = false;   // sticky: continuous mode auto-restarts on onend until user toggles off
+  let suppressListeningStatus = false;   // on auto-restart, keep the prior "Heard:" line visible
 
   function $(id) { return document.getElementById(id); }
 
@@ -172,7 +174,12 @@
     recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = 'en-US';
-    recognition.onstart = () => { listening = true; setButtonState(); setStatus('Listening…'); };
+    recognition.onstart = () => {
+      listening = true;
+      setButtonState();
+      if (!suppressListeningStatus) setStatus('Listening…');
+      suppressListeningStatus = false;
+    };
     recognition.onerror = (e) => {
       if (e.error === 'no-speech') { setStatus('No speech yet — keep going.'); return; }
       if (e.error === 'not-allowed') { setStatus('Mic permission denied — enable in browser settings.'); wantListening = false; }
@@ -191,6 +198,9 @@
       setButtonState();
       if (wantListening) {
         // Engine ended on its own (silence/timeout) — restart to keep continuous behavior.
+        // Suppress the next onstart's "Listening…" so the previous "Heard:" line stays
+        // visible across the pause — the user can verify the last capture at leisure.
+        suppressListeningStatus = true;
         try { recognition.start(); } catch (e) { /* ignored: a fresh start() may race */ }
       } else {
         setStatus('Stopped.');

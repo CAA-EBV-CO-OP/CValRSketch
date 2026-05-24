@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.28] — 2026-05-24
+
+### Added
+- **`+` character recognized as spoken "plus"**. Mirrors the v0.11.25 fix for `-`. If the speech engine renders "plus" as the literal `+` between numbers, the arithmetic step now picks it up.
+- **"Heard:" status line persists across silence-driven auto-restarts.** Previously, after every pause the engine would auto-restart and `recognition.onstart` would overwrite the status with "Listening…" — wiping the last "Heard: → ..." line so you couldn't verify what the engine captured. The auto-restart path now suppresses the "Listening…" update, leaving the prior "Heard:" line in place until the next dictation produces a new one. A user-initiated stop still shows "Stopped." and a fresh user-initiated start shows "Listening…".
+
+---
+
 ## [0.11.27] — 2026-05-24
 
 ### Fixed
