@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.30] — 2026-05-24
+
+### Added
+- **Perpendicular-projection fallback for snap-to-vertex** (`core.js findAlignedCandidates`). Previously a bare direction only snapped to a vertex sitting *exactly on the ray* (directly left/right/up/down). Now, when no such vertex exists, it offers landing points where walking in that direction brings the pen's *moving* coordinate in line with another vertex — "left" walks until your X equals another vertex's X, "up" walks until your Y equals another vertex's Y. This is what lets you square up a closing corner that isn't already axis-aligned with the pen (e.g. the diagonal-triangle case where saying "left" should draw to directly below the start). Applies everywhere the snap logic is used: keyboard preview, one-step voice, and mobile. Projection segments are labeled `(align)` vs. the exact `(auto)` snaps.
+
+---
+
 ## [0.11.29] — 2026-05-24
 
 ### Added
