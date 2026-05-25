@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.39] — 2026-05-24
+
+### Fixed
+- **iPhone PWA wasn't picking up updates, even via "Reload latest (clear cache)".** The mobile page (`m/index.html`) loaded `../core.js` with no cache-bust query. The force-reload button correctly unregisters the service worker and clears the Cache Storage, but the browser's *HTTP* cache still served a stale `core.js` on the next load — so shared parser/geometry changes (e.g. the v0.11.38 projection alignments, direction-word parsing) never reached mobile. Now mobile loads `../core.js?v=0.11.39`, matching the desktop cache-busting scheme. Also synced the mobile `APP_VERSION` stamp, which had been left at `0.11.23`, so the header/drawer version now reflects the real release.
+
+---
+
 ## [0.11.38] — 2026-05-24
 
 ### Changed
