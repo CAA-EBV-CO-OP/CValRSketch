@@ -14,7 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
 <link rel="apple-touch-icon" href="../icon-192.png">
 <title>CValRSketch — Mobile</title>
-<script src="../core.js?v=0.11.39"></script>
+<script src="../core.js?v=0.11.40"></script>
+<script src="../dictation.js?v=0.11.40"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -268,6 +269,11 @@
     <span class="preview" id="entry-preview"></span>
     <button class="toggle-btn" id="btn-collapse" aria-label="Hide keypad">▼</button>
   </div>
+  <div class="dictate-row" style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+    <button id="btnMic" class="toggle-btn" style="flex:0 0 auto;padding:6px 12px;">Dictate</button>
+    <button id="btnTrain" class="toggle-btn" style="flex:0 0 auto;padding:6px 12px;" title="Teach a correction for the last mishearing">Train</button>
+    <span id="micStatus" style="font-size:11px;color:#888;flex:1;min-height:14px;line-height:1.3;"></span>
+  </div>
   <div class="keypad" id="keypad">
     <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="back" class="back" aria-label="backspace">⌫</button>
     <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="ft" class="unit">ft</button>
@@ -364,7 +370,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.39'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.40'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -2496,6 +2502,17 @@ $('drawer-version').textContent = 'v' + APP_VERSION;
 updateEntryDisplay();
 render();
 renderDrawer();
+
+// Voice dictation bridge — lets the shared ../dictation.js drive the mobile
+// entry buffer. entryText is a closure-scoped let, so the adapter (defined here,
+// in the same scope) is the only way the external module can read/write it.
+window.SketchEntryAdapter = {
+  getEntry: () => entryText,
+  setEntry: (v) => { entryText = v; updateEntryDisplay(); },
+  commit:   () => { commitEntry(); },
+  clear:    () => { entryText = ''; updateEntryDisplay(); }
+};
+if (window.Dictation && typeof Dictation.init === 'function') Dictation.init();
 </script>
 </body>
 </html>

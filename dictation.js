@@ -212,6 +212,23 @@
     lastHeardRaw = transcript.trim();
     const { text, submit } = transform(transcript);
     setStatus('Heard: "' + transcript.trim() + '" → ' + (text || '(empty)') + (submit ? '  [enter]' : ''));
+
+    // Mobile path: the touch UI has no #cmd input. It exposes a small adapter
+    // (window.SketchEntryAdapter) over its entry buffer + commitEntry(). Accumulate
+    // the transformed text and commit on "enter". Auto-extend for a bare direction
+    // is handled by the page's commitEntry (snaps to the nearest aligned vertex);
+    // the desktop preview-cycling ("next"/"last") isn't used on mobile.
+    const adapter = window.SketchEntryAdapter;
+    if (adapter) {
+      if (text) {
+        const current = (adapter.getEntry() || '').trim();
+        const combined = current ? (current + ' ' + text) : text;
+        adapter.setEntry(transform(combined).text);
+      }
+      if (submit) adapter.commit();
+      return;
+    }
+
     const cmd = $('cmd');
     if (!cmd) return;
     // APPEND to #cmd rather than overwrite, then RE-NORMALIZE the combined value.

@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.39`
+**Current version:** `0.11.40`
 **Released:** 2026-05-24
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.40 | 2026-05-24 | minor  | Voice dictation ported to the **mobile** touch UI: Dictate + Train buttons added above the keypad, wired to the shared dictation.js via a small entry-buffer adapter. Same transform (measurements, arithmetic, directions, "enter" to commit). Bare-direction auto-extend snaps to the nearest aligned vertex (mobile has no preview-cycling; use the L/U/D/R snap buttons for other candidates). Web Speech works in iPhone Safari. |
 | 0.11.39 | 2026-05-24 | patch  | Mobile cache fix: `m/index.html` loaded `../core.js` with no cache-bust query, so the force-reload button refreshed the HTML but kept serving a stale `core.js` from the HTTP cache — the iPhone PWA never picked up parser/geometry updates. Now loads `../core.js?v=0.11.39`, and the mobile `APP_VERSION` stamp is synced to the real version (was stuck at 0.11.23). |
 | 0.11.38 | 2026-05-24 | minor  | Snap-to-vertex: perpendicular-projection alignments are now ALWAYS offered (merged with on-ray hits, sorted by distance), not just when nothing's directly on the ray. So a bare direction gives the nearer alignment options too (e.g. line up with each step's height) and there's more than one candidate to cycle through. Fixes both "up only offers the far vertex" and "cycling stops at one" when only one vertex sat directly on the ray. Affects keyboard + voice + mobile. |
 | 0.11.37 | 2026-05-24 | minor  | Dictation: "last" / "far" / "farthest" jumps straight to the farthest aligned candidate in one word ("left last"). Added because Chrome's recognizer reliably drops the 2nd of two short words said as separate utterances — the diagnostic log proved a second separate "next" was never transcribed (engine went quiet for 17s mid-session). One-breath "left next next" also counts both. |

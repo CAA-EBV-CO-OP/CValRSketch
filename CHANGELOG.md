@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.40] — 2026-05-24
+
+### Added
+- **Voice dictation on mobile.** The mobile touch UI (`m/index.html`) now has **Dictate** and **Train** buttons above the keypad, sharing the same `dictation.js` engine as desktop (same measurement/arithmetic/direction transforms, spoken "enter" to commit, trained corrections — which carry over since localStorage is shared across the same origin). Because the mobile page drives entry through a closure-scoped `entryText` buffer rather than a `#cmd` input, it exposes a small `window.SketchEntryAdapter` (`getEntry`/`setEntry`/`commit`/`clear`) that `dictation.js` detects and uses. Bare-direction auto-extend snaps to the nearest aligned vertex via the page's `commitEntry()`; the desktop preview-cycling ("next"/"last") isn't wired on mobile — use the on-screen L/U/D/R snap buttons to reach other candidates. Web Speech is available in iPhone Safari (works when the page is open in Safari; standalone-PWA behavior may vary by iOS version).
+
+---
+
 ## [0.11.39] — 2026-05-24
 
 ### Fixed
