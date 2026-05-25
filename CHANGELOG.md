@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.41] — 2026-05-24
+
+### Added
+- **Mobile voice auto-extend cycling.** On the touch UI, a bare direction ("up") now previews a snap candidate and "next"/"last" cycle to farther aligned vertices — the same semantics as desktop — committed on "enter". Since mobile has no live canvas preview for this, the chosen candidate is reported in the status line as "Snap X/N: <length> <DIR>". The `SketchEntryAdapter` gained `candidates(dir)` (aligned snap candidates) and `commitSegment(seg)` (commit a specific chosen segment) so `dictation.js` can pick beyond the nearest. As on desktop, the reliable spoken forms are one-breath "up next next" or the single word "up last" — repeated *separate* "next" utterances are unreliable because Chrome's recognizer drops the second short word.
+
+---
+
 ## [0.11.40] — 2026-05-24
 
 ### Added
