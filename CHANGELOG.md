@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.42] — 2026-05-24
+
+### Fixed
+- **Mobile voice auto-extend now draws the orange dashed preview line.** Previously a spoken direction ("left") registered (the status showed the snap distance) but drew no visual cue on the canvas, because the mobile path committed/reported without using the page's preview renderer. Voice auto-extend now drives the same native `chainPreview` the on-screen L/U/D/R buttons use — a single-leg preview at the chosen candidate — so you see the orange tentative line. "next"/"last" re-point that preview to other candidates; "enter" commits it. The adapter's `commitSegment` was replaced with `previewCandidate(dir, idx)` (sets the preview, returns `{count, idx, segment}` for the status).
+
+---
+
 ## [0.11.41] — 2026-05-24
 
 ### Added

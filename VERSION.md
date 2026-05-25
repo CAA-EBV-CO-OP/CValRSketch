@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.41`
+**Current version:** `0.11.42`
 **Released:** 2026-05-24
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.42 | 2026-05-24 | patch  | Mobile voice auto-extend now shows the orange dashed PREVIEW line (was distance-readout only). Voice "left" drives the page's native chainPreview (same as the L/U/D/R buttons); "next"/"last" re-point the preview to other candidates; "enter" commits. Fixes the missing visual cue on iPhone. |
 | 0.11.41 | 2026-05-24 | minor  | Mobile voice auto-extend cycling: "left"/"up" etc. now preview a snap candidate and "next"/"last" cycle to farther aligned vertices on mobile too (status shows "Snap X/N"), committed on "enter". Adapter gained candidate-lookup + per-segment commit. Reliable forms (Chrome drops repeated separate "next"): one-breath "up next next" or "up last". |
 | 0.11.40 | 2026-05-24 | minor  | Voice dictation ported to the **mobile** touch UI: Dictate + Train buttons added above the keypad, wired to the shared dictation.js via a small entry-buffer adapter. Same transform (measurements, arithmetic, directions, "enter" to commit). Bare-direction auto-extend snaps to the nearest aligned vertex (mobile has no preview-cycling; use the L/U/D/R snap buttons for other candidates). Web Speech works in iPhone Safari. |
 | 0.11.39 | 2026-05-24 | patch  | Mobile cache fix: `m/index.html` loaded `../core.js` with no cache-bust query, so the force-reload button refreshed the HTML but kept serving a stale `core.js` from the HTTP cache — the iPhone PWA never picked up parser/geometry updates. Now loads `../core.js?v=0.11.39`, and the mobile `APP_VERSION` stamp is synced to the real version (was stuck at 0.11.23). |

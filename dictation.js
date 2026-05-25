@@ -197,13 +197,13 @@
     if (el) el.textContent = msg;
   }
 
-  // Mobile has no live canvas preview for auto-extend, so report the chosen snap
-  // candidate in the status line instead.
-  function mobileSnapStatus(cands, idx, submit) {
-    const seg = cands[idx].segment;
+  // Status readout for the mobile snap preview. `info` = { count, idx, segment }
+  // as returned by the page adapter's previewCandidate().
+  function mobileSnapStatus(info, submit) {
+    const seg = info.segment;
     const len = (typeof formatLength === 'function') ? formatLength(seg.length) : seg.length.toFixed(1) + 'ft';
-    const more = (idx + 1 < cands.length) ? ' — "next"/"last" or "enter"' : ' — "enter" to accept';
-    setStatus('Snap ' + (idx + 1) + '/' + cands.length + ': ' + len + ' ' + seg.dir.toUpperCase() + (submit ? '' : more));
+    const more = (info.idx + 1 < info.count) ? ' — "next"/"last" or "enter"' : ' — "enter" to accept';
+    setStatus('Snap ' + (info.idx + 1) + '/' + info.count + ': ' + len + ' ' + seg.dir.toUpperCase() + (submit ? '' : more));
   }
 
   // On-screen diagnostic log (no DevTools needed). Shows recent recognition
@@ -223,57 +223,60 @@
     const { text, submit } = transform(transcript);
     setStatus('Heard: "' + transcript.trim() + '" → ' + (text || '(empty)') + (submit ? '  [enter]' : ''));
 
-    // Mobile path: the touch UI has no #cmd input. It exposes window.SketchEntryAdapter
-    // over its entry buffer + commit. We replicate the desktop auto-extend semantics
-    // (bare direction + "next"/"last") using the adapter's candidate lookup and
-    // per-segment commit, since mobile's own commitEntry only snaps to the nearest.
+    // Mobile path: the touch UI has no #cmd input. It exposes window.SketchEntryAdapter.
+    // For auto-extend we drive the page's native chainPreview (the orange dashed line
+    // the L/U/D/R buttons use) via adapter.previewCandidate, so there's a visual cue —
+    // and "next"/"last" swap which candidate the preview points at. "enter" commits.
     const adapter = window.SketchEntryAdapter;
     if (adapter) {
+      // Parse THIS utterance's transformed text for a bare-direction command.
+      let s = (text || '').toLowerCase().trim();
+      const jumpLast = /\b(last|farthest|far|end)\b/.test(s);
+      s = s.replace(/\b(last|farthest|far|end)\b/g, ' ');
+      let nextCount = 0;
+      const sBare = s.replace(/\bnext\b/g, () => { nextCount++; return ' '; }).replace(/\s+/g, ' ').trim();
+      const bare = BARE_DIR[sBare];
+
+      // Bare direction (optionally + next/last): preview the chosen aligned candidate.
+      if (bare && adapter.previewCandidate) {
+        const probe = adapter.candidates ? adapter.candidates(bare) : [];
+        if (!probe.length) {
+          setStatus('No vertex aligned ' + bare.toUpperCase() + ' of the pen — say a length, or another direction.');
+          mobilePending = null;
+          return;
+        }
+        const idx = jumpLast ? probe.length - 1 : nextCount % probe.length;
+        const info = adapter.previewCandidate(bare, idx);   // draws the orange preview line
+        mobilePending = { dir: bare, count: info.count, idx: info.idx };
+        mobileSnapStatus(info, submit);
+        if (submit) { adapter.commit(); mobilePending = null; }
+        return;
+      }
+
+      // "next"/"last" on its own → re-point the existing preview to another candidate.
+      if ((nextCount > 0 || jumpLast) && sBare === '' && mobilePending && adapter.previewCandidate) {
+        const n = mobilePending.count;
+        const idx = jumpLast ? n - 1 : (mobilePending.idx + nextCount) % n;
+        const info = adapter.previewCandidate(mobilePending.dir, idx);
+        if (info) { mobilePending.idx = info.idx; mobileSnapStatus(info, submit); }
+        if (submit) { adapter.commit(); mobilePending = null; }
+        return;
+      }
+
+      // "enter" on its own with an active preview → commit it.
+      if (submit && sBare === '' && nextCount === 0 && !jumpLast && mobilePending) {
+        adapter.commit();
+        mobilePending = null;
+        return;
+      }
+
+      // Measurement path: accumulate transformed text into the entry, commit on "enter".
       if (text) {
         const current = (adapter.getEntry() || '').trim();
         const combined = current ? (current + ' ' + text) : text;
         adapter.setEntry(transform(combined).text);
       }
-      let staged = (adapter.getEntry() || '').trim().toLowerCase();
-      const jumpLast = /\b(last|farthest|far|end)\b/.test(staged);
-      staged = staged.replace(/\b(last|farthest|far|end)\b/g, ' ');
-      let nextCount = 0;
-      const stagedNoNext = staged.replace(/\bnext\b/g, () => { nextCount++; return ' '; })
-                                 .replace(/\s+/g, ' ').trim();
-      const bare = BARE_DIR[stagedNoNext];
-
-      if (adapter.candidates && bare) {
-        const cands = adapter.candidates(bare);
-        if (!cands.length) {
-          setStatus('No vertex aligned ' + bare.toUpperCase() + ' of the pen — say a length, or another direction.');
-          mobilePending = null; adapter.clear(); return;
-        }
-        const idx = jumpLast ? cands.length - 1 : nextCount % cands.length;
-        mobilePending = { cands, idx };
-        mobileSnapStatus(cands, idx, submit);
-        adapter.clear();
-        if (submit) { adapter.commitSegment(cands[idx].segment); mobilePending = null; }
-        return;
-      }
-
-      if (adapter.candidates && stagedNoNext === '' && (nextCount > 0 || jumpLast) && mobilePending) {
-        const n = mobilePending.cands.length;
-        mobilePending.idx = jumpLast ? n - 1 : (mobilePending.idx + nextCount) % n;
-        mobileSnapStatus(mobilePending.cands, mobilePending.idx, submit);
-        adapter.clear();
-        if (submit) { adapter.commitSegment(mobilePending.cands[mobilePending.idx].segment); mobilePending = null; }
-        return;
-      }
-
-      if (submit) {
-        if (mobilePending) {
-          adapter.commitSegment(mobilePending.cands[mobilePending.idx].segment);
-          mobilePending = null;
-          adapter.clear();
-        } else {
-          adapter.commit();   // measurement path → page's commitEntry parses the entry
-        }
-      }
+      if (submit) adapter.commit();
       return;
     }
 
