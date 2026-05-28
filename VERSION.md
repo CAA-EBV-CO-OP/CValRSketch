@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.11.44`
+**Current version:** `0.11.45`
 **Released:** 2026-05-28
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.45 | 2026-05-28 | patch  | Added a built-in **`other`** floor (alongside basement/main/upper) so detached structures (sheds, barns, pole barns) have a home that isn't a house storey. Floor tabs and the shape Floor dropdown already read from `state.floors`, so custom floors via **+ Floor** always worked — this just adds `other` to the default list for new projects. Existing files: use **+ Floor** to add it. |
 | 0.11.44 | 2026-05-28 | patch  | Mobile: added a **Redo** button (↷) in the header — `redoStack` existed but was never consumed; mirrors desktop `redoHistory`. Undo/redo now guard against an iOS "ghost click" double-firing one tap (80 ms window, below an intentional double-tap, so rapid repeated undo still steps back multiple actions). Header title now ellipsizes so the extra button doesn't overflow on narrow phones. |
 | 0.11.43 | 2026-05-28 | minor  | Added area types **Outbuilding, Barn, Shed, Shop, Carport, Misc** (baked into `core.js` `TYPES`, so they appear in both UIs and the legend on every file). Mobile start-point picking made keyboard-free: a new area's start can be placed by tapping the canvas (snaps to a nearby vertex) and aligned with **↑↓←→** arrows in the new green start bar — fixes iPhone (couldn't open the start option) and Android (keyboard collapsed / voice went to the segment) where nudging the start was previously impossible without typing. |
 | 0.11.42 | 2026-05-24 | patch  | Mobile voice auto-extend now shows the orange dashed PREVIEW line (was distance-readout only). Voice "left" drives the page's native chainPreview (same as the L/U/D/R buttons); "next"/"last" re-point the preview to other candidates; "enter" commits. Fixes the missing visual cue on iPhone. |

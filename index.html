@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.11.44"></script>
-<script src="dictation.js?v=0.11.44"></script>
+<script src="core.js?v=0.11.45"></script>
+<script src="dictation.js?v=0.11.45"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -96,7 +96,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.11.44</span>
+  <span class="version-chip" id="app-version">v0.11.45</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -164,7 +164,7 @@
 let state = {
   segments: [],         // in-progress walking segments
   shapes: [],           // completed shapes (each: {id, points, segments, label, type, floor})
-  floors: ['basement','main','upper'],
+  floors: ['basement','main','upper','other'],
   activeFloor: 'main',
   selection: null,      // {kind:'wall'|'vertex'|'shape', shapeId, idx?}
   splitSelection: null, // {shapeId, idx} for first vertex in split
@@ -2195,7 +2195,7 @@ function newProject() {
   state.annotations = [];
   state.subject = '';
   state.subtitle = '';
-  state.floors = ['basement', 'main', 'upper'];
+  state.floors = ['basement', 'main', 'upper', 'other'];
   state.activeFloor = 'main';
   state.nextShapeId = 1;
   state.selection = null;

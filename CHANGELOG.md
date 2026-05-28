@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.45] — 2026-05-28
+
+### Added
+- **Built-in `other` floor.** The default floor list (`basement`, `main`, `upper`) now includes **`other`**, giving detached structures — sheds, barns, pole barns, shops — a home that isn't a house storey. Both UIs already render the floor tabs and the shape Floor dropdown from `state.floors`, so user-added floors via **+ Floor** have always worked; this only changes the defaults for *new* projects (existing saved files keep their own floor list — add `other` with **+ Floor**).
+
+---
+
 ## [0.11.44] — 2026-05-28
 
 ### Added

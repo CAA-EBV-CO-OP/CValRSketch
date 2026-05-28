@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
 <link rel="apple-touch-icon" href="../icon-192.png">
 <title>CValRSketch — Mobile</title>
-<script src="../core.js?v=0.11.44"></script>
-<script src="../dictation.js?v=0.11.44"></script>
+<script src="../core.js?v=0.11.45"></script>
+<script src="../dictation.js?v=0.11.45"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -391,7 +391,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.44'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.45'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -399,7 +399,7 @@ const svg = $('canvas');
 let state = {
   segments: [],
   shapes: [],
-  floors: ['basement', 'main', 'upper'],
+  floors: ['basement', 'main', 'upper', 'other'],
   activeFloor: 'main',
   selection: null,
   mode: 'walk',
@@ -469,7 +469,7 @@ function restoreState(snap) {
   const d = JSON.parse(snap);
   state.segments = d.segments || [];
   state.shapes = d.shapes || [];
-  state.floors = d.floors || ['basement','main','upper'];
+  state.floors = d.floors || ['basement','main','upper','other'];
   state.activeFloor = d.activeFloor || 'main';
   state.nextShapeId = d.nextShapeId || 1;
   state.startPoint = d.startPoint || null;
@@ -1895,7 +1895,7 @@ function newProject() {
   state.annotations = [];
   state.subject = '';
   state.subtitle = '';
-  state.floors = ['basement', 'main', 'upper'];
+  state.floors = ['basement', 'main', 'upper', 'other'];
   state.activeFloor = 'main';
   state.nextShapeId = 1;
   state.selection = null;
