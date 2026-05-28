@@ -15,6 +15,12 @@ const TYPES = {
   garage:     { name: 'Garage',             fill: '#efe6dc', dashed: false },
   deck:       { name: 'Open deck',          fill: '#e8dcc8', dashed: true },
   upper:      { name: 'Upper floor area',   fill: '#f0e6f4', dashed: false },
+  outbuilding:{ name: 'Outbuilding',        fill: '#e6e0d4', dashed: false },
+  barn:       { name: 'Barn',               fill: '#e9d3c4', dashed: false },
+  shed:       { name: 'Shed',               fill: '#dfe6d2', dashed: false },
+  shop:       { name: 'Shop',               fill: '#d6e0e8', dashed: false },
+  carport:    { name: 'Carport',            fill: '#e6ddec', dashed: true },
+  misc:       { name: 'Misc / other',       fill: '#ededed', dashed: false },
 };
 
 const DIR_BASE = { r: 0, d: 90, l: 180, u: -90 };

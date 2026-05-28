@@ -1,7 +1,7 @@
 # Version
 
-**Current version:** `0.11.42`
-**Released:** 2026-05-24
+**Current version:** `0.11.43`
+**Released:** 2026-05-28
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 While the project is below 1.0, the public "API" (segment syntax, JSON save format) may still change between minor versions; breaking changes will be called out in [CHANGELOG.md](./CHANGELOG.md).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.11.43 | 2026-05-28 | minor  | Added area types **Outbuilding, Barn, Shed, Shop, Carport, Misc** (baked into `core.js` `TYPES`, so they appear in both UIs and the legend on every file). Mobile start-point picking made keyboard-free: a new area's start can be placed by tapping the canvas (snaps to a nearby vertex) and aligned with **↑↓←→** arrows in the new green start bar — fixes iPhone (couldn't open the start option) and Android (keyboard collapsed / voice went to the segment) where nudging the start was previously impossible without typing. |
 | 0.11.42 | 2026-05-24 | patch  | Mobile voice auto-extend now shows the orange dashed PREVIEW line (was distance-readout only). Voice "left" drives the page's native chainPreview (same as the L/U/D/R buttons); "next"/"last" re-point the preview to other candidates; "enter" commits. Fixes the missing visual cue on iPhone. |
 | 0.11.41 | 2026-05-24 | minor  | Mobile voice auto-extend cycling: "left"/"up" etc. now preview a snap candidate and "next"/"last" cycle to farther aligned vertices on mobile too (status shows "Snap X/N"), committed on "enter". Adapter gained candidate-lookup + per-segment commit. Reliable forms (Chrome drops repeated separate "next"): one-breath "up next next" or "up last". |
 | 0.11.40 | 2026-05-24 | minor  | Voice dictation ported to the **mobile** touch UI: Dictate + Train buttons added above the keypad, wired to the shared dictation.js via a small entry-buffer adapter. Same transform (measurements, arithmetic, directions, "enter" to commit). Bare-direction auto-extend snaps to the nearest aligned vertex (mobile has no preview-cycling; use the L/U/D/R snap buttons for other candidates). Web Speech works in iPhone Safari. |

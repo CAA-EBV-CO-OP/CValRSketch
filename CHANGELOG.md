@@ -14,6 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.43] — 2026-05-28
+
+### Added
+- **Six new area types** — `Outbuilding`, `Barn`, `Shed`, `Shop`, `Carport` (open structure → dashed), and `Misc / other` — added to `TYPES` in `core.js`. Because both the desktop and mobile UIs build their type dropdowns and the legend directly from `TYPES`, these appear everywhere and persist across all files with no per-file setup. (The legend already auto-flows into two columns past four types.)
+- **Keyboard-free start-point picking on mobile (`m/index.html`).** A new green **start bar** appears above the keypad whenever no walk is in progress. It shows the current start and offers **↑ ↓ ← →** buttons that snap the start to the next aligned vertex/projection in that direction (reusing `findSnapCandidates`), plus a ⌂ reset-to-origin. You can also now **tap an empty spot on the canvas** to drop the start there (it snaps to a nearby corner within ~1.5 ft).
+
+### Fixed
+- **iPhone: couldn't set a new area's start.** Placing/aligning the start no longer depends on tapping a tiny SVG vertex hit-target (flaky under iOS Safari) — the canvas tap and the arrow bar provide reliable paths.
+- **Android: couldn't nudge the start.** Moving the start previously required typing an offset (the on-screen keyboard collapsed) or voice (which is wired to the segment buffer). The new arrow bar needs neither.
+
+---
+
 ## [0.11.42] — 2026-05-24
 
 ### Fixed
