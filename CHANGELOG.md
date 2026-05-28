@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.46] — 2026-05-28
+
+### Changed
+- **On-screen number pad for measurement fields (mobile).** All length and offset/move text fields — wall-length edits, vertex/wall offset, the start-point offset, and the fence-move field — now open a tap-driven bottom-sheet number pad instead of the iOS QWERTY keyboard. Length fields show digits, `ft '`, `in "`, `+`, and `·`; offset fields additionally show **L / U / D / R**. The fields are marked `readonly` with class `measure` (and `dir` for offset fields) so the system keyboard never appears; a single shared pad fills the value and the field's existing Apply button parses and applies it exactly as before. The full keyboard now only appears for genuinely alphabetic fields (area label, subject). Resolves the "letter-first keyboard for numbers" annoyance and, because feet-inch marks and direction letters are first-class keys, it covers entry that a plain iOS numeric pad cannot.
+
+---
+
 ## [0.11.45] — 2026-05-28
 
 ### Added

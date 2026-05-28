@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
 <link rel="apple-touch-icon" href="../icon-192.png">
 <title>CValRSketch — Mobile</title>
-<script src="../core.js?v=0.11.45"></script>
-<script src="../dictation.js?v=0.11.45"></script>
+<script src="../core.js?v=0.11.46"></script>
+<script src="../dictation.js?v=0.11.46"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -136,6 +136,31 @@
   .start-panel .dirs button { padding: 12px 0; font-size: 17px; font-weight: bold; background: #2e8b57; color: #fff; border: none; border-radius: 8px; }
   .start-panel .dirs button.origin { background: #fff; color: #2e8b57; border: 1px solid #2e8b57; padding: 12px 12px; font-size: 18px; }
   .start-panel .dirs button:active { background: #1f6b40; }
+  /* On-screen number pad — replaces the system (QWERTY) keyboard for length
+     and offset fields so feet-inches and L/U/D/R can be entered by tapping. */
+  .numpad-backdrop { position: fixed; inset: 0; z-index: 400; display: none; }
+  .numpad-backdrop.show { display: block; }
+  .numpad-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 401; display: none;
+    flex-direction: column; gap: 8px; background: #f4f7fa; border-top: 2px solid #2b6cb0;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.25);
+  }
+  .numpad-sheet.show { display: flex; }
+  .numpad-display { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-family: ui-monospace, monospace; }
+  .numpad-display .lbl { font-size: 11px; color: #6b7280; text-transform: uppercase; white-space: nowrap; }
+  .numpad-display .val { font-size: 20px; font-weight: bold; color: #1b3a52; min-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .numpad-grid, .numpad-dirs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .numpad-sheet button { padding: 14px 0; font-size: 18px; font-weight: bold; border: 1px solid #c3cedb; background: #fff; border-radius: 8px; }
+  .numpad-sheet button:active { background: #e4ecf5; }
+  .numpad-sheet .np-unit { background: #eef2f7; color: #2b6cb0; }
+  .numpad-sheet .np-fn { background: #fbe9e9; color: #a33; }
+  .numpad-dirs button { background: #2b6cb0; color: #fff; border-color: #1b4a7a; }
+  .numpad-dirs button:active { background: #1b4a7a; }
+  .numpad-actions { display: flex; gap: 8px; }
+  .numpad-actions button { flex: 1; }
+  .numpad-actions #numpad-done { background: #2e8b57; color: #fff; border-color: #1f6b40; }
+  input.measure { caret-color: transparent; cursor: pointer; background: #fff; }
   /* Entry display — shows the segment expression as the user builds it */
   .entry {
     background: #fff; padding: 8px 12px;
@@ -314,7 +339,7 @@
       <button data-fsnap="r">R →</button>
     </div>
     <div class="hint">Or move by typed offset</div>
-    <input type="text" id="fence-move-input" placeholder="e.g. 3'6 r">
+    <input type="text" readonly class="measure dir" id="fence-move-input" placeholder="e.g. 3'6 r">
     <div class="row">
       <button id="fence-move-btn" class="primary">↔ Move</button>
       <button id="fence-clear-btn">Clear</button>
@@ -345,7 +370,7 @@
   <h2>Start Point</h2>
   <div style="font-size:12px; color:#666;" id="drawer-start-info"></div>
   <div class="row">
-    <input type="text" id="start-offset-input" placeholder="offset, e.g. 3'6 r">
+    <input type="text" readonly class="measure dir" id="start-offset-input" placeholder="offset, e.g. 3'6 r">
     <button id="btn-offset-start">Offset</button>
   </div>
   <button id="btn-reset-start">Reset start to origin</button>
@@ -385,13 +410,31 @@
 
 <div class="toast" id="toast"></div>
 
+<div class="numpad-backdrop" id="numpad-backdrop"></div>
+<div class="numpad-sheet" id="numpad-sheet" role="dialog" aria-label="Number pad">
+  <div class="numpad-display"><span class="lbl" id="numpad-label">Length</span><span class="val" id="numpad-value">—</span></div>
+  <div class="numpad-grid">
+    <button data-nk="7">7</button><button data-nk="8">8</button><button data-nk="9">9</button><button data-nk="back" class="np-fn">⌫</button>
+    <button data-nk="4">4</button><button data-nk="5">5</button><button data-nk="6">6</button><button data-nk="ft" class="np-unit">ft '</button>
+    <button data-nk="1">1</button><button data-nk="2">2</button><button data-nk="3">3</button><button data-nk="in" class="np-unit">in "</button>
+    <button data-nk="0">0</button><button data-nk=".">·</button><button data-nk="+" class="np-unit">+</button><button data-nk="clear" class="np-fn">×</button>
+  </div>
+  <div class="numpad-dirs" id="numpad-dirs">
+    <button data-nk="l">← L</button><button data-nk="u">↑ U</button><button data-nk="d">↓ D</button><button data-nk="r">R →</button>
+  </div>
+  <div class="numpad-actions">
+    <button id="numpad-cancel">Cancel</button>
+    <button id="numpad-done" class="primary">Done</button>
+  </div>
+</div>
+
 <script>
 // =============================================================================
 // CValRSketch — Mobile UI
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.45'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.46'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -755,7 +798,7 @@ function renderEditPanel() {
       </div>
       <div class="hint">Or move by typed offset</div>
       <div class="row">
-        <input id="edit-offset" type="text" placeholder="e.g. 3'6 r, 5'd 2'l">
+        <input id="edit-offset" type="text" readonly class="measure dir" placeholder="e.g. 3'6 r, 5'd 2'l">
         <button id="edit-apply-offset">Apply</button>
       </div>
       <div class="row">
@@ -804,7 +847,7 @@ function renderEditPanel() {
       </div>
       <div class="hint">Change length</div>
       <div class="row">
-        <input id="edit-len" type="text" value="${formatLength(len)}">
+        <input id="edit-len" type="text" readonly class="measure" value="${formatLength(len)}">
         <button id="edit-apply-len">Apply</button>
       </div>
       <div class="hint">Snap-move whole wall (from start endpoint)</div>
@@ -816,7 +859,7 @@ function renderEditPanel() {
       </div>
       <div class="hint">Or move whole wall by typed offset</div>
       <div class="row">
-        <input id="edit-offset" type="text" placeholder="e.g. 3'6 r, 5'd 2'l">
+        <input id="edit-offset" type="text" readonly class="measure dir" placeholder="e.g. 3'6 r, 5'd 2'l">
         <button id="edit-apply-offset">Apply</button>
         <button class="danger" id="edit-delete">Delete wall</button>
       </div>
@@ -982,7 +1025,7 @@ function openVertexMoveModal(sh, vIdx) {
       </div>
       <p style="font-size:11px; color:#888; margin: 8px 0 0; text-transform:uppercase;">Or move by typed offset</p>
       <div class="row" style="display:flex; gap:6px;">
-        <input id="vmove-input" type="text" inputmode="text" placeholder="e.g. 3'6 r, 6&quot; d, or 2'l 1'u"
+        <input id="vmove-input" type="text" readonly class="measure dir" placeholder="e.g. 3'6 r, 6&quot; d, or 2'l 1'u"
           style="flex:1; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">
         <button class="primary" id="vmove-apply" style="padding:0 14px;">Apply</button>
       </div>
@@ -1710,7 +1753,7 @@ function openWallEditor(sh, wallIdx) {
 
       <p style="font-size:11px; color:#888; margin:0; text-transform:uppercase;">Change length</p>
       <div class="row" style="display:flex; gap:6px;">
-        <input id="wall-len-input" type="text" inputmode="text" value="${formatLength(len)}"
+        <input id="wall-len-input" type="text" readonly class="measure" value="${formatLength(len)}"
           style="flex:1; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">
         <button class="primary" id="wall-apply-len-btn" style="padding:0 14px;">Apply</button>
       </div>
@@ -1725,7 +1768,7 @@ function openWallEditor(sh, wallIdx) {
 
       <p style="font-size:11px; color:#888; margin:8px 0 0; text-transform:uppercase;">Or move whole wall by typed offset</p>
       <div class="row" style="display:flex; gap:6px;">
-        <input id="wall-move-input" type="text" inputmode="text" placeholder="e.g. 3'6 r, 5'd 2'l"
+        <input id="wall-move-input" type="text" readonly class="measure dir" placeholder="e.g. 3'6 r, 5'd 2'l"
           style="flex:1; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">
         <button class="primary" id="wall-apply-move-btn" style="padding:0 14px;">Apply</button>
       </div>
@@ -1990,6 +2033,51 @@ function showModal(html) {
   $('modal-bg').classList.add('open');
 }
 function closeModal() { $('modal-bg').classList.remove('open'); $('modal').innerHTML = ''; }
+
+// =============================================================================
+// ON-SCREEN NUMBER PAD
+// Fills measurement inputs by tapping, so the system (QWERTY) keyboard never
+// appears for lengths/offsets. Length fields carry class "measure"; offset
+// fields add "dir" to also expose L/U/D/R. The field's own Apply button still
+// parses and applies the value — this only changes how the text is entered.
+// =============================================================================
+let numTarget = null, numBuf = '', numAllowDir = false;
+function openNumpad(inp) {
+  numTarget = inp;
+  numBuf = (inp.value || '').trim();
+  numAllowDir = inp.classList.contains('dir');
+  $('numpad-dirs').style.display = numAllowDir ? 'grid' : 'none';
+  $('numpad-label').textContent = numAllowDir ? 'Offset — length + direction' : 'Length';
+  $('numpad-sheet').classList.add('show');
+  $('numpad-backdrop').classList.add('show');
+  updateNumpadDisplay();
+}
+function closeNumpad(apply) {
+  if (apply && numTarget) {
+    numTarget.value = numBuf;
+    numTarget.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  $('numpad-sheet').classList.remove('show');
+  $('numpad-backdrop').classList.remove('show');
+  numTarget = null; numBuf = '';
+}
+function updateNumpadDisplay() { $('numpad-value').textContent = numBuf || '—'; }
+function numpadKey(k) {
+  const endsSpace = numBuf === '' || numBuf.slice(-1) === ' ';
+  switch (k) {
+    case 'back':  numBuf = numBuf.replace(/\s+$/, '').slice(0, -1).replace(/\s+$/, ''); break;
+    case 'clear': numBuf = ''; break;
+    case 'ft':    numBuf += "'"; break;
+    case 'in':    numBuf += '"'; break;
+    case '+':     numBuf += '+'; break;
+    case '.':     numBuf += '.'; break;
+    case 'l': case 'r': case 'u': case 'd':
+      if (numBuf && !endsSpace) numBuf += ' ';
+      numBuf += k; break;
+    default: if (/^\d$/.test(k)) numBuf += k;
+  }
+  updateNumpadDisplay();
+}
 
 let toastTimer = null;
 function toast(msg) {
@@ -2464,6 +2552,19 @@ svg.addEventListener('pointerdown', (e) => {
 document.querySelectorAll('#keypad button').forEach(b => {
   b.addEventListener('click', () => pressKey(b.dataset.k));
 });
+// Measurement fields (class "measure") open the on-screen number pad instead of
+// the system keyboard. Delegated so it covers inputs created inside modals/panels.
+document.addEventListener('click', (e) => {
+  const inp = e.target.closest && e.target.closest('input.measure');
+  if (inp) { inp.blur(); openNumpad(inp); }
+});
+$('numpad-sheet').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-nk]');
+  if (b) numpadKey(b.dataset.nk);
+});
+$('numpad-done').onclick   = () => closeNumpad(true);
+$('numpad-cancel').onclick = () => closeNumpad(false);
+$('numpad-backdrop').onclick = () => closeNumpad(false);
 // Collapse / expand the bottom controls so the canvas can use the full screen
 function setControlsCollapsed(collapsed) {
   document.body.classList.toggle('collapsed', collapsed);
