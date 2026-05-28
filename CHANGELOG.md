@@ -14,6 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.11.44] — 2026-05-28
+
+### Added
+- **Redo on mobile.** Added a **↷ Redo** button to the `m/index.html` header and the `redoHistory()` it calls (the `redoStack` was already maintained but never consumed). Mirrors the desktop. This is also the recovery path if an undo steps back further than intended.
+
+### Fixed
+- **Undo/redo double-fire guard (mobile).** A single tap on ↶/↷ that registered as two click events (iOS "ghost click") could undo/redo two actions at once. Both now ignore a second invocation within 80 ms — well under an intentional double-tap, so deliberately tapping undo several times to step back multiple actions still works.
+- **Header overflow.** The title now ellipsizes and buttons no longer shrink, so the added redo button doesn't break the header layout on narrow phones.
+
+---
+
 ## [0.11.43] — 2026-05-28
 
 ### Added

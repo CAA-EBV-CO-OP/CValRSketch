@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
 <link rel="apple-touch-icon" href="../icon-192.png">
 <title>CValRSketch — Mobile</title>
-<script src="../core.js?v=0.11.43"></script>
-<script src="../dictation.js?v=0.11.43"></script>
+<script src="../core.js?v=0.11.44"></script>
+<script src="../dictation.js?v=0.11.44"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -36,7 +36,8 @@
     padding: 8px 12px;
     flex: 0 0 auto;
   }
-  header .title { flex: 1; font-size: 14px; font-weight: bold; display: flex; align-items: baseline; gap: 6px; }
+  header .title { flex: 1; min-width: 0; font-size: 14px; font-weight: bold; display: flex; align-items: baseline; gap: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  header button { flex: 0 0 auto; }
   header .ver { font-size: 11px; font-weight: normal; color: rgba(255,255,255,0.65); }
   header button {
     background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.3);
@@ -259,6 +260,7 @@
   <button id="btn-menu" aria-label="Menu">☰</button>
   <div class="title" id="title-text"><span>CValRSketch</span><span class="ver" id="header-version"></span></div>
   <button id="btn-undo" aria-label="Undo">↶</button>
+  <button id="btn-redo" aria-label="Redo">↷</button>
   <button id="btn-fence-toggle" aria-label="Group select / fence">🔲</button>
   <button id="btn-close-shape" aria-label="Close Shape">✓</button>
 </header>
@@ -389,7 +391,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.43'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.11.44'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -479,10 +481,26 @@ function pushUndo() {
   if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
   state.redoStack.length = 0;
 }
+// Guard against a single physical tap registering as two click events (iOS
+// "ghost click"). 80ms is far below an intentional double-tap (~150ms+), so
+// repeatedly tapping undo to step back several actions still works.
+let lastHistoryAt = -1000;
 function undoHistory() {
-  if (!state.undoStack.length) return;
+  const now = performance.now();
+  if (now - lastHistoryAt < 80) return;
+  lastHistoryAt = now;
+  if (!state.undoStack.length) { toast('Nothing to undo'); return; }
   state.redoStack.push(snapshotState());
   restoreState(state.undoStack.pop());
+  render();
+}
+function redoHistory() {
+  const now = performance.now();
+  if (now - lastHistoryAt < 80) return;
+  lastHistoryAt = now;
+  if (!state.redoStack.length) { toast('Nothing to redo'); return; }
+  state.undoStack.push(snapshotState());
+  restoreState(state.redoStack.pop());
   render();
 }
 
@@ -2459,6 +2477,7 @@ $('btn-expand').onclick = () => setControlsCollapsed(false);
 $('btn-menu').onclick = openDrawer;
 $('drawer-bg').onclick = closeDrawer;
 $('btn-undo').onclick = undoHistory;
+$('btn-redo').onclick = redoHistory;
 $('btn-close-shape').onclick = closeShape;
 // Fence mode wiring
 $('btn-fence-toggle').onclick = toggleFenceMode;
