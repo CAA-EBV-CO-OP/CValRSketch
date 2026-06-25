@@ -1,7 +1,7 @@
 # Version
 
-**Current version:** `0.11.46`
-**Released:** 2026-05-28
+**Current version:** `0.12.0`
+**Released:** 2026-06-25
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 While the project is below 1.0, the public "API" (segment syntax, JSON save format) may still change between minor versions; breaking changes will be called out in [CHANGELOG.md](./CHANGELOG.md).
@@ -12,6 +12,8 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.12.0  | 2026-06-25 | minor  | Desktop sketch + export overhaul: **click-to-snap** closing; **free-text notes** (Text mode — multi-line, optional heading, placeable over areas, per-floor); **basement declaration** with % finished + **Above/Below-Grade** summary on sheet and totals; **🖨 Export / Print-preview** modal (page size, title/legend, per-floor "dimensions + notes" surfacing); **draggable area labels**; floor-bar **label-size slider**; other-floor **ghosts** redrawn as a faded dashed-outline overlay; export crop tightened to rendered text. JSON gains `labels`/`basements`/`labelOffset` (backward-compatible). |
+| 0.11.47 | 2026-05-28 | minor  | Added a **Building / dwelling** tag to each area (`Dwelling 1/2/3`, `Outbuildings`, `Other` — baked into `core.js`). Both UIs' shape editors gain a Building dropdown; desktop Totals now group **Building → Floor → Type** with per-building subtotals. New areas default to `Dwelling 1`; copies/splits inherit the parent's building; legacy shapes fall back to `Dwelling 1`. Lightweight (Option 3) — no per-building floor tabs. |
 | 0.11.46 | 2026-05-28 | minor  | Mobile: measurement fields (wall length, all offset/move inputs, start offset, fence move) now open an **on-screen number pad** instead of the iOS QWERTY keyboard. Length fields show digits + ft/in/+/·; offset fields also expose L/U/D/R. Fields are `readonly` + class `measure`/`dir`; a shared bottom-sheet pad fills them and their existing Apply button parses as before. The full keyboard now appears only for genuinely alphabetic fields (area label, subject). |
 | 0.11.45 | 2026-05-28 | patch  | Added a built-in **`other`** floor (alongside basement/main/upper) so detached structures (sheds, barns, pole barns) have a home that isn't a house storey. Floor tabs and the shape Floor dropdown already read from `state.floors`, so custom floors via **+ Floor** always worked — this just adds `other` to the default list for new projects. Existing files: use **+ Floor** to add it. |
 | 0.11.44 | 2026-05-28 | patch  | Mobile: added a **Redo** button (↷) in the header — `redoStack` existed but was never consumed; mirrors desktop `redoHistory`. Undo/redo now guard against an iOS "ghost click" double-firing one tap (80 ms window, below an intentional double-tap, so rapid repeated undo still steps back multiple actions). Header title now ellipsizes so the extra button doesn't overflow on narrow phones. |

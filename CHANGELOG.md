@@ -14,6 +14,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.12.0] — 2026-06-25
+
+### Added
+- **Click-to-snap closing (desktop walk mode).** With a walk in progress, every vertex is clickable; clicking one draws a single straight segment from the pen to that point (click the green start to draw the closing line). Robust for angled walks where keyboard `r`/`u` snapping has no aligned vertex to grab.
+- **Free-text labels / notes (new "Text" mode).** Click anywhere — including over an area — to drop a label; click-drag to move, double-click to edit, Delete to remove. A modal editor supports **multiple lines** (Enter = line break) and an optional **"first line is a heading"** style (larger bold heading over standard body text). Notes are per-floor, persist in the JSON, and are undo-able.
+- **Basement (below-grade) declaration + grade summary.** A sidebar panel declares a basement per dwelling: area auto-pulls from the main-floor enclosed-living footprint (overridable) with a **% finished** that auto-splits **Finished / Unfinished**. The Totals footer and the export sheet show **Above-Grade Living Area** (Enclosed living + Upper floor area on main/upper floors) and **Below-Grade (basement)** with finished/unfinished.
+- **Print-preview / export modal.** The two export buttons are replaced by **🖨 Export / Preview**, showing the printable sheet with live controls: page size (Auto / Letter Portrait / Letter Landscape), Title/Legend toggles, and a per-floor **"Show dimensions + notes for:"** list that surfaces another floor's dimensions and notes (e.g. an upper-floor note) on the active-floor sheet. Save PNG / Save SVG from there.
+- **Draggable area labels.** In Edit mode a shape's area/centroid label can be dragged to a custom offset (saved per shape) to clear concave-notch / dimension-label collisions.
+- **Sketch label-size slider.** A "Label size" slider on the floor bar scales all on-drawing text (dimensions, area labels, notes) together, 60–200%.
+
+### Changed
+- **Other-floor "ghosts" are now a faded dashed-outline overlay.** Non-active floors render on top as a no-fill dashed blue outline with a muted, slightly smaller area label, so e.g. the basement outline stays visible under the opaque main floor. They are non-interactive (never block edits on the active floor); a per-floor opt-in surfaces their dimensions (crisp) and notes.
+- **Export scaling.** The printable crop is computed from the actually-rendered text (`getBBox`), so the drawing fills the page (bigger dimension/area fonts) without clipping multi-line notes; the title and legend are slimmer; the grade/basement totals sit in the legend.
+- **Area labels gain a white halo** so they stay legible over walls and dimension lines; a single-line note with the heading box unchecked now renders at the standard small body size (was large/bold).
+- **Floor-opacity control moved** from the floor bar into Settings (the floor bar now hosts the label-size slider).
+
+### Notes
+- Save/JSON format gains `labels`, `basements`, per-shape `labelOffset`, and the `sketchFontScale` / `ghostDimFloors` settings — all backward-compatible (older files load; missing fields default).
+
+---
+
+## [0.11.47] — 2026-05-28
+
+### Added
+- **Building / dwelling grouping for areas.** Each shape now carries a `building` tag, chosen from a baked-in list in `core.js` (`Dwelling 1`, `Dwelling 2`, `Dwelling 3`, `Outbuildings`, `Other`). Both the desktop and mobile shape editors gained a **Building** dropdown, and the desktop **Totals** panel now groups **Building → Floor → Type** with a subtotal per building (and per floor within it). New areas default to `Dwelling 1`; duplicated and split shapes inherit the source's building; shapes from older saves with no `building` fall back to `Dwelling 1`. The shape lists in both UIs show the building. This is the lightweight grouping (no per-building floor tabs); it can grow into a full Building→Floor model later.
+
+---
+
 ## [0.11.46] — 2026-05-28
 
 ### Changed

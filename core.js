@@ -23,11 +23,19 @@ const TYPES = {
   misc:       { name: 'Misc / other',       fill: '#ededed', dashed: false },
 };
 
+// Building / dwelling grouping for shapes. A shape's `building` is a free label
+// from this list; totals subtotal by building. New/legacy shapes default to the
+// first entry. Baked in (like TYPES) so it's consistent across files.
+const BUILDINGS = ['Dwelling 1', 'Dwelling 2', 'Dwelling 3', 'Outbuildings', 'Other'];
+const DEFAULT_BUILDING = BUILDINGS[0];
+
 const DIR_BASE = { r: 0, d: 90, l: 180, u: -90 };
 
 const SETTINGS_DEFAULTS = {
   showSegmentLabels: true,
   showCentroidLabels: true,
+  sketchFontScale: 1,   // global multiplier for on-drawing label sizes (dimensions, area, notes)
+  ghostDimFloors: [],   // names of non-active floors whose dimension labels should still show
   showVertexDots: true,
   showFloorGhosts: true,
   ghostOpacity: 0.45,

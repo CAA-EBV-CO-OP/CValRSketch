@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.11.46"></script>
-<script src="dictation.js?v=0.11.46"></script>
+<script src="core.js?v=0.12.0"></script>
+<script src="dictation.js?v=0.12.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -30,6 +30,10 @@
   #canvas-wrap { flex: 1; background: #fff; position: relative; overflow: hidden; }
   #canvas { display: block; width: 100%; height: 100%; cursor: default; }
   #canvas.split-mode { cursor: crosshair; }
+  /* In Text mode the whole drawing is click-through so notes can be placed over
+     areas; only the free-text labels themselves stay interactive. */
+  #canvas.text-mode { cursor: text; }
+  #canvas.text-mode > :not(.free-label) { pointer-events: none; }
   #floor-bar { background: #eef2f6; border-bottom: 1px solid #d0d8e0; padding: 6px 14px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
   #floor-bar .ft-tabs { display: flex; gap: 4px; }
   #floor-bar .ft-tabs button { background: #fff; border: 1px solid #c0c8d0; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
@@ -90,26 +94,26 @@
   .visible-vertex.selected { fill: #2b6cb0; stroke: #fff; }
   .visible-vertex.split-hover { fill: #ffa500; stroke: #fff; }
   .visible-vertex.pickable { fill: #d4edda; stroke: #2e8b57; stroke-width: 2; }
-  .ghost { opacity: var(--ghost-opacity, 0.45); }
+  .ghost { opacity: var(--ghost-opacity, 0.45); pointer-events: none; }
 </style>
 </head>
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.11.46</span>
+  <span class="version-chip" id="app-version">v0.12.0</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
     <button data-mode="split">Split</button>
     <button data-mode="fence">Fence</button>
+    <button data-mode="text">Text</button>
   </div>
   <div class="sep"></div>
   <button id="btn-undo" onclick="undoHistory()" title="Undo (Ctrl+Z)">↶ Undo</button>
   <button id="btn-redo" onclick="redoHistory()" title="Redo (Ctrl+Y)">↷ Redo</button>
   <div class="sep"></div>
   <button onclick="openSettings()">⚙ Settings</button>
-  <button onclick="exportSVG()">Export SVG</button>
-  <button onclick="exportPNG()">Export PNG</button>
+  <button onclick="openExportPreview()" title="Preview the printable sheet, pick a page size, and export">🖨 Export / Preview</button>
   <button onclick="newProject()" title="Clear current sketch and start a new project (Ctrl+Z to recover)">🗋 New</button>
   <button onclick="saveJSON()">Save</button>
   <button onclick="openRecentsModal()" title="Open from recent projects (stored in this browser)">📂 Recent</button>
@@ -124,10 +128,10 @@
   <button class="small-btn" onclick="addFloor()">+ Floor</button>
   <button class="small-btn" onclick="renameFloor()">Rename</button>
   <button class="small-btn" onclick="removeFloor()">Delete Floor</button>
-  <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Opacity of shapes on other floors">
-    Other floors:
-    <input type="range" id="floor-ghost-opacity" min="0.05" max="1" step="0.05" style="width:120px;">
-    <span id="floor-ghost-opacity-val" style="font-family:monospace; min-width:34px; text-align:right;"></span>
+  <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Size of the dimension, area, and note labels on the drawing">
+    Label size:
+    <input type="range" id="sketch-font-bar" min="0.6" max="2" step="0.1" style="width:120px;">
+    <span id="sketch-font-bar-val" style="font-family:monospace; min-width:34px; text-align:right;"></span>
   </label>
   <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Subject / project name — appears as the title on SVG/PNG exports">
     Subject:
@@ -176,6 +180,12 @@ let state = {
   undoStack: [],
   redoStack: [],
   annotations: [],      // [{ a:{x,y}, b:{x,y} }] — offset measurement labels between two points
+  basements: {},        // { [building]: { areaOverride: number|null, pctFinished: number } } — declared below-grade area
+  labels: [],           // [{ id, x, y, text, floor }] — free-text labels in WORLD coords
+  nextLabelId: 1,
+  selectedLabel: null,  // id of the currently selected free-text label (Text mode)
+  labelDrag: null,      // transient: { id, grabX, grabY, moved } while dragging a label
+  shapeLabelDrag: null, // transient: while dragging a shape's area/centroid label
   offsetPick: null,     // null | { first: {x,y}|null } — active picking state for offset tool
   fenceDraw: null,      // null | { start:{x,y}, end:{x,y} } in WORLD coords while dragging
   fenceSelection: null, // null | { shapeVerts:[{shapeId,idx}], inProgVerts:[idx], annEnds:[{idx,end}] }
@@ -195,6 +205,9 @@ function snapshotState() {
     nextShapeId: state.nextShapeId,
     startPoint: state.startPoint,
     annotations: state.annotations,
+    basements: state.basements,
+    labels: state.labels,
+    nextLabelId: state.nextLabelId,
   });
 }
 function restoreState(snap) {
@@ -206,7 +219,13 @@ function restoreState(snap) {
   state.nextShapeId = d.nextShapeId;
   state.startPoint = d.startPoint;
   state.annotations = d.annotations || [];
+  state.basements = d.basements || {};
+  state.labels = d.labels || [];
+  state.nextLabelId = d.nextLabelId || 1;
   state.selection = null;
+  state.selectedLabel = null;
+  state.labelDrag = null;
+  state.shapeLabelDrag = null;
   state.fenceSelection = null;
   state.fenceDraw = null;
   state.splitSelection = null;
@@ -377,6 +396,9 @@ function fitView() {
   const all = [];
   state.shapes.forEach(s => all.push(...s.points));
   if (state.segments.length) all.push(...pathPointsHere(state.segments));
+  // Include text-label anchors so notes placed below/around the drawing stay on
+  // screen (the 80px pad below covers each label's height).
+  labelsOnFloor(state.activeFloor).forEach(l => all.push({ x: l.x, y: l.y }));
   const w = svg.clientWidth || 800, h = svg.clientHeight || 600;
   if (all.length === 0) return { tx: w/2, ty: h/2, scale: 18 };
   const xs = all.map(p=>p.x), ys = all.map(p=>p.y);
@@ -401,6 +423,7 @@ function render() {
     b.classList.toggle('active', b.dataset.mode === state.mode);
   });
   svg.classList.toggle('split-mode', state.mode === 'split');
+  svg.classList.toggle('text-mode', state.mode === 'text');
 
   // Floor tabs
   const ftEl = document.getElementById('floor-tabs');
@@ -408,11 +431,12 @@ function render() {
     `<button class="${f===state.activeFloor?'active':''}" onclick="state.activeFloor='${f}'; state.selection=null; state.splitSelection=null; render();">${f}</button>`
   ).join('');
   document.getElementById('floor-help').textContent =
+    state.mode==='text' ? 'Click a blank spot to add a text label. Click a label to select it; drag to move it; double-click to edit.' :
     state.mode==='split' ? 'Click two vertices in a shape to split it.' :
     state.mode==='edit' ? 'Click a wall or vertex to edit.' :
     (state.segments.length === 0
       ? 'Type segments to build a shape — or click any vertex (green) to start from there.'
-      : 'Type segments to extend the path. Close Shape when you return to start.');
+      : 'Type segments to extend the path, or click any vertex to draw a straight line to it. Close Shape when you return to start.');
 
   // SVG render
   const w = svg.clientWidth, h = svg.clientHeight;
@@ -430,15 +454,19 @@ function render() {
   document.documentElement.style.setProperty('--ghost-opacity', state.settings.ghostOpacity);
   const W = p => ({ x: v.tx + p.x*v.scale, y: v.ty + p.y*v.scale });
 
-  // Ghosts (other floors)
+  // Active floor first…
+  shapesOnFloor(state.activeFloor).forEach(sh => renderShape(sh, W, false));
+  // …then other floors as a faded dashed-outline overlay on top, so their outline
+  // and label stay visible even where they sit under the active floor's fill.
   if (state.settings.showFloorGhosts) {
     shapesOnOtherFloors().forEach(sh => renderShape(sh, W, true));
   }
-  // Active floor
-  shapesOnFloor(state.activeFloor).forEach(sh => renderShape(sh, W, false));
 
   // Persistent offset annotations
   renderAnnotations(W);
+
+  // Free-text labels
+  renderLabels(W);
 
   // Fence rectangle + selection highlight
   renderFence(W);
@@ -487,6 +515,10 @@ function render() {
   renderSidebar();
 }
 
+// Global sketch-area label scale (dimension + area labels). Header/legend on
+// exports use their own fixed sizes and are not affected.
+function skFont(px) { return px * (state.settings.sketchFontScale || 1); }
+
 function addEl(tag, attrs, text) {
   const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
   for (const k in attrs) el.setAttribute(k, attrs[k]);
@@ -501,32 +533,43 @@ function renderShape(sh, W, isGhost) {
   const d = screenPts.map((p,i)=> (i===0?'M':'L') + p.x + ' ' + p.y).join(' ') + ' Z';
   const cls = isGhost ? 'ghost' : '';
 
-  // Fill
-  const poly = addEl('path', { d, fill: t.fill, stroke: 'black', 'stroke-width': 2, class: cls });
-  if (t.dashed) poly.setAttribute('stroke-dasharray', '8,5');
+  // Fill (active floor only). Ghosts of other floors are drawn as a no-fill dashed
+  // outline so they read as a faint overlay without obscuring the active floor.
+  const poly = addEl('path', { d, fill: isGhost ? 'none' : t.fill, stroke: isGhost ? '#2b6cb0' : 'black', 'stroke-width': isGhost ? 1.5 : 2, class: cls });
+  if (isGhost) poly.setAttribute('stroke-dasharray', '6,4');
+  else if (t.dashed) poly.setAttribute('stroke-dasharray', '8,5');
   if (!isGhost) {
     poly.style.cursor = 'pointer';
     poly.addEventListener('click', () => { state.selection = { kind:'shape', shapeId: sh.id }; render(); });
   }
 
   const canPickStart = state.mode === 'walk' && state.segments.length === 0;
+  // Walk in progress → clicking any vertex draws a straight line from the pen to it.
+  const canSnapTo = state.mode === 'walk' && state.segments.length > 0;
 
-  // Walls + segment labels (hit/selection only for non-ghost)
+  // Walls + segment labels. Ghost floors draw no wall lines (the dashed poly is the
+  // outline); their dimension labels show only for floors the user opted in via
+  // ghostDimFloors — so e.g. the upper floor's dims can be surfaced while the
+  // coincident basement's are kept off.
+  const showDims = state.settings.showSegmentLabels &&
+    (!isGhost || (state.settings.ghostDimFloors || []).includes(sh.floor));
   for (let i = 0; i < sh.segments.length; i++) {
     const a = screenPts[i], b = screenPts[i+1];
-    const isSel = !isGhost && state.selection && state.selection.kind === 'wall' && state.selection.shapeId === sh.id && state.selection.idx === i;
-    const wallClass = 'visible-wall' + (isSel ? ' selected' : '') + (isGhost ? ' ghost' : '');
-    const visibleWall = addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: 'black', 'stroke-width': 2, class: wallClass });
-    if (t.dashed) visibleWall.setAttribute('stroke-dasharray', '8,5');
-    if (!isGhost && state.mode === 'edit') {
-      const hit = addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'hit-wall' });
-      hit.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        state.selection = { kind:'wall', shapeId: sh.id, idx: i };
-        render();
-      });
+    if (!isGhost) {
+      const isSel = state.selection && state.selection.kind === 'wall' && state.selection.shapeId === sh.id && state.selection.idx === i;
+      const wallClass = 'visible-wall' + (isSel ? ' selected' : '');
+      const visibleWall = addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: 'black', 'stroke-width': 2, class: wallClass });
+      if (t.dashed) visibleWall.setAttribute('stroke-dasharray', '8,5');
+      if (state.mode === 'edit') {
+        const hit = addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'hit-wall' });
+        hit.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          state.selection = { kind:'wall', shapeId: sh.id, idx: i };
+          render();
+        });
+      }
     }
-    if (state.settings.showSegmentLabels) {
+    if (showDims) {
       const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
       const dx=b.x-a.x, dy=b.y-a.y;
       const len = Math.hypot(dx,dy);
@@ -535,22 +578,23 @@ function renderShape(sh, W, isGhost) {
         const c = W(polygonCentroid(sh.points));
         const sign = ((mx - c.x)*nx + (my - c.y)*ny) > 0 ? 1 : -1;
         const tx = mx + nx*12*sign, ty = my + ny*12*sign;
-        addEl('text', { x: tx, y: ty, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':11, 'font-weight':'bold', fill:'#0066cc', class: cls }, formatLength(sh.segments[i].length));
+        // No ghost fade on dimensions: a surfaced floor's dims should read crisply.
+        addEl('text', { x: tx, y: ty, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':skFont(11), 'font-weight':'bold', fill:'#0066cc' }, formatLength(sh.segments[i].length));
       }
     }
   }
 
   // Vertices: dots visible on non-ghost (per settings/mode), and on ghosts when picking start.
   // Hit areas: in edit/split (non-ghost only), and in walk mode for picking start (all shapes).
-  const showDots = !isGhost ? (state.settings.showVertexDots || state.mode !== 'walk') : canPickStart;
-  const addHits = canPickStart || (!isGhost && (state.mode === 'edit' || state.mode === 'split'));
+  const showDots = !isGhost ? (state.settings.showVertexDots || state.mode !== 'walk' || canSnapTo) : canPickStart;
+  const addHits = canPickStart || (!isGhost && (canSnapTo || state.mode === 'edit' || state.mode === 'split'));
   if (showDots || addHits) {
     for (let i = 0; i < sh.points.length - 1; i++) {
       const p = screenPts[i];
       const isSel = !isGhost && state.selection && state.selection.kind === 'vertex' && state.selection.shapeId === sh.id && state.selection.idx === i;
       const isSplitPicked = !isGhost && state.splitSelection && state.splitSelection.shapeId === sh.id && state.splitSelection.idx === i;
       if (showDots) {
-        const dotClass = 'visible-vertex' + (isSel || isSplitPicked ? ' selected' : '') + (canPickStart ? ' pickable' : '');
+        const dotClass = 'visible-vertex' + (isSel || isSplitPicked ? ' selected' : '') + (canPickStart || canSnapTo ? ' pickable' : '');
         addEl('circle', { cx: p.x, cy: p.y, r: canPickStart ? 5 : 4, class: dotClass });
       }
       if (addHits) {
@@ -559,6 +603,7 @@ function renderShape(sh, W, isGhost) {
           ev.stopPropagation();
           if (state.offsetPick) { handleOffsetPick(sh.points[i]); return; }
           if (canPickStart) setStartPoint(sh.points[i]);
+          else if (canSnapTo) snapWalkToPoint(sh.points[i]);
           else if (state.mode === 'split') handleSplitClick(sh.id, i);
           else { state.selection = { kind:'vertex', shapeId: sh.id, idx: i }; render(); }
         });
@@ -566,12 +611,28 @@ function renderShape(sh, W, isGhost) {
     }
   }
 
-  // Centroid label (shown for ghosts too, just faded)
+  // Centroid label (shown for ghosts too, just faded). White halo keeps it legible
+  // over walls/dimension labels; draggable in Edit mode via per-shape labelOffset.
   if (state.settings.showCentroidLabels) {
-    const c = W(polygonCentroid(sh.points));
+    const base = polygonCentroid(sh.points);
+    const off = sh.labelOffset || { dx: 0, dy: 0 };
+    const c = W({ x: base.x + off.dx, y: base.y + off.dy });
     const area = polygonArea(sh.points);
-    addEl('text', { x: c.x, y: c.y-7, 'text-anchor':'middle', 'font-size':14, 'font-weight':'bold', class: cls }, sh.label);
-    addEl('text', { x: c.x, y: c.y+10, 'text-anchor':'middle', 'font-size':11, fill:'#555', class: cls }, `${Math.round(area)} sq ft`);
+    const halo = { stroke: 'white', 'stroke-width': 3.5, 'paint-order': 'stroke fill' };
+    // Other-floor (ghost) labels render a touch smaller and in a muted blue-grey so
+    // they stay distinguishable from the active floor's label even at high opacity.
+    const nameSize = isGhost ? skFont(11.5) : skFont(14);
+    const areaSize = isGhost ? skFont(9.5)  : skFont(11);
+    const nameFill = isGhost ? '#5a6b80' : '#222';
+    const areaFill = isGhost ? '#7c8a9c' : '#555';
+    addEl('text', { x: c.x, y: c.y-7, 'text-anchor':'middle', 'font-size':nameSize, 'font-weight':'bold', fill:nameFill, ...halo, class: cls }, sh.label);
+    addEl('text', { x: c.x, y: c.y+9, 'text-anchor':'middle', 'font-size':areaSize, fill:areaFill, ...halo, class: cls }, `${Math.round(area)} sq ft`);
+    if (!isGhost && state.mode === 'edit') {
+      const hw = Math.max(44, sh.label.length * 8);
+      const hit = addEl('rect', { x: c.x - hw/2, y: c.y - 20, width: hw, height: 34, fill: 'rgba(0,0,0,0)', class: 'ui-overlay' });
+      hit.style.cursor = 'move';
+      hit.addEventListener('mousedown', (ev) => startShapeLabelDrag(ev, sh.id));
+    }
   }
 }
 
@@ -601,7 +662,7 @@ function renderInProgress(W) {
       const len = Math.hypot(dx,dy);
       if (len < 30) return;
       const nx=-dy/len, ny=dx/len;
-      addEl('text', { x: mx+nx*10, y: my+ny*10, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':11, fill:'#2b6cb0' }, formatLength(seg.length));
+      addEl('text', { x: mx+nx*10, y: my+ny*10, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':skFont(11), fill:'#2b6cb0' }, formatLength(seg.length));
     });
   }
   // Offset-tool picking: make every in-progress vertex clickable
@@ -613,6 +674,18 @@ function renderInProgress(W) {
       h.addEventListener('click', (ev) => {
         ev.stopPropagation();
         handleOffsetPick(wp);
+      });
+    });
+  } else if (state.mode === 'walk' && state.segments.length > 0) {
+    // Click-to-snap: any walk vertex except the pen itself (clicking the start
+    // draws the closing line straight back to it).
+    wpts.forEach((wp, i) => {
+      if (i === wpts.length - 1) return; // the pen — skip
+      const sp = W(wp);
+      const h = addEl('circle', { cx: sp.x, cy: sp.y, r: 12, class: 'hit-vertex ui-overlay' });
+      h.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        snapWalkToPoint(wp);
       });
     });
   }
@@ -652,10 +725,33 @@ function renderSidebar() {
   if (state.mode === 'edit') html += sidebarEdit();
   if (state.mode === 'split') html += sidebarSplit();
   if (state.mode === 'fence') html += sidebarFence();
+  if (state.mode === 'text') html += sidebarText();
   html += sidebarOffsets();
-  html += sidebarShapes() + sidebarTotals();
+  html += sidebarShapes() + sidebarBasement() + sidebarTotals();
   aside.innerHTML = html;
   attachSidebarHandlers();
+}
+
+function sidebarText() {
+  const labels = labelsOnFloor(state.activeFloor);
+  const list = labels.length
+    ? labels.map(l => {
+        const sel = state.selectedLabel === l.id ? ' style="background:#eaf2fb;"' : '';
+        const preview = escapeHtml(l.text).replace(/\n/g, ' / ');
+        const tag = l.headingFirst ? ' <span style="color:#888; font-size:10px;">(heading)</span>' : '';
+        return `<div class="seg-item"${sel}>
+          <span data-act="selectLabel" data-id="${l.id}" style="cursor:pointer; flex:1;">${preview}${tag}</span>
+          <button data-act="editLabel" data-id="${l.id}" title="Edit">✎</button>
+          <button data-act="deleteLabel" data-id="${l.id}" title="Delete">×</button>
+        </div>`;
+      }).join('')
+    : '<div class="help">No labels on this floor yet.</div>';
+  return `
+    <div class="section">
+      <h2>Text Labels</h2>
+      <div class="help">Click a blank spot on the canvas to add a label. Click a label to select, drag to move, double-click to edit. Delete key removes the selected label. Labels can span multiple lines, and the first line can be styled as a larger heading.</div>
+      <div style="margin-top:8px;">${list}</div>
+    </div>`;
 }
 
 function renderFence(W) {
@@ -893,6 +989,192 @@ function renderAnnotations(W) {
   });
 }
 
+// Free-text labels (Text mode). Stored in world coords; rendered on top of shapes.
+// The text itself is export content; only the selection box is a ui-overlay.
+function labelsOnFloor(floor) {
+  return state.labels.filter(l => (l.floor || 'main') === floor);
+}
+// Per-line style for a label: heading mode makes line 0 large+bold and the rest
+// smaller; otherwise every line is uniform. Returns [{txt,size,weight,lh}].
+function labelLineStyles(l) {
+  const lines = String(l.text).split('\n');
+  // Heading box unchecked → every line is standard small body text. Checked →
+  // first line is the larger bold heading, the rest stay standard body text.
+  const heading = { size: skFont(16), weight: 'bold', lh: skFont(21) };
+  const body    = { size: skFont(11.5), weight: 'normal', lh: skFont(15) };
+  return lines.map((txt, i) =>
+    (l.headingFirst && i === 0) ? { txt, ...heading } : { txt, ...body }
+  );
+}
+function renderLabels(W) {
+  const ns = 'http://www.w3.org/2000/svg';
+  // Active-floor notes are interactive; notes on a "surfaced" floor (one ticked in
+  // the export dimension list) are shown display-only so e.g. an upper-floor note
+  // appears on the main-floor sheet.
+  const surfaced = state.settings.ghostDimFloors || [];
+  const visible = state.labels.filter(l => {
+    const f = l.floor || 'main';
+    return f === state.activeFloor || surfaced.includes(f);
+  });
+  visible.forEach(l => {
+    const onActiveFloor = (l.floor || 'main') === state.activeFloor;
+    const editable = state.mode === 'text' && onActiveFloor;
+    const s = W(l);
+    const styled = labelLineStyles(l);
+    const totalH = styled.reduce((a, ln) => a + ln.lh, 0);
+    const top = s.y - totalH / 2;
+    const isSel = editable && state.selectedLabel === l.id;
+    if (isSel) {
+      // Selection box behind the text (UI-only, stripped from exports)
+      const approxW = Math.max(24, ...styled.map(ln => ln.txt.length * ln.size * 0.55));
+      addEl('rect', {
+        x: s.x - approxW/2 - 6, y: top - 4, width: approxW + 12, height: totalH + 8,
+        rx: 4, fill: 'rgba(43,108,176,0.10)', stroke: '#2b6cb0',
+        'stroke-width': 1.5, 'stroke-dasharray': '4,3', class: 'ui-overlay'
+      });
+    }
+    const txt = document.createElementNS(ns, 'text');
+    if (onActiveFloor) txt.classList.add('free-label');  // only active-floor notes stay clickable in Text mode
+    txt.setAttribute('text-anchor', 'middle');
+    let cy = top;
+    styled.forEach(ln => {
+      const ts = document.createElementNS(ns, 'tspan');
+      ts.setAttribute('x', s.x);
+      ts.setAttribute('y', cy + ln.lh * 0.75);
+      ts.setAttribute('font-size', ln.size);
+      ts.setAttribute('font-weight', ln.weight);
+      ts.setAttribute('fill', '#222');
+      ts.setAttribute('stroke', 'white');
+      ts.setAttribute('stroke-width', 3);
+      ts.setAttribute('paint-order', 'stroke fill');
+      ts.textContent = ln.txt;
+      txt.appendChild(ts);
+      cy += ln.lh;
+    });
+    svg.appendChild(txt);
+    if (editable) {
+      txt.style.cursor = 'move';
+      txt.addEventListener('mousedown', (ev) => startLabelDrag(ev, l.id));
+      txt.addEventListener('dblclick', (ev) => { ev.stopPropagation(); editLabel(l.id); });
+    } else {
+      txt.style.pointerEvents = 'none';  // don't intercept clicks on shapes/walls behind
+    }
+  });
+}
+
+function addLabelAt(world) { openLabelEditor({ world }); }
+function editLabel(id) { openLabelEditor({ id }); }
+
+// Modal editor for a label: multi-line text (Enter = line break) + optional
+// "first line is a heading" styling (bigger heading, smaller body lines).
+function openLabelEditor(opts) {
+  const existing = opts.id != null ? state.labels.find(l => l.id === opts.id) : null;
+  const m = createModal();
+  const div = document.createElement('div');
+  div.className = 'modal';
+  div.innerHTML = `
+    <h3>${existing ? 'Edit label' : 'Add label'}</h3>
+    <textarea id="label-text" rows="4" style="width:100%; box-sizing:border-box; font-size:14px; padding:6px; font-family:inherit;" placeholder="Type label text — press Enter for a new line">${existing ? escapeHtml(existing.text) : ''}</textarea>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; cursor:pointer;">
+      <input type="checkbox" id="label-heading" ${existing && existing.headingFirst ? 'checked' : ''}>
+      First line is a heading (larger, with smaller text below)
+    </label>
+    <div class="help" style="margin-top:6px;">Tip: Ctrl/⌘+Enter saves. Esc cancels.</div>
+    <div class="modal-buttons">
+      ${existing ? '<button class="danger" id="label-delete">Delete</button>' : ''}
+      <button onclick="closeModal()">Cancel</button>
+      <button class="primary" id="label-save">Save</button>
+    </div>`;
+  m.appendChild(div);
+  const ta = div.querySelector('#label-text');
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  const save = () => {
+    const text = ta.value.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    const headingFirst = div.querySelector('#label-heading').checked;
+    if (!text) { closeModal(); if (existing) deleteLabel(existing.id); return; }
+    pushUndo();
+    if (existing) { existing.text = text; existing.headingFirst = headingFirst; }
+    else {
+      const id = state.nextLabelId++;
+      state.labels.push({ id, x: opts.world.x, y: opts.world.y, text, headingFirst, floor: state.activeFloor });
+      state.selectedLabel = id;
+    }
+    closeModal();
+    render();
+  };
+  div.querySelector('#label-save').addEventListener('click', save);
+  const del = div.querySelector('#label-delete');
+  if (del) del.addEventListener('click', () => { closeModal(); deleteLabel(existing.id); });
+  ta.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); save(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); closeModal(); }
+  });
+}
+function deleteLabel(id) {
+  if (!state.labels.some(l => l.id === id)) return;
+  pushUndo();
+  state.labels = state.labels.filter(l => l.id !== id);
+  if (state.selectedLabel === id) state.selectedLabel = null;
+  render();
+}
+function startLabelDrag(ev, id) {
+  if (ev.button !== 0) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+  const l = state.labels.find(l => l.id === id);
+  if (!l) return;
+  const w = screenToWorld(ev.clientX, ev.clientY);
+  state.labelDrag = { id, grabX: w.x - l.x, grabY: w.y - l.y, moved: false };
+  // Only re-render when selection actually changes — re-rendering replaces the
+  // text node and would break the dblclick-to-edit sequence on an already-selected label.
+  if (state.selectedLabel !== id) { state.selectedLabel = id; render(); }
+}
+function labelDragMove(e) {
+  if (!state.labelDrag) return;
+  const l = state.labels.find(l => l.id === state.labelDrag.id);
+  if (!l) { state.labelDrag = null; return; }
+  // Snapshot once, on the first real movement, so a drag is a single undo step
+  // and a plain select-click (no movement) doesn't touch undo/redo history.
+  if (!state.labelDrag.moved) { pushUndo(); state.labelDrag.moved = true; }
+  const w = screenToWorld(e.clientX, e.clientY);
+  l.x = w.x - state.labelDrag.grabX;
+  l.y = w.y - state.labelDrag.grabY;
+  render();
+}
+function labelDragUp() {
+  if (!state.labelDrag) return;
+  state.labelDrag = null;
+}
+
+// Drag a shape's area/centroid label to a custom offset (Edit mode). Fixes labels
+// that land in a concave notch or collide with dimension text.
+function startShapeLabelDrag(ev, shapeId) {
+  if (ev.button !== 0) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+  const sh = state.shapes.find(s => s.id === shapeId);
+  if (!sh) return;
+  const base = polygonCentroid(sh.points);
+  const off = sh.labelOffset || { dx: 0, dy: 0 };
+  const w = screenToWorld(ev.clientX, ev.clientY);
+  state.shapeLabelDrag = { shapeId, grabX: w.x - (base.x + off.dx), grabY: w.y - (base.y + off.dy), moved: false };
+}
+function shapeLabelDragMove(e) {
+  if (!state.shapeLabelDrag) return;
+  const sh = state.shapes.find(s => s.id === state.shapeLabelDrag.shapeId);
+  if (!sh) { state.shapeLabelDrag = null; return; }
+  if (!state.shapeLabelDrag.moved) { pushUndo(); state.shapeLabelDrag.moved = true; }
+  const base = polygonCentroid(sh.points);
+  const w = screenToWorld(e.clientX, e.clientY);
+  sh.labelOffset = { dx: (w.x - state.shapeLabelDrag.grabX) - base.x, dy: (w.y - state.shapeLabelDrag.grabY) - base.y };
+  render();
+}
+function shapeLabelDragUp() {
+  if (!state.shapeLabelDrag) return;
+  state.shapeLabelDrag = null;
+}
+
 function startOffsetPick() {
   state.offsetPick = { first: null };
   render();
@@ -996,7 +1278,7 @@ function sidebarWalk() {
       return `
     <div class="section" style="background:${bg};border:2px solid ${border};">
       <h2 style="color:${color};">${title} — ${formatLength(state.preview.candidates[state.preview.candIdx].along)} ${state.preview.dir}</h2>
-      <div class="help">Candidate <b>${state.preview.candIdx + 1} of ${state.preview.candidates.length}</b>. ${cycleHint}. Press Enter with empty input (or click below) to accept. Esc cancels.</div>
+      <div class="help">Candidate <b>${state.preview.candIdx + 1} of ${state.preview.candidates.length}</b>. ${cycleHint}. Press Enter with empty input (or click below) to accept — this also lines up the next snap in the same direction, so press Enter again to keep stepping. Esc stops.</div>
       <div class="row-buttons">
         <button data-act="commitPreview" class="primary">✓ Accept</button>
         <button data-act="cancelPreview" class="danger">Cancel</button>
@@ -1011,8 +1293,8 @@ function sidebarWalk() {
         Direction: <code>r l u d</code>. Angle (after <code>r</code>/<code>l</code>): degrees turned from your previous heading — <code>r</code> turns right, <code>l</code> turns left. (First segment, or <code>u</code>/<code>d</code> with angle: degrees CW from cardinal base.)<br>
         Batch (separate walls): <code>16'4 u, 26'9 r, 8 d</code><br>
         Diagonal from components (one wall): <code>5'd 2'l</code> or <code>5'd &amp; 2'l</code><br>
-        <b>Snap-to-vertex:</b> type just <code>r</code> (no length) + Enter to <i>preview</i> the next aligned vertex. Press <code>r</code>+Enter again to cycle. Press Enter on an empty input to accept.<br>
-        <b>Pen-jump (arrow keys):</b> with the input empty, press <code>← ↑ → ↓</code> to <i>jump</i> the pen to the next aligned vertex without drawing a wall. Press the same arrow again to skip further. Enter accepts, Esc cancels.
+        <b>Snap-to-vertex:</b> type just <code>r</code> (no length) + Enter to <i>preview</i> the next aligned vertex. Press <code>r</code>+Enter again to cycle. Press Enter on an empty input to accept — accepting also lines up the next snap in that direction, so <code>r⏎ ⏎ ⏎</code> walks three alignments right, then <code>u⏎ ⏎</code> two up. Esc stops stepping.<br>
+        <b>Pen-jump (arrow keys):</b> with the input empty, press <code>← ↑ → ↓</code> to <i>jump</i> the pen to the next aligned vertex without drawing a wall. Press the same arrow again to skip further. Enter accepts (and arms the next jump), Esc cancels.
       </div>
     </div>
     <div class="section">
@@ -1084,6 +1366,9 @@ function sidebarEdit() {
         <div class="field"><label>Floor</label><select id="sh-floor">
           ${state.floors.map(f=>`<option value="${f}"${f===sh.floor?' selected':''}>${f}</option>`).join('')}
         </select></div>
+        <div class="field"><label>Building</label><select id="sh-building">
+          ${BUILDINGS.map(b=>`<option value="${b}"${b===(sh.building||DEFAULT_BUILDING)?' selected':''}>${b}</option>`).join('')}
+        </select></div>
         <div class="row-buttons">
           <button data-act="applyShape" class="primary">Apply</button>
           <button data-act="deleteShape" class="danger">Delete shape</button>
@@ -1146,7 +1431,7 @@ function sidebarShapes() {
     return `
       <div class="shape-item${isSel?' selected':''}">
         <div class="hdr"><span>${escapeHtml(sh.label)}</span><span>${Math.round(area)} sf</span></div>
-        <div class="meta">${TYPES[sh.type].name} · ${sh.floor}</div>
+        <div class="meta">${TYPES[sh.type].name} · ${sh.floor} · ${escapeHtml(sh.building||DEFAULT_BUILDING)}</div>
         <div class="actions">
           <button data-act="selectShape" data-id="${sh.id}">Select</button>
           <button data-act="editShape" data-id="${sh.id}">Quick edit</button>
@@ -1157,23 +1442,124 @@ function sidebarShapes() {
   return `<div class="section"><h2>Areas on "${state.activeFloor}"</h2>${html}</div>`;
 }
 
+// ----- Above/below-grade area helpers (appraisal reporting) -----
+const ABOVE_GRADE_FLOORS = ['main', 'upper'];
+const AGLA_TYPES = ['living', 'upper'];   // Enclosed living + Upper floor area
+
+function buildingsPresent() {
+  return [...new Set(state.shapes.map(sh => sh.building || DEFAULT_BUILDING))];
+}
+// Main-floor footprint = enclosed living on the 'main' floor (the basement's footprint by default).
+function mainFloorFootprint(building) {
+  return state.shapes
+    .filter(sh => (sh.building || DEFAULT_BUILDING) === building && sh.floor === 'main' && sh.type === 'living')
+    .reduce((a, sh) => a + polygonArea(sh.points), 0);
+}
+function aboveGradeLiving(building) {
+  return state.shapes
+    .filter(sh => (sh.building || DEFAULT_BUILDING) === building
+      && ABOVE_GRADE_FLOORS.includes(sh.floor) && AGLA_TYPES.includes(sh.type))
+    .reduce((a, sh) => a + polygonArea(sh.points), 0);
+}
+function basementArea(building) {
+  const b = state.basements[building];
+  if (b && b.areaOverride != null) return b.areaOverride;
+  return mainFloorFootprint(building);
+}
+function toggleBasement(b, on) {
+  pushUndo();
+  if (on) state.basements[b] = state.basements[b] || { areaOverride: null, pctFinished: 100 };
+  else delete state.basements[b];
+  render();
+}
+function setBasementArea(b, val) {
+  const bm = state.basements[b]; if (!bm) return;
+  pushUndo();
+  const n = parseFloat(val);
+  bm.areaOverride = (String(val).trim() === '' || isNaN(n)) ? null : Math.max(0, n);
+  render();
+}
+function setBasementPct(b, val) {
+  const bm = state.basements[b]; if (!bm) return;
+  pushUndo();
+  let n = parseFloat(val); if (isNaN(n)) n = 0;
+  bm.pctFinished = Math.max(0, Math.min(100, n));
+  render();
+}
+
+function sidebarBasement() {
+  const buildings = buildingsPresent();
+  if (buildings.length === 0) return '';
+  let html = '<div class="section"><h2>Basement (below grade)</h2>';
+  buildings.forEach(b => {
+    const bm = state.basements[b];
+    const enabled = !!bm;
+    const auto = Math.round(mainFloorFootprint(b));
+    html += `<div style="padding:6px 0; border-bottom:1px solid #eee;">
+      <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:bold; cursor:pointer;">
+        <input type="checkbox" onchange="toggleBasement('${b}', this.checked)" ${enabled ? 'checked' : ''}> ${escapeHtml(b)}</label>`;
+    if (enabled) {
+      const area = Math.round(basementArea(b));
+      const pct = bm.pctFinished;
+      const fin = Math.round(area * pct / 100);
+      const unf = Math.round(area - area * pct / 100);
+      const areaVal = bm.areaOverride != null ? Math.round(bm.areaOverride) : '';
+      html += `
+        <div class="field"><label style="flex:1;">Area (sf)</label>
+          <input type="number" style="width:90px;" value="${areaVal}" placeholder="auto ${auto}"
+            onchange="setBasementArea('${b}', this.value)"></div>
+        <div class="field"><label style="flex:1;">% finished</label>
+          <input type="number" min="0" max="100" style="width:90px;" value="${pct}"
+            onchange="setBasementPct('${b}', this.value)"></div>
+        <div class="help">Footprint <b>${area} sf</b> → Finished <b>${fin} sf</b> · Unfinished <b>${unf} sf</b>.
+          ${bm.areaOverride == null ? `Auto from main-floor enclosed living (${auto} sf).` : 'Manual override — clear the field to auto-use the main-floor footprint.'}</div>`;
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
 function sidebarTotals() {
   if (state.shapes.length === 0) return '';
-  // Totals per floor
-  let html = '<div class="section"><h2>Totals (all floors)</h2><div id="totals">';
-  const byFloor = {};
+  // Totals grouped Building → Floor → Type
+  let html = '<div class="section"><h2>Totals (all buildings)</h2><div id="totals">';
+  const byBuilding = {};
   state.shapes.forEach(sh => {
-    if (!byFloor[sh.floor]) byFloor[sh.floor] = {};
-    byFloor[sh.floor][sh.type] = (byFloor[sh.floor][sh.type] || 0) + polygonArea(sh.points);
+    const b = sh.building || DEFAULT_BUILDING;
+    if (!byBuilding[b]) byBuilding[b] = {};
+    if (!byBuilding[b][sh.floor]) byBuilding[b][sh.floor] = {};
+    byBuilding[b][sh.floor][sh.type] = (byBuilding[b][sh.floor][sh.type] || 0) + polygonArea(sh.points);
   });
-  Object.entries(byFloor).forEach(([floor, types]) => {
-    html += `<div style="margin-top:6px;font-weight:bold;font-size:11px;color:#555;">${floor}</div>`;
-    let floorTotal = 0;
-    Object.entries(types).forEach(([k,v]) => {
-      html += `<div class="row"><span>&nbsp;&nbsp;${TYPES[k].name}</span><span>${Math.round(v)} sf</span></div>`;
-      floorTotal += v;
+  Object.entries(byBuilding).forEach(([building, floors]) => {
+    html += `<div style="margin-top:8px;font-weight:bold;font-size:12px;color:#2b3a4a;border-bottom:1px solid #ddd;">${escapeHtml(building)}</div>`;
+    let buildingTotal = 0;
+    Object.entries(floors).forEach(([floor, types]) => {
+      html += `<div style="margin-top:4px;font-weight:bold;font-size:11px;color:#555;">&nbsp;&nbsp;${floor}</div>`;
+      let floorTotal = 0;
+      Object.entries(types).forEach(([k,v]) => {
+        html += `<div class="row"><span>&nbsp;&nbsp;&nbsp;&nbsp;${TYPES[k]?TYPES[k].name:k}</span><span>${Math.round(v)} sf</span></div>`;
+        floorTotal += v;
+      });
+      html += `<div class="row total"><span>&nbsp;&nbsp;&nbsp;&nbsp;Floor total</span><span>${Math.round(floorTotal)} sf</span></div>`;
+      buildingTotal += floorTotal;
     });
-    html += `<div class="row total"><span>&nbsp;&nbsp;Floor total</span><span>${Math.round(floorTotal)} sf</span></div>`;
+    html += `<div class="row total"><span>&nbsp;&nbsp;${escapeHtml(building)} total</span><span>${Math.round(buildingTotal)} sf</span></div>`;
+
+    // Above / below grade living-area summary (appraisal reporting)
+    const agla = aboveGradeLiving(building);
+    const bm = state.basements[building];
+    if (agla > 0 || bm) {
+      html += `<div style="margin-top:4px; padding-top:4px; border-top:1px dashed #bbb;"></div>`;
+      html += `<div class="row total"><span>&nbsp;&nbsp;Above-Grade Living Area</span><span>${Math.round(agla)} sf</span></div>`;
+      if (bm) {
+        const area = basementArea(building);
+        const fin = area * bm.pctFinished / 100;
+        html += `<div class="row"><span>&nbsp;&nbsp;Below-Grade (basement)</span><span>${Math.round(area)} sf</span></div>`;
+        html += `<div class="row"><span>&nbsp;&nbsp;&nbsp;&nbsp;Finished (${Math.round(bm.pctFinished)}%)</span><span>${Math.round(fin)} sf</span></div>`;
+        html += `<div class="row"><span>&nbsp;&nbsp;&nbsp;&nbsp;Unfinished</span><span>${Math.round(area - fin)} sf</span></div>`;
+      }
+    }
   });
   html += '</div></div>';
   return html;
@@ -1240,6 +1626,9 @@ function sidebarAction(e) {
     case 'clearFenceSelection': clearFenceSelection(); break;
     case 'commitPreview': commitWalkPreview(); break;
     case 'cancelPreview': cancelWalkPreview(); break;
+    case 'selectLabel': state.selectedLabel = parseInt(id); render(); break;
+    case 'editLabel': editLabel(parseInt(id)); break;
+    case 'deleteLabel': deleteLabel(parseInt(id)); break;
     case 'splitProject': splitProject(); break;
     case 'confirmSplitProject': confirmSplitProject(); break;
     case 'cancelSplitProject': cancelSplitProject(); break;
@@ -1379,6 +1768,7 @@ function applyShapeEdit() {
   sh.label = document.getElementById('sh-label').value;
   sh.type = document.getElementById('sh-type').value;
   sh.floor = document.getElementById('sh-floor').value;
+  sh.building = document.getElementById('sh-building').value;
   render();
 }
 
@@ -1401,6 +1791,7 @@ function copySelectedShape() {
     label: `${sh.label} (copy)`,
     type: sh.type,
     floor: sh.floor,
+    building: sh.building || DEFAULT_BUILDING,
     points: sh.points.map(p => ({ x: p.x + seg.dx, y: p.y + seg.dy })),
     segments: sh.segments.map(s => ({ ...s })),
   };
@@ -1535,8 +1926,13 @@ function addCmd() {
       return;
     }
 
-    // Any other input — commit any pending preview first, then process normally.
-    if (state.preview) commitWalkPreview(/*silent=*/true);
+    // Any other input — resolve a pending preview first. A preview the user is
+    // actively cycling gets committed (don't lose it); an auto-armed step
+    // suggestion gets discarded so explicit input doesn't inject a phantom wall.
+    if (state.preview) {
+      if (state.preview.armed) state.preview = null;
+      else commitWalkPreview(/*silent=*/true);
+    }
 
     let priorHeading = state.segments.length > 0
       ? headingDeg(state.segments[state.segments.length - 1])
@@ -1568,6 +1964,7 @@ function handleAutoExtendKey(dir, asJump = false) {
   // Cycle if we already have a preview in same direction AND same mode (jump vs extend)
   if (state.preview && state.preview.dir === dir && !!state.preview.jump === asJump) {
     state.preview.candIdx = (state.preview.candIdx + 1) % state.preview.candidates.length;
+    state.preview.armed = false;   // user is now actively choosing this preview
     render();
     return;
   }
@@ -1578,21 +1975,47 @@ function handleAutoExtendKey(dir, asJump = false) {
   render();
 }
 
+// Click-to-snap: draw one straight segment from the pen to a clicked point
+// (any shape vertex or walk vertex). Works regardless of alignment — the fix
+// for closing angled walks where keyboard r/u snapping has nothing to grab.
+function snapWalkToPoint(target) {
+  if (state.mode !== 'walk' || state.segments.length === 0) return;
+  const wpts = pathPointsHere(state.segments);
+  const pen = wpts[wpts.length - 1];
+  const dx = target.x - pen.x, dy = target.y - pen.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 1e-6) return; // pen already there
+  const dir = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'r' : 'l') : (dy >= 0 ? 'd' : 'u');
+  pushUndo();
+  state.preview = null;
+  state.segments.push({ length, dir, angle: 0, dx, dy, raw: `${formatLength(length)} ${dir} (to point)` });
+  render();
+}
+
 function commitWalkPreview(silent) {
   if (!state.preview) return;
+  const { dir, jump } = state.preview;
   const cand = state.preview.candidates[state.preview.candIdx];
   pushUndo();
-  if (state.preview.jump) {
+  if (jump) {
     state.segments.push({
       ...cand.segment,
       jump: true,
-      raw: `↷ ${formatLength(cand.along)} ${state.preview.dir} (jump)`
+      raw: `↷ ${formatLength(cand.along)} ${dir} (jump)`
     });
   } else {
     state.segments.push(cand.segment);
   }
   state.preview = null;
-  if (!silent) render();
+  // Step-mode chaining: an explicit (non-silent) commit immediately re-arms the
+  // next aligned snap in the SAME direction/mode from the new pen, so you can walk
+  // successive alignments with r⏎ … ⏎ ⏎ (then u⏎ ⏎) without retyping the direction.
+  // A silent pre-commit (made before processing other input) does not re-arm.
+  if (!silent) {
+    const next = findAlignedCandidatesHere(state.segments, dir);
+    if (next.length) state.preview = { dir, candIdx: 0, candidates: next, jump, armed: true };
+    render();
+  }
 }
 
 function cancelWalkPreview() {
@@ -1704,14 +2127,19 @@ function closeShape() {
   }
   const label = prompt('Label for this area:', `Area ${state.nextShapeId}`);
   if (label === null) return;
-  const typeKey = prompt(`Type? (${Object.keys(TYPES).join(', ')})`, 'living');
-  if (!typeKey || !(typeKey in TYPES)) { alert('Cancelled.'); return; }
+  const typeRaw = prompt(`Type? (${Object.keys(TYPES).join(', ')})`, 'living');
+  if (typeRaw === null) return; // Cancel/Escape only — keep the walk intact
+  const typeKey = typeRaw.trim().toLowerCase();
+  // Forgiving match: a typo or wrong case must not discard the walk. Fall back to
+  // 'misc' and let the user fix the type in Edit mode rather than losing their work.
+  const finalType = (typeKey in TYPES) ? typeKey : 'misc';
+  if (!(typeKey in TYPES)) alert(`Unrecognized type "${typeRaw.trim()}" — using "Misc / other". You can change it anytime in Edit mode.`);
   pushUndo();
   const shape = {
     id: state.nextShapeId++,
     points: pointsToUse,
     segments: hasJumps ? [] : [...state.segments],
-    label, type: typeKey, floor: state.activeFloor,
+    label, type: finalType, floor: state.activeFloor, building: DEFAULT_BUILDING,
   };
   if (hasJumps) rebuildSegments(shape);
   state.shapes.push(shape);
@@ -1727,6 +2155,9 @@ document.querySelectorAll('#mode-tabs button').forEach(b => {
   b.addEventListener('click', () => {
     state.mode = b.dataset.mode;
     state.selection = null;
+    state.selectedLabel = null;
+    state.labelDrag = null;
+    state.shapeLabelDrag = null;
     state.splitSelection = null;
     state.preview = null;
     state.splitPreview = null;
@@ -1735,15 +2166,25 @@ document.querySelectorAll('#mode-tabs button').forEach(b => {
 });
 
 svg.addEventListener('click', (e) => {
-  if (e.target === svg) {
-    state.selection = null;
-    render();
+  if (e.target !== svg) return;
+  if (state.mode === 'text') {
+    // Blank-canvas click in Text mode: place a new label here. If one is
+    // selected, a blank click deselects instead of immediately adding another.
+    if (state.selectedLabel !== null) { state.selectedLabel = null; render(); return; }
+    addLabelAt(screenToWorld(e.clientX, e.clientY));
+    return;
   }
+  state.selection = null;
+  render();
 });
 
 svg.addEventListener('mousedown', fenceMouseDown);
 window.addEventListener('mousemove', fenceMouseMove);
 window.addEventListener('mouseup', fenceMouseUp);
+window.addEventListener('mousemove', labelDragMove);
+window.addEventListener('mouseup', labelDragUp);
+window.addEventListener('mousemove', shapeLabelDragMove);
+window.addEventListener('mouseup', shapeLabelDragUp);
 
 (function initSubjectInput() {
   const inp = document.getElementById('subject-input');
@@ -1752,24 +2193,24 @@ window.addEventListener('mouseup', fenceMouseUp);
   inp.addEventListener('input', () => { state.subject = inp.value; });
 })();
 
-(function initFloorBarGhostSlider() {
-  const slider = document.getElementById('floor-ghost-opacity');
-  const valEl = document.getElementById('floor-ghost-opacity-val');
+(function initFloorBarFontSlider() {
+  const slider = document.getElementById('sketch-font-bar');
+  const valEl = document.getElementById('sketch-font-bar-val');
   if (!slider || !valEl) return;
   const sync = () => {
-    slider.value = state.settings.ghostOpacity;
-    valEl.textContent = Math.round(state.settings.ghostOpacity * 100) + '%';
-    document.documentElement.style.setProperty('--ghost-opacity', state.settings.ghostOpacity);
+    const v = state.settings.sketchFontScale || 1;
+    slider.value = v;
+    valEl.textContent = Math.round(v * 100) + '%';
   };
   sync();
   slider.addEventListener('input', () => {
-    const v = parseFloat(slider.value);
-    state.settings.ghostOpacity = v;
+    const v = parseFloat(slider.value) || 1;
+    state.settings.sketchFontScale = v;
     valEl.textContent = Math.round(v * 100) + '%';
-    document.documentElement.style.setProperty('--ghost-opacity', v);
+    render();
   });
   slider.addEventListener('change', () => { saveSettings(); });
-  window.__syncFloorGhostSlider = sync; // let openSettings refresh us after Save
+  window.__syncSketchFontBar = sync; // keep in sync if changed elsewhere
 })();
 
 // =============================================================================
@@ -1809,15 +2250,6 @@ function openSettings() {
         </label>
       </div>
       <div style="margin-top:10px;">
-        <label style="font-size:12px;">Export page size:
-          <select id="set-page-size" style="margin-left:8px;">
-            <option value="auto"${s.exportPageSize==='auto'?' selected':''}>Auto (canvas size)</option>
-            <option value="letter-portrait"${s.exportPageSize==='letter-portrait'?' selected':''}>Letter — Portrait (8.5×11)</option>
-            <option value="letter-landscape"${s.exportPageSize==='letter-landscape'?' selected':''}>Letter — Landscape (11×8.5)</option>
-          </select>
-        </label>
-      </div>
-      <div style="margin-top:10px;">
         <label style="font-size:12px;">Auto-close threshold (feet):
           <input type="number" id="set-close" value="${s.autoCloseFeet}" step="0.01" min="0" max="1" style="width:80px;">
         </label>
@@ -1830,7 +2262,7 @@ function openSettings() {
         </label>
       </div>
       <div class="modal-buttons">
-        <button onclick="closeModal()">Cancel</button>
+        <button onclick="cancelSettings()">Cancel</button>
         <button class="primary" onclick="applySettings()">Save</button>
       </div>
     </div>
@@ -1851,6 +2283,12 @@ function openSettings() {
   });
 }
 
+// Revert the live opacity preview to the saved value, then close.
+function cancelSettings() {
+  document.documentElement.style.setProperty('--ghost-opacity', state.settings.ghostOpacity);
+  closeModal();
+}
+
 function settingRow(key, label) {
   return `<div class="row"><label><input type="checkbox" id="set-${key}" ${state.settings[key]?'checked':''}> ${label}</label></div>`;
 }
@@ -1861,9 +2299,7 @@ function applySettings() {
   });
   state.settings.defaultLengthEditMode = document.getElementById('set-default-mode').value;
   state.settings.autoCloseFeet = parseFloat(document.getElementById('set-close').value) || 0.05;
-  state.settings.exportPageSize = document.getElementById('set-page-size').value || 'auto';
   state.settings.ghostOpacity = parseFloat(document.getElementById('set-ghost-opacity').value) || 0.45;
-  if (typeof window.__syncFloorGhostSlider === 'function') window.__syncFloorGhostSlider();
   saveSettings();
   closeModal();
   render();
@@ -1879,6 +2315,73 @@ function saveSettings() {
 function exportFilename(ext) {
   return (state.subject || 'sketch').replace(/[^\w\-]/g, '_') + '.' + ext;
 }
+// Print-preview modal: shows the printable sheet, lets you pick page size + what's
+// included, and exports PNG/SVG from there. Page size is chosen here at export time.
+function openExportPreview() {
+  const m = createModal();
+  const s = state.settings;
+  const div = document.createElement('div');
+  div.className = 'modal';
+  div.style.maxWidth = '760px';
+  div.style.width = '94%';
+  div.innerHTML = `
+    <h3>Export / Print preview</h3>
+    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:10px; font-size:12px;">
+      <label>Page:
+        <select id="prev-page-size" style="margin-left:6px;">
+          <option value="auto">Auto (fit content)</option>
+          <option value="letter-portrait">Letter — Portrait (8.5×11)</option>
+          <option value="letter-landscape">Letter — Landscape (11×8.5)</option>
+        </select>
+      </label>
+      <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="prev-title" ${s.exportIncludeTitle?'checked':''}> Title</label>
+      <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="prev-legend" ${s.exportIncludeLegend?'checked':''}> Legend</label>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; font-size:12px;">
+      <span style="color:#555;">Show dimensions + notes for:</span>
+      ${state.floors.map(f => {
+        const isActive = f === state.activeFloor;
+        const on = isActive || (s.ghostDimFloors||[]).includes(f);
+        return `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" data-dimfloor="${f}" ${on?'checked':''} ${isActive?'disabled':''}> ${escapeHtml(f)}${isActive?' (active)':''}</label>`;
+      }).join('')}
+    </div>
+    <div id="prev-area" style="background:#e9edf1; padding:14px; display:flex; justify-content:center; align-items:flex-start; max-height:60vh; overflow:auto; border:1px solid #ccc; border-radius:4px; min-height:200px;"></div>
+    <div class="modal-buttons">
+      <button onclick="closeModal()">Cancel</button>
+      <button id="prev-save-svg">Save SVG</button>
+      <button class="primary" id="prev-save-png">Save PNG</button>
+    </div>`;
+  m.appendChild(div);
+  const sel = div.querySelector('#prev-page-size');
+  sel.value = s.exportPageSize || 'auto';
+  const draw = () => {
+    s.exportPageSize = sel.value;
+    s.exportIncludeTitle = div.querySelector('#prev-title').checked;
+    s.exportIncludeLegend = div.querySelector('#prev-legend').checked;
+    s.ghostDimFloors = [...div.querySelectorAll('[data-dimfloor]')]
+      .filter(cb => cb.checked && !cb.disabled).map(cb => cb.dataset.dimfloor);
+    saveSettings();
+    render();  // refresh the live canvas so the clone reflects the dimension-floor choices
+    const area = div.querySelector('#prev-area');
+    area.innerHTML = '';
+    let svgEl;
+    try { svgEl = svgForExport(); } catch (e) { area.textContent = 'Preview error: ' + e.message; return; }
+    const w = parseFloat(svgEl.getAttribute('width')), h = parseFloat(svgEl.getAttribute('height'));
+    const scale = Math.min(680 / w, (window.innerHeight * 0.55) / h, 1);
+    svgEl.setAttribute('width', Math.round(w * scale));
+    svgEl.setAttribute('height', Math.round(h * scale));
+    svgEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)';
+    area.appendChild(svgEl);
+  };
+  sel.addEventListener('change', draw);
+  div.querySelector('#prev-title').addEventListener('change', draw);
+  div.querySelector('#prev-legend').addEventListener('change', draw);
+  div.querySelectorAll('[data-dimfloor]').forEach(cb => cb.addEventListener('change', draw));
+  div.querySelector('#prev-save-svg').addEventListener('click', () => { exportSVG(); closeModal(); });
+  div.querySelector('#prev-save-png').addEventListener('click', () => { exportPNG(); closeModal(); });
+  draw();
+}
+
 async function exportSVG() {
   const clone = svgForExport();
   const xml = new XMLSerializer().serializeToString(clone);
@@ -1916,19 +2419,35 @@ function svgForExport() {
   const usedTypes = [...new Set(state.shapes.map(s => s.type))].filter(k => k in TYPES);
   const includeLegend = state.settings.exportIncludeLegend && usedTypes.length > 0;
 
-  // Title + legend layout in PAGE coords (so they stay readable regardless of canvas scale)
-  const titleH = includeTitle ? 80 : 0;
-  const legendRowH = 26;
-  const legendFooterH = 32;
-  const legendPad = 14;
-  const legendHeaderH = 28;
-  const legendH = includeLegend ? (legendPad*2 + legendHeaderH + usedTypes.length * legendRowH + legendFooterH) : 0;
+  // Above/below-grade summary line shown on the sheet (appraisal totals)
+  const gradeSummary = (() => {
+    let agla = 0, bArea = 0, bFin = 0, hasB = false;
+    buildingsPresent().forEach(b => {
+      agla += aboveGradeLiving(b);
+      const bm = state.basements[b];
+      if (bm) { hasB = true; const a = basementArea(b); bArea += a; bFin += a * bm.pctFinished / 100; }
+    });
+    const parts = [];
+    if (agla > 0) parts.push(`Above-Grade Living ${Math.round(agla)} sq ft`);
+    if (hasB) parts.push(`Basement ${Math.round(bArea)} sq ft (${Math.round(bFin)} finished / ${Math.round(bArea - bFin)} unfinished)`);
+    return parts.join('      •      ');
+  })();
+
+  // Title + legend layout in PAGE coords (slimmed so the drawing gets more room).
+  const titleH = includeTitle ? 48 : 0;
+  const legendRowH = 20;
+  const legendFooterH = 24;
+  const legendPad = 10;
+  const legendHeaderH = 20;
+  const summaryRowH = (gradeSummary && includeLegend) ? 18 : 0;  // grade/basement totals live in the legend
+  const legendH = includeLegend ? (legendPad*2 + legendHeaderH + usedTypes.length * legendRowH + summaryRowH + legendFooterH) : 0;
 
   // ---- 2. Tight bbox of actual content in SCREEN coords (live render) ----
   const allWorldPts = [];
   state.shapes.forEach(sh => allWorldPts.push(...sh.points));
   if (state.segments.length) allWorldPts.push(...pathPointsHere(state.segments));
   state.annotations.forEach(a => { allWorldPts.push(a.a); allWorldPts.push(a.b); });
+  labelsOnFloor(state.activeFloor).forEach(l => allWorldPts.push({ x: l.x, y: l.y }));
 
   let tight;
   if (allWorldPts.length === 0 || !viewTransform) {
@@ -1936,9 +2455,20 @@ function svgForExport() {
   } else {
     const sxs = allWorldPts.map(p => viewTransform.tx + p.x * viewTransform.scale);
     const sys = allWorldPts.map(p => viewTransform.ty + p.y * viewTransform.scale);
-    const sMinX = Math.min(...sxs), sMaxX = Math.max(...sxs);
-    const sMinY = Math.min(...sys), sMaxY = Math.max(...sys);
-    const labelPad = 70; // room for outside dimension labels + centroid labels
+    let sMinX = Math.min(...sxs), sMaxX = Math.max(...sxs);
+    let sMinY = Math.min(...sys), sMaxY = Math.max(...sys);
+    // Union in the ACTUAL rendered text (dimension labels, area labels, multi-line
+    // notes) so nothing clips and we can crop tightly — which scales the drawing up.
+    [...svg.querySelectorAll('text')].forEach(t => {
+      if (t.classList.contains('ui-overlay')) return;
+      try {
+        const bb = t.getBBox();
+        if (!bb || (bb.width === 0 && bb.height === 0)) return;
+        sMinX = Math.min(sMinX, bb.x); sMaxX = Math.max(sMaxX, bb.x + bb.width);
+        sMinY = Math.min(sMinY, bb.y); sMaxY = Math.max(sMaxY, bb.y + bb.height);
+      } catch (e) { /* getBBox can throw on unrendered nodes */ }
+    });
+    const labelPad = 12; // text extents already counted; just a little breathing room
     tight = {
       x: sMinX - labelPad,
       y: sMinY - labelPad,
@@ -1981,17 +2511,17 @@ function svgForExport() {
   // Page background
   out.appendChild(mk('rect', { width: pageW, height: pageH, fill: '#fff' }));
 
-  // Title block in page coords (full readable size)
+  // Title block in page coords (slimmed)
   if (includeTitle) {
     const subj = (state.subject || '').trim();
     const sub = (state.subtitle || '').trim();
     out.appendChild(mk('text', {
-      x: pageW / 2, y: 38, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
-      'font-size': 22, 'font-weight':'bold', fill:'#222'
+      x: pageW / 2, y: 26, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
+      'font-size': 18, 'font-weight':'bold', fill:'#222'
     }, subj));
     out.appendChild(mk('text', {
-      x: pageW / 2, y: 60, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
-      'font-size': 13, fill:'#555'
+      x: pageW / 2, y: 42, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
+      'font-size': 11, fill:'#555'
     }, sub || 'Not to scale — dimensions as labeled'));
   }
 
@@ -2030,8 +2560,8 @@ function svgForExport() {
       fill: 'none', stroke: '#999', 'stroke-width': 0.75
     }));
     out.appendChild(mk('text', {
-      x: x0 + 14, y: y0 + 4, 'font-family':'Arial, sans-serif',
-      'font-size': 16, 'font-weight':'bold', fill:'#222'
+      x: x0 + 12, y: y0 + 2, 'font-family':'Arial, sans-serif',
+      'font-size': 13, 'font-weight':'bold', fill:'#222'
     }, 'Legend'));
     // Two-column layout if there are many types
     const usePerColumn = usedTypes.length > 4 ? Math.ceil(usedTypes.length / 2) : usedTypes.length;
@@ -2040,38 +2570,47 @@ function svgForExport() {
       const t = TYPES[key];
       const col = Math.floor(i / usePerColumn);
       const rowInCol = i % usePerColumn;
-      const rowX = x0 + 14 + col * colW;
-      const rowY = y0 + 22 + rowInCol * legendRowH;
+      const rowX = x0 + 12 + col * colW;
+      const rowY = y0 + 16 + rowInCol * legendRowH;
       const swatch = mk('rect', {
-        x: rowX, y: rowY, width: 30, height: 18,
+        x: rowX, y: rowY, width: 22, height: 13,
         fill: t.fill, stroke: 'black', 'stroke-width': 1
       });
       if (t.dashed) swatch.setAttribute('stroke-dasharray','5,3');
       out.appendChild(swatch);
       out.appendChild(mk('text', {
-        x: rowX + 40, y: rowY + 14, 'font-family':'Arial, sans-serif', 'font-size': 13, fill:'#222'
+        x: rowX + 30, y: rowY + 11, 'font-family':'Arial, sans-serif', 'font-size': 11, fill:'#222'
       }, t.name));
       const total = state.shapes.filter(s => s.type === key).reduce((a, s) => a + polygonArea(s.points), 0);
       out.appendChild(mk('text', {
-        x: rowX + colW - 24, y: rowY + 14, 'text-anchor':'end',
-        'font-family':'Arial, sans-serif', 'font-size': 13, 'font-weight':'bold', fill:'#444'
+        x: rowX + colW - 20, y: rowY + 11, 'text-anchor':'end',
+        'font-family':'Arial, sans-serif', 'font-size': 11, 'font-weight':'bold', fill:'#444'
       }, `${Math.round(total)} sq ft`));
     });
+    // Grade/basement totals consolidated into the legend (below the type rows)
+    let summaryBottom = y0 + 16 + usePerColumn * legendRowH;
+    if (gradeSummary) {
+      out.appendChild(mk('text', {
+        x: x0 + 12, y: summaryBottom + 12, 'font-family':'Arial, sans-serif',
+        'font-size': 11, 'font-weight':'bold', fill:'#2b3a4a'
+      }, gradeSummary));
+      summaryBottom += 18;
+    }
     // Wall-style swatches as a footer row
-    const footerY = y0 + 22 + usePerColumn * legendRowH + 8;
+    const footerY = summaryBottom + 6;
     out.appendChild(mk('line', {
-      x1: x0 + 14, y1: footerY + 6, x2: x0 + 60, y2: footerY + 6,
+      x1: x0 + 12, y1: footerY + 5, x2: x0 + 52, y2: footerY + 5,
       stroke:'black', 'stroke-width': 2.5
     }));
     out.appendChild(mk('text', {
-      x: x0 + 68, y: footerY + 10, 'font-family':'Arial, sans-serif', 'font-size': 12, fill:'#222'
+      x: x0 + 58, y: footerY + 9, 'font-family':'Arial, sans-serif', 'font-size': 10, fill:'#222'
     }, 'Enclosed wall'));
     out.appendChild(mk('line', {
-      x1: x0 + 220, y1: footerY + 6, x2: x0 + 266, y2: footerY + 6,
+      x1: x0 + 190, y1: footerY + 5, x2: x0 + 230, y2: footerY + 5,
       stroke:'black', 'stroke-width': 2.5, 'stroke-dasharray':'8,5'
     }));
     out.appendChild(mk('text', {
-      x: x0 + 274, y: footerY + 10, 'font-family':'Arial, sans-serif', 'font-size': 12, fill:'#222'
+      x: x0 + 236, y: footerY + 9, 'font-family':'Arial, sans-serif', 'font-size': 10, fill:'#222'
     }, 'Open / dashed edge'));
   }
 
@@ -2193,6 +2732,12 @@ function newProject() {
   state.segments = [];
   state.startPoint = null;
   state.annotations = [];
+  state.basements = {};
+  state.labels = [];
+  state.nextLabelId = 1;
+  state.selectedLabel = null;
+  state.labelDrag = null;
+  state.shapeLabelDrag = null;
   state.subject = '';
   state.subtitle = '';
   state.floors = ['basement', 'main', 'upper', 'other'];
@@ -2217,6 +2762,9 @@ document.getElementById('load-json').addEventListener('change', (e) => {
       const d = JSON.parse(r.result);
       Object.assign(state, d);
       state.selection = null; state.splitSelection = null;
+      state.labels = d.labels || []; state.nextLabelId = d.nextLabelId || 1;
+      state.basements = d.basements || {};
+      state.selectedLabel = null; state.labelDrag = null; state.shapeLabelDrag = null;
       const subjInp = document.getElementById('subject-input');
       if (subjInp) subjInp.value = state.subject || '';
       saveToRecents();  // also add loaded sketch to recents so it's reloadable
@@ -2279,6 +2827,8 @@ window.addEventListener('keydown', (e) => {
   else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoHistory(); }
   else if (e.key === 'Escape' && state.offsetPick) { cancelOffsetPick(); }
   else if (e.key === 'Escape' && state.mode === 'fence' && (state.fenceSelection || state.fenceDraw)) { state.fenceDraw = null; state.fenceSelection = null; render(); }
+  else if (state.mode === 'text' && state.selectedLabel !== null && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); deleteLabel(state.selectedLabel); }
+  else if (e.key === 'Escape' && state.mode === 'text' && state.selectedLabel !== null) { state.selectedLabel = null; render(); }
 });
 
 render();
