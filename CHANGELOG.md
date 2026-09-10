@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.28.0] — 2026-09-10
+
+### Changed
+- **Compass rose** replaces the four-arrow pad and the angle picker. It is a pie of *absolute* directions — up is always the top of the drawing, so there is no question of which baseline an angle is measured from. A *Steps* switch gives 8 wedges at 45° or 16 at 22.5° (finer is too small on some screens). Beside it, a list shows every direction with the typed command it stands for (`u`, `u 45`, `d -22.5`, …); hovering a wedge highlights its list entry and picking from the list highlights the wedge, so the grammar is learned by seeing it. With a length typed, clicking a wedge adds the wall; with a direction chosen first, Enter / Add uses it. Non-cardinal directions map to `u <angle>` / `d <angle>`, which the parser treats as absolute whatever the previous wall did. ← ↑ → ↓ still add the four cardinals; empty-box behaviour (pen-jump) is unchanged.
+
+---
+
 ## [0.27.1] — 2026-09-10
 
 ### Fixed
