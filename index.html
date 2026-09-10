@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.18.0"></script>
-<script src="dictation.js?v=0.18.0"></script>
+<script src="core.js?v=0.18.1"></script>
+<script src="dictation.js?v=0.18.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -105,7 +105,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.18.0</span>
+  <span class="version-chip" id="app-version">v0.18.1</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -221,6 +221,10 @@ function snapshotState() {
 }
 function restoreState(snap) {
   const d = JSON.parse(snap);
+  // Keep the selection across undo/redo when it still points at something real.
+  const keep = state.selection;
+  const keepSh = keep && d.shapes.find(s => s.id === keep.shapeId);
+  const keepOk = !!keepSh && (keep.kind === 'shape' || (keep.idx != null && keep.idx < keepSh.points.length - 1));
   state.segments = d.segments;
   state.shapes = d.shapes;
   state.floors = d.floors;
@@ -231,7 +235,7 @@ function restoreState(snap) {
   state.basements = d.basements || {};
   state.labels = d.labels || [];
   state.nextLabelId = d.nextLabelId || 1;
-  state.selection = null;
+  state.selection = keepOk ? keep : null;
   state.selectedLabel = null;
   state.labelDrag = null;
   state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null;
@@ -643,7 +647,7 @@ function render() {
   document.getElementById('floor-help').textContent =
     state.mode==='text' ? 'Click a blank spot to add a text label. Click a label to select it; drag to move it; double-click to edit.' :
     state.mode==='split' ? 'Click two vertices in a shape to split it.' :
-    state.mode==='edit' ? 'Click a wall or vertex to edit, or the body of a shape to move/copy/retype it. Drag a dimension or area label to move it; double-click a dimension label to snap it back.' :
+    state.mode==='edit' ? 'Click a wall or vertex to edit, or the body of a shape to move/copy/retype it. Esc deselects. Drag a dimension or area label to move it; double-click a dimension label to snap it back.' :
     (state.segments.length === 0
       ? 'Type segments to build a shape — or click any vertex (green) to start from there. Click a blank spot to drop the start, then Shift+Arrow to snap it onto aligned vertices.'
       : 'Type segments to extend the path, or click any vertex to draw a straight line to it. Close Shape when you return to start.');
@@ -2623,6 +2627,9 @@ svg.addEventListener('click', (e) => {
     if (state.shapeMovePick.anchor) finishShapeMove(screenToWorld(e.clientX, e.clientY));
     return;
   }
+  // Edit mode: a blank click keeps the current selection (the panel stays put);
+  // Esc, or clicking another wall/vertex/shape, changes it.
+  if (state.mode === 'edit') return;
   state.selection = null;
   render();
 });
@@ -3447,6 +3454,7 @@ window.addEventListener('keydown', (e) => {
   else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoHistory(); }
   else if (e.key === 'Escape' && state.offsetPick) { cancelOffsetPick(); }
   else if (e.key === 'Escape' && state.shapeMovePick) { cancelShapeMovePick(); }
+  else if (e.key === 'Escape' && state.mode === 'edit' && state.selection) { state.selection = null; render(); }
   else if (e.key === 'Escape' && state.mode === 'fence' && (state.fenceSelection || state.fenceDraw)) { state.fenceDraw = null; state.fenceSelection = null; render(); }
   else if (state.mode === 'text' && state.selectedLabel !== null && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); deleteLabel(state.selectedLabel); }
   else if (e.key === 'Escape' && state.mode === 'text' && state.selectedLabel !== null) { state.selectedLabel = null; render(); }

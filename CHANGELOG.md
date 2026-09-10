@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.18.1] — 2026-09-09
+
+### Fixed
+- **Edit panel kept vanishing.** In Edit mode, clicking a blank spot on the canvas cleared the selection, so the shape, wall, or vertex editor disappeared whenever you clicked away to look at something. A blank click now leaves the selection alone; **Esc** deselects, and clicking another wall, vertex, or shape body switches to it as before.
+- **Undo / Redo** used to drop the selection too. They now keep it whenever the selected shape (and wall or vertex index) still exists after the restore.
+
+---
+
 ## [0.18.0] — 2026-09-09
 
 ### Added
