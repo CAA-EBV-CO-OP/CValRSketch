@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.30.0`
+**Current version:** `0.30.1`
 **Released:** 2026-09-10
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.30.1  | 2026-09-11 | patch  | **New-area label sticks after clicking a type** (typing was being pulled into the walk box behind the dialog). **Phantom leg after Close Shape fixed** (a leftover snap preview was committed from the origin by the next Enter). **Enter takes the enclosed-area offer even while a snap preview is showing** (it used to commit the preview step instead, then a retraced leg left a stray line). Candidates that double back along a walked leg are no longer offered. Both sidebar boxes say which Enter does what. |
 | 0.30.0  | 2026-09-11 | minor  | **Fence can delete.** *Delete fenced* (or the Delete key) removes whatever the fence captured whole: shapes with every vertex inside, an unfinished walk with all its points inside, offset measurements with both ends inside. Confirmed, one undo step. The button names what it will remove. |
 | 0.29.0  | 2026-09-11 | minor  | **Enclosed-area offer**: when the pen lands on an existing wall and the walk started on one, the region fenced off by the walk plus existing walls is highlighted in yellow; Enter (or *Close along walls*) closes the shape along those walls instead of a straight line back to the start; N cycles when several regions qualify; Esc ignores. **New-area picker** replaces the two prompt boxes: label field plus a grid of type buttons with swatches, a text box that matches a few letters, and a suggested type from the floor/building. |
 | 0.28.0  | 2026-09-10 | minor  | **Compass rose** replaces the arrow pad + angle picker: a pie of absolute directions (8 at 45° or 16 at 22.5°, your choice), a matching list showing the typed command for each, two-way highlighting between them. Click a wedge with a length typed and the wall goes that way; or pick the direction first and Enter adds it. Arrow keys keep the four cardinals. |

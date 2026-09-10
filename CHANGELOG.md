@@ -14,6 +14,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.30.1] — 2026-09-11
+
+### Fixed
+- **New-area label did not stick after clicking a type.** Clicking a type button left the keyboard on that button, and the walk-mode rule “a printable key with nothing focused starts typing in the segment box” pulled the label text into the walk box behind the dialog, so the shape kept its default *Area n* name. Dialogs now own the keyboard, and a type click hands the caret back to the label field.
+- **Phantom leg after closing a shape.** A snap preview left over from `u` + Enter stepping survived Close Shape; the next Enter committed it as a segment from the drawing origin, leaving a stray dashed line (and, after a save, a stranded unfinished walk far from the house). Closing a shape now clears the preview.
+- **Enter did not take the enclosed-area offer while a snap preview was showing.** Reaching the vertex by `u` + Enter stepping leaves a snap preview on screen, and Enter went to that preview: the pen stepped on up the wall, and the next offer (now doubling back down that leg) closed with a stray line. Enter now takes the yellow offer whenever one is showing; to step instead, click *Accept* in the preview box or press Esc (drops the offer) and then Enter. Candidates that retrace a walked leg are no longer offered at all. The preview box says so while an offer is up.
+
+---
+
 ## [0.30.0] — 2026-09-11
 
 ### Added

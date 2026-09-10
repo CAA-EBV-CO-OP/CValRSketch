@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.30.0"></script>
-<script src="dictation.js?v=0.30.0"></script>
+<script src="core.js?v=0.30.1"></script>
+<script src="dictation.js?v=0.30.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -193,7 +193,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.30.0</span>
+  <span class="version-chip" id="app-version">v0.30.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -2012,7 +2012,7 @@ function sidebarWalk() {
       return `
     <div class="section enclose-box">
       <h2>Enclosed area found — ${Math.round(c.area)} sq ft</h2>
-      <div class="help">The pen sits on an existing wall. Closing along the highlighted walls (${c.path.length - 1} of them) makes this area${n > 1 ? ` — option <b>${enc.idx + 1} of ${n}</b>, <b>N</b> shows the next` : ''}. Press <b>Enter</b> with the box empty (or the button) to take it; keep typing walls to ignore it. <b>Esc</b> drops the offer so Close Shape uses a straight line.</div>
+      <div class="help">The pen sits on an existing wall. Closing along the highlighted walls (${c.path.length - 1} of them) makes this area${n > 1 ? ` — option <b>${enc.idx + 1} of ${n}</b>, <b>N</b> shows the next` : ''}. Press <b>Enter</b> with the box empty (or the button) to take it — even while a snap preview is showing. Keep typing walls to ignore it. <b>Esc</b> drops the offer: Close Shape then uses a straight line, and Enter steps the snap preview again.</div>
       <div class="row-buttons">
         <button data-act="encloseAccept" class="primary">&#10003; Close along walls</button>
         ${n > 1 ? '<button data-act="encloseNext">Next option</button>' : ''}
@@ -2030,7 +2030,7 @@ function sidebarWalk() {
       return `
     <div class="section" style="background:${bg};border:2px solid ${border};">
       <h2 style="color:${color};">${title} — ${formatLength(state.preview.candidates[state.preview.candIdx].along)} ${state.preview.dir}</h2>
-      <div class="help">Candidate <b>${state.preview.candIdx + 1} of ${state.preview.candidates.length}</b>. ${cycleHint}. Press Enter with empty input (or click below) to accept — this also lines up the next snap in the same direction, so press Enter again to keep stepping. Esc stops.</div>
+      <div class="help">Candidate <b>${state.preview.candIdx + 1} of ${state.preview.candidates.length}</b>. ${cycleHint}. ${currentEnclose() ? 'An <b>enclosed area is offered</b> (yellow), so Enter takes that. To step here instead, click <b>&#10003; Accept</b> below, or press Esc to drop the offer and then Enter.' : 'Press Enter with empty input (or click below) to accept — this also lines up the next snap in the same direction, so press Enter again to keep stepping. Esc stops.'}</div>
       <div class="row-buttons">
         <button data-act="commitPreview" class="primary">✓ Accept</button>
         <button data-act="cancelPreview" class="danger">Cancel</button>
@@ -2869,7 +2869,7 @@ function addCmd() {
   // Empty input: an offered enclosure wins over a merely armed step suggestion;
   // a preview the user is actively cycling still commits.
   if (!raw) {
-    if (currentEnclose() && (!state.preview || state.preview.armed)) { closeShape(); return; }
+    if (currentEnclose()) { closeShape(); return; }
     if (state.preview) commitWalkPreview();
     return;
   }
@@ -3160,6 +3160,7 @@ function finishNewShape(shape, rebuild) {
   state.shapes.push(shape);
   state.segments = [];
   state.startPoint = null;
+  state.preview = null;    // a snap preview left over from stepping would otherwise draw a phantom leg from the origin
   state.enclose = null;
   render();
 }
@@ -3215,7 +3216,11 @@ function openNewAreaModal(defLabel, onOk) {
   m.appendChild(div);
   const typeIn = div.querySelector('#na-type'), labelIn = div.querySelector('#na-label');
   const mark = () => div.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('sel', b.dataset.type === sel));
-  div.querySelectorAll('.type-btn').forEach(b => b.addEventListener('click', () => { sel = b.dataset.type; typeIn.value = sel; mark(); }));
+  div.querySelectorAll('.type-btn').forEach(b => b.addEventListener('click', () => {
+    sel = b.dataset.type; typeIn.value = sel; mark();
+    // Hand the caret back to the label so typing after a type click goes there, not to the walk box.
+    labelIn.focus(); if (labelIn.value === defLabel) labelIn.select();
+  }));
   typeIn.addEventListener('input', () => { const k = resolveTypeText(typeIn.value); if (k) { sel = k; mark(); } });
   const ok = () => {
     const typed = resolveTypeText(typeIn.value);
@@ -3257,6 +3262,18 @@ function shapeInteriorPoint(pts) {
   const a = pts[0], b = pts[1], len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
   const nx = -(b.y - a.y) / len * Math.sign(sgn || 1), ny = (b.x - a.x) / len * Math.sign(sgn || 1);
   return { x: (a.x + b.x) / 2 + nx * 0.02, y: (a.y + b.y) / 2 + ny * 0.02 };
+}
+// True when the outline reverses on itself at any vertex (a leg walked and then
+// retraced along the same line), which would leave a stray line on the shape.
+function hasSpur(pts) {
+  const n = pts.length - 1;   // closed: last point repeats the first
+  for (let i = 0; i < n; i++) {
+    const a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n];
+    const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    const dot = (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y);
+    if (Math.abs(cross) < 1e-6 && dot < 0) return true;
+  }
+  return false;
 }
 function dropCollinear(pts) {
   const out = [pts[0]];
@@ -3327,6 +3344,7 @@ function encCandidates() {
     for (const ids of paths) {
       const run = ids.map(id => g.nodes[id]);                    // pen … start along existing walls
       const poly = dropCollinear([...walk, ...run.slice(1)]);     // start … pen … start
+      if (hasSpur(poly)) continue;                                // doubles back along a walked leg
       const area = polygonArea(poly);
       if (area < 1) continue;
       if (interior.some(ip => pointInPoly(ip, poly.slice(0, -1)))) continue;   // would swallow a shape
@@ -4769,6 +4787,7 @@ document.addEventListener('input', (e) => {
 window.addEventListener('keydown', (e) => {
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (document.getElementById('modal-host')?.childElementCount) return;   // a dialog owns the keyboard; never pull typing into the walk box
   const mod = e.ctrlKey || e.metaKey;
   // Walk mode: a printable key with nothing focused starts typing in the segment box.
   if (!mod && !e.altKey && state.mode === 'walk' && e.key.length === 1 && !galleryActive()) {
