@@ -42,6 +42,7 @@ const SETTINGS_DEFAULTS = {
   exportIncludeTitle: true,
   exportIncludeLegend: true,
   exportPageSize: 'auto',  // 'auto' | 'letter-portrait' | 'letter-landscape'
+  exportLayout: 'active',  // 'active' (live canvas) | 'horizontal' | 'vertical' (every floor as its own panel)
   confirmDelete: true,
   askOnLengthEdit: true,
   defaultLengthEditMode: 'stretch-end',

@@ -14,6 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.14.0] — 2026-09-09
+
+### Added
+- **Export layout choice.** The Export / Preview modal has a **Layout** selector: **Active floor** (what you see on the canvas, unchanged), **All floors — side by side**, or **All floors — stacked vertically**. The multi-floor layouts draw every floor that has content as its own panel — rendered alone, ghosts off, with its own dimensions and notes — and tile the panels on one sheet at a common scale, so the floors read as separate plans instead of a stack. Each panel gets a caption (floor name and its total sq ft); the basement is placed last. Title and legend behave as before; the "Show dimensions + notes for" row is hidden in multi-floor mode because every floor already shows its own. Persisted as the `exportLayout` setting.
+
+### Fixed
+- The green walk-mode **start marker** and its "start" label were being exported. They are now tagged `ui-overlay` and stripped like the other on-canvas UI.
+- When floor ghosts are off, the export crop now measures only the active floor instead of every floor's extent.
+- Session autosave now carries the **subject and subtitle**, so the export title survives a reload (they live outside the undo snapshot and were being dropped).
+
+---
+
 ## [0.13.0] — 2026-09-09
 
 ### Added

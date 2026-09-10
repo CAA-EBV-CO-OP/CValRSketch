@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.13.0"></script>
-<script src="dictation.js?v=0.13.0"></script>
+<script src="core.js?v=0.14.0"></script>
+<script src="dictation.js?v=0.14.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -100,7 +100,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.13.0</span>
+  <span class="version-chip" id="app-version">v0.14.0</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -239,7 +239,7 @@ function restoreState(snap) {
 const AUTOSAVE_KEY = 'cvalrsketch:autosave';
 let _autosaveTimer = null;
 function writeAutosave() {
-  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ at: Date.now(), snap: snapshotState() })); }
+  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ at: Date.now(), snap: snapshotState(), subject: state.subject, subtitle: state.subtitle })); }
   catch (e) { /* quota / private mode — non-fatal */ }
 }
 function scheduleAutosave() {
@@ -250,7 +250,14 @@ function autoRestoreSession() {
   let saved;
   try { saved = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); } catch (e) { return; }
   if (!saved || !saved.snap) return;
-  try { restoreState(saved.snap); }       // restoreState resets transient UI fields itself
+  try {
+    restoreState(saved.snap);            // restoreState resets transient UI fields itself
+    // Title fields live outside the undo snapshot, so carry them separately.
+    if (typeof saved.subject === 'string') state.subject = saved.subject;
+    if (typeof saved.subtitle === 'string') state.subtitle = saved.subtitle;
+    const subjInp = document.getElementById('subject-input');
+    if (subjInp) subjInp.value = state.subject || '';
+  }
   catch (e) { /* corrupt slot — ignore and start fresh */ }
 }
 
@@ -538,9 +545,9 @@ function render() {
       if (verts.some(p => Math.abs(p.y - start.y) < tol))
         addEl('line', { x1: 0, y1: startScreen.y, x2: svg.clientWidth, y2: startScreen.y, stroke: '#2e8b57', 'stroke-width': 1, 'stroke-dasharray': '4,4', opacity: 0.45, class: 'ui-overlay' });
     }
-    addEl('circle', { cx: startScreen.x, cy: startScreen.y, r: 6, fill: '#2e8b57', stroke: '#fff', 'stroke-width': 2 });
+    addEl('circle', { cx: startScreen.x, cy: startScreen.y, r: 6, fill: '#2e8b57', stroke: '#fff', 'stroke-width': 2, class: 'ui-overlay' });
     const lbl = state.startPoint ? 'start (picked)' : 'start';
-    addEl('text', { x: startScreen.x+10, y: startScreen.y+4, 'font-size': 12, fill: '#666' }, lbl);
+    addEl('text', { x: startScreen.x+10, y: startScreen.y+4, 'font-size': 12, fill: '#666', class: 'ui-overlay' }, lbl);
   }
 
   // Walk preview (auto-extend or pen-jump candidate)
@@ -2404,10 +2411,17 @@ function openExportPreview() {
           <option value="letter-landscape">Letter — Landscape (11×8.5)</option>
         </select>
       </label>
+      <label>Layout:
+        <select id="prev-layout" style="margin-left:6px;">
+          <option value="active">Active floor</option>
+          <option value="horizontal">All floors — side by side</option>
+          <option value="vertical">All floors — stacked vertically</option>
+        </select>
+      </label>
       <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="prev-title" ${s.exportIncludeTitle?'checked':''}> Title</label>
       <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="prev-legend" ${s.exportIncludeLegend?'checked':''}> Legend</label>
     </div>
-    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; font-size:12px;">
+    <div id="prev-dimrow" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; font-size:12px;">
       <span style="color:#555;">Show dimensions + notes for:</span>
       ${state.floors.map(f => {
         const isActive = f === state.activeFloor;
@@ -2424,8 +2438,13 @@ function openExportPreview() {
   m.appendChild(div);
   const sel = div.querySelector('#prev-page-size');
   sel.value = s.exportPageSize || 'auto';
+  const laySel = div.querySelector('#prev-layout');
+  laySel.value = s.exportLayout || 'active';
   const draw = () => {
     s.exportPageSize = sel.value;
+    s.exportLayout = laySel.value;
+    // Multi-floor layouts draw every floor with its own dims, so the surfacing row is moot.
+    div.querySelector('#prev-dimrow').style.display = s.exportLayout === 'active' ? '' : 'none';
     s.exportIncludeTitle = div.querySelector('#prev-title').checked;
     s.exportIncludeLegend = div.querySelector('#prev-legend').checked;
     s.ghostDimFloors = [...div.querySelectorAll('[data-dimfloor]')]
@@ -2444,6 +2463,7 @@ function openExportPreview() {
     area.appendChild(svgEl);
   };
   sel.addEventListener('change', draw);
+  laySel.addEventListener('change', draw);
   div.querySelector('#prev-title').addEventListener('change', draw);
   div.querySelector('#prev-legend').addEventListener('change', draw);
   div.querySelectorAll('[data-dimfloor]').forEach(cb => cb.addEventListener('change', draw));
@@ -2474,6 +2494,82 @@ function exportPNG() {
   };
   img.src = url;
 }
+
+// Snapshot the live canvas for export: the tight bbox of what's actually drawn
+// (screen px, including rendered text extents) plus a stripped clone of the content.
+// Captures whatever floor is on the canvas right now.
+function captureLivePanel() {
+  const allWorldPts = [];
+  const sceneShapes = state.settings.showFloorGhosts ? state.shapes : shapesOnFloor(state.activeFloor);
+  sceneShapes.forEach(sh => allWorldPts.push(...sh.points));
+  if (state.segments.length) allWorldPts.push(...pathPointsHere(state.segments));
+  state.annotations.forEach(a => { allWorldPts.push(a.a); allWorldPts.push(a.b); });
+  labelsOnFloor(state.activeFloor).forEach(l => allWorldPts.push({ x: l.x, y: l.y }));
+
+  let tight;
+  if (allWorldPts.length === 0 || !viewTransform) {
+    tight = { x: 0, y: 0, w: svg.clientWidth, h: svg.clientHeight };
+  } else {
+    const sxs = allWorldPts.map(p => viewTransform.tx + p.x * viewTransform.scale);
+    const sys = allWorldPts.map(p => viewTransform.ty + p.y * viewTransform.scale);
+    let sMinX = Math.min(...sxs), sMaxX = Math.max(...sxs);
+    let sMinY = Math.min(...sys), sMaxY = Math.max(...sys);
+    // Union in the ACTUAL rendered text (dimension labels, area labels, multi-line
+    // notes) so nothing clips and we can crop tightly — which scales the drawing up.
+    [...svg.querySelectorAll('text')].forEach(t => {
+      if (t.classList.contains('ui-overlay')) return;
+      try {
+        const bb = t.getBBox();
+        if (!bb || (bb.width === 0 && bb.height === 0)) return;
+        sMinX = Math.min(sMinX, bb.x); sMaxX = Math.max(sMaxX, bb.x + bb.width);
+        sMinY = Math.min(sMinY, bb.y); sMaxY = Math.max(sMaxY, bb.y + bb.height);
+      } catch (e) { /* getBBox can throw on unrendered nodes */ }
+    });
+    const labelPad = 12; // text extents already counted; just a little breathing room
+    tight = {
+      x: sMinX - labelPad,
+      y: sMinY - labelPad,
+      w: (sMaxX - sMinX) + labelPad * 2,
+      h: (sMaxY - sMinY) + labelPad * 2,
+    };
+  }
+
+  const content = svg.cloneNode(true);
+  // Strip UI-only elements that shouldn't appear in exports
+  ['.hit-wall', '.hit-vertex', '.visible-vertex', '.ui-overlay'].forEach(sel => {
+    [...content.querySelectorAll(sel)].forEach(n => n.remove());
+  });
+  // Clear "selected" styling on walls so exports don't show blue highlights
+  [...content.querySelectorAll('.visible-wall.selected')].forEach(n => n.classList.remove('selected'));
+  // Drop the defs (the outer export SVG carries its own copy)
+  const cloneDefs = content.querySelector('defs');
+  if (cloneDefs) cloneDefs.remove();
+  return { tight, content };
+}
+
+// Temporarily draw `floor` alone (ghosts off, no in-progress walk or start marker),
+// run fn() against that canvas, then put the live view back exactly as it was.
+function withFloorRendered(floor, fn) {
+  const saved = {
+    activeFloor: state.activeFloor, segments: state.segments, preview: state.preview,
+    startPoint: state.startPoint, ghosts: state.settings.showFloorGhosts,
+  };
+  state.activeFloor = floor;
+  state.segments = []; state.preview = null; state.startPoint = null;
+  state.settings.showFloorGhosts = false;
+  try {
+    render();
+    return fn();
+  } finally {
+    state.activeFloor = saved.activeFloor;
+    state.segments = saved.segments; state.preview = saved.preview; state.startPoint = saved.startPoint;
+    state.settings.showFloorGhosts = saved.ghosts;
+    render();
+  }
+}
+
+const FLOOR_CAPTIONS = { basement: 'Basement', main: 'Main floor', upper: 'Upper floor', other: 'Other' };
+function floorCaption(f) { return FLOOR_CAPTIONS[f] || (f.charAt(0).toUpperCase() + f.slice(1)); }
 
 function svgForExport() {
   const ns = 'http://www.w3.org/2000/svg';
@@ -2512,40 +2608,32 @@ function svgForExport() {
   const summaryRowH = (gradeSummary && includeLegend) ? 18 : 0;  // grade/basement totals live in the legend
   const legendH = includeLegend ? (legendPad*2 + legendHeaderH + usedTypes.length * legendRowH + summaryRowH + legendFooterH) : 0;
 
-  // ---- 2. Tight bbox of actual content in SCREEN coords (live render) ----
-  const allWorldPts = [];
-  state.shapes.forEach(sh => allWorldPts.push(...sh.points));
-  if (state.segments.length) allWorldPts.push(...pathPointsHere(state.segments));
-  state.annotations.forEach(a => { allWorldPts.push(a.a); allWorldPts.push(a.b); });
-  labelsOnFloor(state.activeFloor).forEach(l => allWorldPts.push({ x: l.x, y: l.y }));
-
-  let tight;
-  if (allWorldPts.length === 0 || !viewTransform) {
-    tight = { x: 0, y: 0, w: svg.clientWidth, h: svg.clientHeight };
+  // ---- 2. Capture the drawing panel(s) ----
+  // 'active' exports the live canvas as-is (active floor + ghosts + surfaced dims).
+  // 'horizontal' / 'vertical' re-render each floor on its own with ghosts off and
+  // tile the panels on one sheet, so the floors read as separate plans, not a stack.
+  const layout = state.settings.exportLayout || 'active';
+  const floorsWithContent = state.floors.filter(f => shapesOnFloor(f).length || labelsOnFloor(f).length);
+  const multi = layout !== 'active' && floorsWithContent.length > 1;
+  let panels;
+  if (!multi) {
+    panels = [{ floor: state.activeFloor, ...captureLivePanel() }];
   } else {
-    const sxs = allWorldPts.map(p => viewTransform.tx + p.x * viewTransform.scale);
-    const sys = allWorldPts.map(p => viewTransform.ty + p.y * viewTransform.scale);
-    let sMinX = Math.min(...sxs), sMaxX = Math.max(...sxs);
-    let sMinY = Math.min(...sys), sMaxY = Math.max(...sys);
-    // Union in the ACTUAL rendered text (dimension labels, area labels, multi-line
-    // notes) so nothing clips and we can crop tightly — which scales the drawing up.
-    [...svg.querySelectorAll('text')].forEach(t => {
-      if (t.classList.contains('ui-overlay')) return;
-      try {
-        const bb = t.getBBox();
-        if (!bb || (bb.width === 0 && bb.height === 0)) return;
-        sMinX = Math.min(sMinX, bb.x); sMaxX = Math.max(sMaxX, bb.x + bb.width);
-        sMinY = Math.min(sMinY, bb.y); sMaxY = Math.max(sMaxY, bb.y + bb.height);
-      } catch (e) { /* getBBox can throw on unrendered nodes */ }
-    });
-    const labelPad = 12; // text extents already counted; just a little breathing room
-    tight = {
-      x: sMinX - labelPad,
-      y: sMinY - labelPad,
-      w: (sMaxX - sMinX) + labelPad * 2,
-      h: (sMaxY - sMinY) + labelPad * 2,
-    };
+    // Report order: above-grade floors as listed, basement last.
+    const order = floorsWithContent.filter(f => f !== 'basement').concat(floorsWithContent.filter(f => f === 'basement'));
+    panels = order.map(f => ({ floor: f, ...withFloorRendered(f, captureLivePanel) }));
   }
+  const horiz = !multi || layout === 'horizontal';
+  const n = panels.length;
+  const captionH = multi ? 22 : 0;   // page px, under each panel
+  const gap = 28;                    // page px, between panels
+  const sumW = panels.reduce((a, p) => a + p.tight.w, 0), sumH = panels.reduce((a, p) => a + p.tight.h, 0);
+  const maxW = Math.max(...panels.map(p => p.tight.w)), maxH = Math.max(...panels.map(p => p.tight.h));
+  // Drawing extent (screen px, scales with fitScale) vs fixed page chrome (gaps, captions)
+  const contentW = horiz ? sumW : maxW;
+  const contentH = horiz ? maxH : sumH;
+  const fixedW = horiz ? gap * (n - 1) : 0;
+  const fixedH = horiz ? captionH : captionH * n + gap * (n - 1);
 
   // ---- 3. Page size & available canvas area ----
   const page = EXPORT_PAGE_SIZES[state.settings.exportPageSize] || null;
@@ -2555,18 +2643,18 @@ function svgForExport() {
     pageW = page.w;
     pageH = page.h;
   } else {
-    // Auto: page width = tight content width + margins; height fits content + title + legend
-    pageW = Math.max(640, tight.w + sideMargin * 2);
-    pageH = titleH + sideMargin + tight.h + sideMargin + legendH;
+    // Auto: page width = content width + margins; height fits content + title + legend
+    pageW = Math.max(640, contentW + fixedW + sideMargin * 2);
+    pageH = titleH + sideMargin + contentH + fixedH + sideMargin + legendH;
   }
 
   const canvasAvailW = pageW - sideMargin * 2;
   const canvasAvailH = pageH - titleH - legendH - sideMargin * 2;
-  const fitScale = Math.min(canvasAvailW / tight.w, canvasAvailH / tight.h);
-  const fittedW = tight.w * fitScale;
-  const fittedH = tight.h * fitScale;
-  const canvasX = sideMargin + (canvasAvailW - fittedW) / 2;
-  const canvasY = titleH + sideMargin + (canvasAvailH - fittedH) / 2;
+  const fitScale = Math.min((canvasAvailW - fixedW) / contentW, (canvasAvailH - fixedH) / contentH);
+  const blockW = contentW * fitScale + fixedW;
+  const blockH = contentH * fitScale + fixedH;
+  const blockX = sideMargin + (canvasAvailW - blockW) / 2;
+  const blockY = titleH + sideMargin + (canvasAvailH - blockH) / 2;
 
   // ---- 4. Build the export SVG: page-coord outer, nested SVG for the canvas ----
   const liveDefs = svg.querySelector('defs');
@@ -2595,30 +2683,29 @@ function svgForExport() {
     }, sub || 'Not to scale — dimensions as labeled'));
   }
 
-  // ---- 5. Nested SVG that crops to the tight bbox and scales to fit ----
-  const liveClone = svg.cloneNode(true);
-  // Strip UI-only elements that shouldn't appear in exports
-  ['.hit-wall', '.hit-vertex', '.visible-vertex', '.ui-overlay'].forEach(sel => {
-    [...liveClone.querySelectorAll(sel)].forEach(n => n.remove());
+  // ---- 5. Place the panel(s): one nested SVG per panel, cropped to its tight bbox ----
+  let cx = blockX, cy = blockY;
+  panels.forEach(p => {
+    const fw = p.tight.w * fitScale, fh = p.tight.h * fitScale;
+    let px, py;
+    if (horiz) { px = cx; py = blockY + (contentH * fitScale - fh) / 2; cx += fw + gap; }
+    else       { px = blockX + (blockW - fw) / 2; py = cy; cy += fh + captionH + gap; }
+    const nested = mk('svg', {
+      x: px, y: py, width: fw, height: fh,
+      viewBox: `${p.tight.x} ${p.tight.y} ${p.tight.w} ${p.tight.h}`,
+      preserveAspectRatio: 'xMidYMid meet',
+    });
+    while (p.content.firstChild) nested.appendChild(p.content.firstChild);
+    out.appendChild(nested);
+    if (multi) {
+      const area = shapesOnFloor(p.floor).reduce((a, sh) => a + polygonArea(sh.points), 0);
+      const capY = (horiz ? blockY + contentH * fitScale : py + fh) + 15;
+      out.appendChild(mk('text', {
+        x: px + fw / 2, y: capY, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
+        'font-size': 12, 'font-weight':'bold', fill:'#222'
+      }, `${floorCaption(p.floor)} — ${Math.round(area)} sq ft`));
+    }
   });
-  // Clear "selected" styling on walls so exports don't show blue highlights
-  [...liveClone.querySelectorAll('.visible-wall.selected')].forEach(n => {
-    n.classList.remove('selected');
-  });
-  // Remove the defs from the live clone (we already copied them to `out`)
-  const cloneDefs = liveClone.querySelector('defs');
-  if (cloneDefs) cloneDefs.remove();
-
-  const nested = document.createElementNS(ns, 'svg');
-  nested.setAttribute('x', canvasX);
-  nested.setAttribute('y', canvasY);
-  nested.setAttribute('width', fittedW);
-  nested.setAttribute('height', fittedH);
-  nested.setAttribute('viewBox', `${tight.x} ${tight.y} ${tight.w} ${tight.h}`);
-  nested.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  // Move the cloned live content into the nested SVG
-  while (liveClone.firstChild) nested.appendChild(liveClone.firstChild);
-  out.appendChild(nested);
 
   // ---- 6. Legend in page coords at the bottom ----
   if (includeLegend) {
