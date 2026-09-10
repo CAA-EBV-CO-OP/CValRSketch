@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.25.0"></script>
-<script src="dictation.js?v=0.25.0"></script>
+<script src="core.js?v=0.25.1"></script>
+<script src="dictation.js?v=0.25.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -156,7 +156,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.25.0</span>
+  <span class="version-chip" id="app-version">v0.25.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">shared to <b>osasi.org</b></a>
@@ -3132,7 +3132,7 @@ function settingsBrandRows() {
           <input type="file" id="set-brand-logo" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="font-size:11px; flex:1;">
           <button type="button" id="set-brand-logo-clear" style="padding:2px 8px;">Remove</button>
         </div>
-        <label style="font-size:12px; display:flex; align-items:center; gap:6px; margin-top:6px;"><input type="checkbox" id="set-brand-osasi" ${b.osasiCredit ? 'checked' : ''}> Add a small “shared to osasi.org” credit at the foot of exports</label>
+        <label style="font-size:12px; display:flex; align-items:center; gap:6px; margin-top:6px;"><input type="checkbox" id="set-brand-osasi" ${b.osasiCredit ? 'checked' : ''}> Add a small “provided by osasi.org” credit at the foot of exports</label>
       </div>`;
 }
 function wireBrandSettings(m) {
@@ -3206,7 +3206,7 @@ function exportFilename(ext) {
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
   ['0.23.0', '2026-09-10', 'Save app copy: one click saves a frozen, self-contained HTML of the running version into the job folder (from osasi.org or any served copy).'],
-  ['0.22.0', '2026-09-10', 'Your branding: firm name and logo in the header and on every export title block (Settings); optional "shared to osasi.org" credit on exports, off by default.'],
+  ['0.22.0', '2026-09-10', 'Your branding: firm name and logo in the header and on every export title block (Settings); optional "provided by osasi.org" credit on exports, off by default.'],
   ['0.21.0', '2026-09-10', 'Floor menu: double-click a blank spot to switch floors; PageUp / PageDown cycle them. Header renamed CValR-Sketch.'],
   ['0.20.x', '2026-09-10', 'Named buildings and a Building dropdown; All shows a click-to-edit gallery of every building; Add files… merges one-building-per-file sketches; per-building export; About dialog, OSASI attribution and full AGPL-3.0 licence text.'],
   ['0.19.x', '2026-09-10', 'Export layout choice, autosave to file (Chrome/Edge), draggable dimension labels, Move shape by offset or by picking points, fill palette with a deck-plank pattern, Re-walk this wall.'],
@@ -3812,7 +3812,7 @@ function svgForExport() {
     out.appendChild(mk('text', {
       x: pageW - sideMargin, y: pageH - 8, 'text-anchor':'end', 'font-family':'Arial, sans-serif',
       'font-size': 9, fill:'#888'
-    }, 'Sketch: CValR-Sketch · shared to osasi.org'));
+    }, 'Sketch: CValR-Sketch · provided by osasi.org'));
   }
 
   return out;
