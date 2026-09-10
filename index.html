@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.28.0"></script>
-<script src="dictation.js?v=0.28.0"></script>
+<script src="core.js?v=0.29.0"></script>
+<script src="dictation.js?v=0.29.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -101,6 +101,14 @@
   .rose-label.fine { font-size: 8px; font-weight: 500; }
   .rose-label.sel { fill: #fff; }
   .rose-hub { fill: #fff; stroke: #c0c8d0; }
+  .enclose-box { background: #fffbd6; border: 2px solid #e6b800; }
+  .enclose-box h2 { color: #8a6d00; }
+  .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 6px 0 8px; }
+  .type-btn { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border: 1px solid #c9d3dc; border-radius: 5px; background: #fff; cursor: pointer; font-size: 12px; text-align: left; line-height: 1.2; }
+  .type-btn:hover { background: #f4f7fa; }
+  .type-btn.sel { border-color: #2b6cb0; background: #e8f0fa; box-shadow: inset 0 0 0 1px #2b6cb0; }
+  .type-btn .sw { flex: 0 0 16px; width: 16px; height: 16px; border-radius: 3px; border: 1px solid #b8c2cc; }
+  .type-btn small { display: block; color: #7a8792; font-size: 10px; }
   .compass { display: grid; grid-template-columns: repeat(3, 34px); grid-template-rows: repeat(3, 30px); gap: 3px; margin-top: 8px; justify-content: start; align-items: stretch; }
   .compass button { background: #eef2f6; color: #2b3a4a; border: 1px solid #c0c8d0; border-radius: 4px; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
   .compass button:hover { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
@@ -185,7 +193,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.28.0</span>
+  <span class="version-chip" id="app-version">v0.29.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -280,7 +288,8 @@ let state = {
   nextShapeId: 1,
   startPoint: null,     // origin of current walk; null = (0,0)
   preview: null,        // walk-mode auto-extend preview: { dir, candIdx, candidates: [{along, point, segment}] }
-  splitPreview: null,   // split-mode projection preview: { shapeId, originIdx, dir, hit: {wallIdx, point, distance} }
+  splitPreview: null,
+  enclose: null,       // { key, idx, off } for the enclosed-area offer at the current pen position   // split-mode projection preview: { shapeId, originIdx, dir, hit: {wallIdx, point, distance} }
   undoStack: [],
   redoStack: [],
   annotations: [],      // [{ a:{x,y}, b:{x,y} }] — offset measurement labels between two points
@@ -985,6 +994,7 @@ function render() {
 
   // Current in-progress segments
   if (state.segments.length) renderInProgress(W);
+  if (state.segments.length && state.mode === 'walk') renderEnclose(W);
   else if (state.mode === 'walk') {
     const start = getStart();
     const startScreen = W(start);
@@ -1957,6 +1967,21 @@ function sidebarWalk() {
       </div>
       <div class="pen-indicator">${penInfo}</div>
     </div>
+    ${(() => {
+      const enc = currentEnclose();
+      if (!enc) return '';
+      const c = enc.cands[enc.idx], n = enc.cands.length;
+      return `
+    <div class="section enclose-box">
+      <h2>Enclosed area found — ${Math.round(c.area)} sq ft</h2>
+      <div class="help">The pen sits on an existing wall. Closing along the highlighted walls (${c.path.length - 1} of them) makes this area${n > 1 ? ` — option <b>${enc.idx + 1} of ${n}</b>, <b>N</b> shows the next` : ''}. Press <b>Enter</b> with the box empty (or the button) to take it; keep typing walls to ignore it. <b>Esc</b> drops the offer so Close Shape uses a straight line.</div>
+      <div class="row-buttons">
+        <button data-act="encloseAccept" class="primary">&#10003; Close along walls</button>
+        ${n > 1 ? '<button data-act="encloseNext">Next option</button>' : ''}
+        <button data-act="encloseDismiss">Ignore</button>
+      </div>
+    </div>`;
+    })()}
     ${state.preview ? (() => {
       const isJ = !!state.preview.jump;
       const bg = isJ ? '#f0f0f0' : '#fff4e6';
@@ -2301,7 +2326,8 @@ function attachSidebarHandlers() {
   const ARROW_DIR = { ArrowRight: 'r', ArrowLeft: 'l', ArrowUp: 'u', ArrowDown: 'd' };
   if (cmd) cmd.addEventListener('keydown', e => {
     if (e.key === 'Enter') addCmd();
-    else if (e.key === 'Escape') { cancelWalkPreview(); cmd.value = ''; }
+    else if (e.key === 'Escape') { if (currentEnclose()) encloseDismiss(); else cancelWalkPreview(); cmd.value = ''; }
+    else if ((e.key === 'n' || e.key === 'N') && cmd.value === '' && currentEnclose()) { e.preventDefault(); encloseNext(); }
     else if (e.key in ARROW_DIR && cmd.value === '') {
       // Empty input + arrow key → preview/cycle next aligned vertex as a pen-jump (no wall)
       e.preventDefault();
@@ -2331,6 +2357,9 @@ function sidebarAction(e) {
     case 'addCmd': addCmd(); break;
     case 'undo': undoHistory(); break;
     case 'closeShape': closeShape(); break;
+    case 'encloseAccept': closeShape(); break;
+    case 'encloseNext': encloseNext(); break;
+    case 'encloseDismiss': encloseDismiss(); break;
     case 'cancelShape': cancelShape(); break;
     case 'removeSeg': pushUndo(); state.segments.splice(parseInt(i),1); render(); break;
     case 'applyLen': applyLengthEdit(); break;
@@ -2798,8 +2827,10 @@ function addCmd() {
   if (roseHeading !== null && isLengthOnly(input.value)) input.value = input.value.trim() + ' ' + headingToCmd(roseHeading);
   const raw = input.value.trim();
 
-  // Empty input + active preview → commit it
+  // Empty input: an offered enclosure wins over a merely armed step suggestion;
+  // a preview the user is actively cycling still commits.
   if (!raw) {
+    if (currentEnclose() && (!state.preview || state.preview.armed)) { closeShape(); return; }
     if (state.preview) commitWalkPreview();
     return;
   }
@@ -3023,10 +3054,14 @@ function assemblePolygonFromWalls(walls) {
 }
 
 function closeShape() {
-  if (state.segments.length < 3) { alert('Need at least 3 segments.'); return; }
+  const enc = currentEnclose();
+  if (!enc && state.segments.length < 3) { alert('Need at least 3 segments.'); return; }
   const hasJumps = state.segments.some(s => s.jump);
   let pointsToUse;
-  if (hasJumps) {
+  if (enc) {
+    // Close along existing walls: the walk plus the highlighted run back to the start.
+    pointsToUse = enc.cands[enc.idx].polygon.map(p => ({ x: p.x, y: p.y }));
+  } else if (hasJumps) {
     const walls = extractWalls(state.segments);
     if (walls.length < 3) { alert('Need at least 3 wall segments (jumps don’t count).'); return; }
     const polygon = assemblePolygonFromWalls(walls);
@@ -3055,38 +3090,248 @@ function closeShape() {
       pointsToUse = pts.map((p,i) => i === pts.length-1 ? { ...start } : p);
     }
   }
-  let shape;
+  // The walked segments only describe the outline when nothing was jumped or
+  // borrowed from existing walls; otherwise rebuild them from the points.
+  const rebuild = hasJumps || !!enc;
   if (state.rewalk) {
     // Re-walk: the shape keeps everything but its geometry. Per-wall label nudges
     // are indexed by wall and no longer line up, so they're dropped.
     pushUndo();
     const o = state.rewalk.original;
-    shape = { ...o, points: pointsToUse, segments: hasJumps ? [] : [...state.segments] };
+    const shape = { ...o, points: pointsToUse, segments: rebuild ? [] : [...state.segments] };
     delete shape.dimOffsets;
     state.rewalk = null;
-  } else {
-    const label = prompt('Label for this area:', `Area ${state.nextShapeId}`);
-    if (label === null) return;
-    const typeRaw = prompt(`Type? (${Object.keys(TYPES).join(', ')})`, 'living');
-    if (typeRaw === null) return; // Cancel/Escape only — keep the walk intact
-    const typeKey = typeRaw.trim().toLowerCase();
-    // Forgiving match: a typo or wrong case must not discard the walk. Fall back to
-    // 'misc' and let the user fix the type in Edit mode rather than losing their work.
-    const finalType = (typeKey in TYPES) ? typeKey : 'misc';
-    if (!(typeKey in TYPES)) alert(`Unrecognized type "${typeRaw.trim()}" — using "Misc / other". You can change it anytime in Edit mode.`);
+    finishNewShape(shape, rebuild);
+    return;
+  }
+  // Cancel / Esc in the picker keeps the walk intact.
+  openNewAreaModal(`Area ${state.nextShapeId}`, (label, type) => {
     pushUndo();
-    shape = {
+    const shape = {
       id: state.nextShapeId++,
       points: pointsToUse,
-      segments: hasJumps ? [] : [...state.segments],
-      label, type: finalType, floor: state.activeFloor, building: newShapeBuilding(),
+      segments: rebuild ? [] : [...state.segments],
+      label, type, floor: state.activeFloor, building: newShapeBuilding(),
     };
-  }
-  if (hasJumps) rebuildSegments(shape);
+    finishNewShape(shape, rebuild);
+  });
+}
+function finishNewShape(shape, rebuild) {
+  if (rebuild) rebuildSegments(shape);
   state.shapes.push(shape);
   state.segments = [];
   state.startPoint = null;
+  state.enclose = null;
   render();
+}
+
+// ----- New-area picker: label + type as buttons (replaces two prompt() boxes) -----
+// The type list is fixed (each type carries a fill and a legend entry), so a
+// "new" type is the closest listed one with the detail in the label.
+function suggestedType() {
+  if (state.activeFloor === 'basement') return 'finished';
+  const b = (newShapeBuilding() || '').toLowerCase();
+  for (const k of ['barn', 'shop', 'shed', 'carport', 'garage']) if (b.includes(k)) return k;
+  if (b.includes('outbuild')) return 'outbuilding';
+  return 'living';
+}
+function typeSwatch(k) {
+  const f = TYPES[k].fill;
+  return f.startsWith('#') ? f : 'repeating-linear-gradient(45deg,#c8c8c8 0 2px,#fff 2px 5px)';
+}
+// Resolve free text to a type key: exact key, then a name that starts with or contains it.
+function resolveTypeText(t) {
+  t = (t || '').trim().toLowerCase();
+  if (!t) return null;
+  if (t in TYPES) return t;
+  const ents = Object.entries(TYPES);
+  const hit = ents.find(([k, v]) => k.startsWith(t) || v.name.toLowerCase().startsWith(t))
+           || ents.find(([k, v]) => v.name.toLowerCase().includes(t));
+  return hit ? hit[0] : null;
+}
+function openNewAreaModal(defLabel, onOk) {
+  const m = createModal();
+  const div = document.createElement('div');
+  div.className = 'modal';
+  div.id = 'new-area-modal';
+  div.style.maxWidth = '560px';
+  let sel = suggestedType();
+  div.innerHTML = `
+    <h3>New area</h3>
+    <label style="font-size:12px;display:block;">Label<br>
+      <input id="na-label" value="${escapeHtml(defLabel)}" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:13px;border:1px solid #c0c8d0;border-radius:4px;margin-top:3px;">
+    </label>
+    <div style="font-size:12px;margin-top:10px;">Type</div>
+    <div class="type-grid">${Object.entries(TYPES).map(([k, v]) =>
+      `<button type="button" class="type-btn${k === sel ? ' sel' : ''}" data-type="${k}"><span class="sw" style="background:${typeSwatch(k)}"></span><span>${escapeHtml(v.name)}<small>${k}</small></span></button>`).join('')}
+    </div>
+    <label style="font-size:12px;display:block;">Or type it<br>
+      <input id="na-type" value="${sel}" placeholder="living, garage, deck, shop …" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:13px;border:1px solid #c0c8d0;border-radius:4px;margin-top:3px;">
+    </label>
+    <div class="help" style="margin-top:6px;">Click a type or type its name (a few letters will do). Enter = OK, Esc = cancel and keep the walk. Types are fixed because each one has its own fill and legend entry; for anything else pick the closest and put the detail in the label.</div>
+    <div class="modal-buttons">
+      <button type="button" onclick="closeModal()">Cancel</button>
+      <button type="button" class="primary" id="na-ok">OK</button>
+    </div>`;
+  m.appendChild(div);
+  const typeIn = div.querySelector('#na-type'), labelIn = div.querySelector('#na-label');
+  const mark = () => div.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('sel', b.dataset.type === sel));
+  div.querySelectorAll('.type-btn').forEach(b => b.addEventListener('click', () => { sel = b.dataset.type; typeIn.value = sel; mark(); }));
+  typeIn.addEventListener('input', () => { const k = resolveTypeText(typeIn.value); if (k) { sel = k; mark(); } });
+  const ok = () => {
+    const typed = resolveTypeText(typeIn.value);
+    const type = typed || sel || 'misc';
+    const label = labelIn.value.trim() || defLabel;
+    closeModal();
+    onOk(label, type);
+  };
+  div.querySelector('#na-ok').addEventListener('click', ok);
+  div.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); ok(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
+  });
+  labelIn.focus(); labelIn.select();
+}
+
+// ----- Enclosed-area offer -----------------------------------------------------
+// When the pen lands on an existing wall or vertex and the walk also started on
+// one, the walked legs plus a run of existing walls may fence off a region. Rather
+// than closing with a straight line back to the start (which cuts a triangle
+// through the room), offer to close along those walls. Candidates are every
+// simple run of existing walls from the pen back to the start, smallest area
+// first, skipping runs that would swallow an existing shape.
+const ENC_EPS = 0.05;
+let encCache = { sig: null, cands: [] };
+function encPointKey(p) { return p.x.toFixed(2) + ',' + p.y.toFixed(2); }
+function pointInPoly(pt, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a.y > pt.y) !== (b.y > pt.y) && pt.x < (b.x - a.x) * (pt.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+// A point just inside a simple polygon: the first edge's midpoint nudged toward the interior.
+function shapeInteriorPoint(pts) {
+  let sgn = 0;
+  for (let i = 0; i < pts.length - 1; i++) sgn += pts[i].x * pts[i+1].y - pts[i+1].x * pts[i].y;
+  const a = pts[0], b = pts[1], len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const nx = -(b.y - a.y) / len * Math.sign(sgn || 1), ny = (b.x - a.x) / len * Math.sign(sgn || 1);
+  return { x: (a.x + b.x) / 2 + nx * 0.02, y: (a.y + b.y) / 2 + ny * 0.02 };
+}
+function dropCollinear(pts) {
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = out[out.length - 1], b = pts[i], c = pts[i + 1];
+    const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    const dot = (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y);
+    if (Math.abs(cross) < 1e-6 && dot > 0) continue;   // straight through b
+    out.push(b);
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+// Wall graph of the active floor: nodes are vertices (merged within ENC_EPS) plus
+// the given extra points; edges are wall pieces between consecutive nodes on a wall.
+function encGraph(shapes, extra) {
+  const nodes = [];
+  const nodeId = p => {
+    for (let i = 0; i < nodes.length; i++) if (Math.hypot(nodes[i].x - p.x, nodes[i].y - p.y) < ENC_EPS) return i;
+    nodes.push({ x: p.x, y: p.y });
+    return nodes.length - 1;
+  };
+  shapes.forEach(sh => sh.points.slice(0, -1).forEach(nodeId));
+  extra.forEach(nodeId);
+  const adj = nodes.map(() => new Set());
+  shapes.forEach(sh => {
+    for (let i = 0; i < sh.points.length - 1; i++) {
+      const a = sh.points[i], b = sh.points[i + 1];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len < ENC_EPS) continue;
+      const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+      const on = [];
+      nodes.forEach((n, id) => {
+        const t = (n.x - a.x) * ux + (n.y - a.y) * uy;
+        const perp = Math.abs((n.x - a.x) * -uy + (n.y - a.y) * ux);
+        if (t > -ENC_EPS && t < len + ENC_EPS && perp < ENC_EPS) on.push({ id, t });
+      });
+      on.sort((p, q) => p.t - q.t);
+      for (let k = 0; k < on.length - 1; k++) if (on[k].id !== on[k + 1].id) { adj[on[k].id].add(on[k + 1].id); adj[on[k + 1].id].add(on[k].id); }
+    }
+  });
+  return { nodes, adj, nodeId };
+}
+function encCandidates() {
+  if (state.mode !== 'walk' || !state.segments.length || state.segments.some(sg => sg.jump)) return [];
+  const walk = pathPointsHere(state.segments);
+  const start = walk[0], pen = walk[walk.length - 1];
+  if (Math.hypot(pen.x - start.x, pen.y - start.y) <= state.settings.autoCloseFeet) return [];
+  const shapes = shapesOnFloor(state.activeFloor);
+  if (!shapes.length) return [];
+  const sig = [state.activeFloor, viewBuildingOrAll(), state.shapes.length, state.undoStack.length, state.segments.length, encPointKey(start), encPointKey(pen)].join('|');
+  if (encCache.sig === sig) return encCache.cands;
+  const g = encGraph(shapes, [start, pen]);
+  const sId = g.nodeId(start), pId = g.nodeId(pen);
+  const cands = [];
+  if (g.adj[sId].size && g.adj[pId].size) {
+    const interior = shapes.map(sh => shapeInteriorPoint(sh.points));
+    const seen = new Set();
+    const paths = []; const visited = new Set([pId]); let budget = 6000;
+    (function dfs(cur, path) {
+      if (budget-- <= 0 || paths.length >= 40) return;
+      for (const nx of g.adj[cur]) {
+        if (nx === sId) { paths.push([...path, nx]); continue; }
+        if (visited.has(nx) || path.length > 80) continue;
+        visited.add(nx); dfs(nx, [...path, nx]); visited.delete(nx);
+      }
+    })(pId, [pId]);
+    for (const ids of paths) {
+      const run = ids.map(id => g.nodes[id]);                    // pen … start along existing walls
+      const poly = dropCollinear([...walk, ...run.slice(1)]);     // start … pen … start
+      const area = polygonArea(poly);
+      if (area < 1) continue;
+      if (interior.some(ip => pointInPoly(ip, poly.slice(0, -1)))) continue;   // would swallow a shape
+      const key = area.toFixed(1) + ':' + poly.length;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      cands.push({ polygon: poly, path: run, area });
+    }
+    cands.sort((a, b) => a.area - b.area);
+  }
+  encCache = { sig, cands };
+  return cands;
+}
+// The live offer, or null: candidates at the current pen, minus a dismissed one.
+function currentEnclose() {
+  const cands = encCandidates();
+  if (!cands.length) return null;
+  const walk = pathPointsHere(state.segments);
+  const key = state.segments.length + '@' + encPointKey(walk[walk.length - 1]);
+  if (!state.enclose || state.enclose.key !== key) state.enclose = { key, idx: 0, off: false };
+  if (state.enclose.off) return null;
+  return { cands, idx: Math.min(state.enclose.idx, cands.length - 1) };
+}
+function encloseNext() {
+  const enc = currentEnclose();
+  if (!enc) return;
+  state.enclose.idx = (enc.idx + 1) % enc.cands.length;
+  render(); focusWalkInput();
+}
+function encloseDismiss() {
+  if (currentEnclose()) { state.enclose.off = true; render(); focusWalkInput(); }
+}
+function renderEnclose(W) {
+  const enc = currentEnclose();
+  if (!enc) return;
+  const c = enc.cands[enc.idx];
+  const d = c.polygon.map((p, i) => (i ? 'L' : 'M') + W(p).x + ' ' + W(p).y).join(' ') + ' Z';
+  addEl('path', { d, fill: '#ffe600', 'fill-opacity': 0.38, stroke: '#e6b800', 'stroke-width': 2, 'stroke-dasharray': '7,4', class: 'ui-overlay' });
+  const run = c.path.map((p, i) => (i ? 'L' : 'M') + W(p).x + ' ' + W(p).y).join(' ');
+  addEl('path', { d: run, fill: 'none', stroke: '#e6b800', 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.9, class: 'ui-overlay' });
+  const ctr = W(polygonCentroid(c.polygon));
+  addEl('text', { x: ctr.x, y: ctr.y - 6, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 'bold', fill: '#7a5f00', class: 'ui-overlay' }, `${Math.round(c.area)} sq ft`);
+  addEl('text', { x: ctr.x, y: ctr.y + 10, 'text-anchor': 'middle', 'font-size': 11, fill: '#7a5f00', class: 'ui-overlay' },
+    enc.cands.length > 1 ? `Enter closes here · N next (${enc.idx + 1}/${enc.cands.length})` : 'Enter closes here');
 }
 
 // =============================================================================
@@ -3447,6 +3692,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.29.0', '2026-09-11', 'Enclosed areas: when the pen lands on an existing wall, the region it fences off with the existing walls lights up yellow — Enter closes along those walls (N cycles options) instead of a straight line back to the start. New-area picker: label plus a grid of type buttons, no more typing the type.'],
   ['0.28.0', '2026-09-10', 'Compass rose: click a direction (8 at 45° or 16 at 22.5°) with a length typed and the wall goes that way; the list beside it shows the typed command for each direction and highlights with the wedge. Directions are absolute (up is always up).'],
   ['0.24–0.27', '2026-09-10', 'Walk box focuses on click; arrow keys add cardinal walls; Manage buildings (rename, merge, delete); mark buildings for deletion from the gallery or full-screen; gallery export prints every building on one sheet.'],
   ['0.23.0', '2026-09-10', 'Save app copy: one click saves a frozen, self-contained HTML of the running version into the job folder (from osasi.org or any served copy).'],
