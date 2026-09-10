@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.23.1`
+**Current version:** `0.23.2`
 **Released:** 2026-09-10
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.23.2  | 2026-09-10 | patch  | Sidebar input rows no longer overflow the right edge: the text box may shrink (`min-width: 0`), buttons keep their size and wrap to a second line only if the panel is too narrow; the sidebar never scrolls sideways. |
 | 0.23.1  | 2026-09-10 | patch  | **Walk mode: just start typing.** The segment box takes the caret when Walk is chosen, after Load / New, and on startup; a printable key pressed with nothing focused goes straight into it. No more click into the box first. |
 | 0.23.0  | 2026-09-10 | minor  | **Save app copy.** Header button saves a frozen, self-contained HTML (scripts inlined, PWA hooks removed, version-stamped) of the running app for the job folder. Needs a served copy; explains itself when opened from disk. |
 | 0.22.0  | 2026-09-10 | minor  | **Your branding.** Settings → *Your branding*: firm name and logo (browser-local, never in sketch files) shown in the app header and the export title block; optional *shared to osasi.org* credit at the foot of exports, off by default. |

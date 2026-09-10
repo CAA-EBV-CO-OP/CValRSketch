@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.23.1"></script>
-<script src="dictation.js?v=0.23.1"></script>
+<script src="core.js?v=0.23.2"></script>
+<script src="dictation.js?v=0.23.2"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -67,12 +67,14 @@
   #floor-bar .ft-tabs button { background: #fff; border: 1px solid #c0c8d0; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
   #floor-bar .ft-tabs button.active { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
   #floor-bar .small-btn { background: #fff; border: 1px solid #c0c8d0; padding: 3px 7px; border-radius: 4px; cursor: pointer; font-size: 11px; }
-  aside { width: 360px; background: #fafafa; border-left: 1px solid #ccc; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  aside { width: 360px; background: #fafafa; border-left: 1px solid #ccc; padding: 12px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 10px; }
   aside h2 { font-size: 11px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.5px; color: #555; }
-  .section { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 10px; }
-  .input-row { display: flex; gap: 6px; }
-  .input-row input { flex: 1; padding: 6px 8px; border: 1px solid #bbb; border-radius: 4px; font-family: monospace; font-size: 13px; }
-  .input-row button { background: #2b6cb0; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .section { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 10px; min-width: 0; }
+  /* Text inputs have an intrinsic minimum width; without min-width:0 the row overflowed
+     the sidebar and the buttons ran off the right edge. Wrap as a last resort. */
+  .input-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .input-row input { flex: 1 1 120px; min-width: 0; padding: 6px 8px; border: 1px solid #bbb; border-radius: 4px; font-family: monospace; font-size: 13px; }
+  .input-row button { flex: 0 0 auto; white-space: nowrap; background: #2b6cb0; color: #fff; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
   .input-row button:hover { background: #3577c2; }
   .row-buttons { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
   .row-buttons button { flex: 1; background: #6c7a8a; color: #fff; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px; min-width: 70px; }
@@ -145,7 +147,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.23.1</span>
+  <span class="version-chip" id="app-version">v0.23.2</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">shared to <b>osasi.org</b></a>
