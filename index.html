@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.23.0"></script>
-<script src="dictation.js?v=0.23.0"></script>
+<script src="core.js?v=0.23.1"></script>
+<script src="dictation.js?v=0.23.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -145,7 +145,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.23.0</span>
+  <span class="version-chip" id="app-version">v0.23.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">shared to <b>osasi.org</b></a>
@@ -2804,6 +2804,17 @@ function closeShape() {
 // =============================================================================
 // MODE SWITCHING
 // =============================================================================
+// In Walk mode the segment box should have the caret without a click: after
+// picking the Walk tab, loading a file, or starting a project, and whenever a
+// printable key is pressed while nothing else has focus (see the keydown handler).
+function focusWalkInput() {
+  if (state.mode !== 'walk') return;
+  const el = document.getElementById('cmd');
+  if (el && document.activeElement !== el) el.focus();
+}
+document.querySelectorAll('#mode-tabs button').forEach(b => {
+  b.addEventListener('click', () => { if (b.dataset.mode === 'walk') setTimeout(focusWalkInput, 0); });
+});
 document.querySelectorAll('#mode-tabs button').forEach(b => {
   b.addEventListener('click', () => {
     state.mode = b.dataset.mode;
@@ -4023,6 +4034,7 @@ function newProject() {
   const subjInp = document.getElementById('subject-input'); if (subjInp) subjInp.value = '';
   dropFileHandle();   // a fresh project must never autosave over the previous file
   render();
+  setTimeout(focusWalkInput, 0);
 }
 function applyLoadedProject(text) {
   const d = JSON.parse(text);
@@ -4038,6 +4050,7 @@ function applyLoadedProject(text) {
   if (subjInp) subjInp.value = state.subject || '';
   saveToRecents();  // also add loaded sketch to recents so it's reloadable
   render();
+  setTimeout(focusWalkInput, 0);
 }
 // Plain <input type=file> path (Firefox/Safari, or when the picker is unavailable): no handle, so no file autosave.
 document.getElementById('load-json').addEventListener('change', (e) => {
@@ -4127,6 +4140,11 @@ window.addEventListener('keydown', (e) => {
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   const mod = e.ctrlKey || e.metaKey;
+  // Walk mode: a printable key with nothing focused starts typing in the segment box.
+  if (!mod && !e.altKey && state.mode === 'walk' && e.key.length === 1 && !galleryActive()) {
+    const cmd = document.getElementById('cmd');
+    if (cmd) { cmd.focus(); return; }   // the key lands in the newly focused input
+  }
   if (e.key === 'Escape' && document.getElementById('floor-menu')) { closeFloorMenu(); return; }
   if (!mod && (e.key === 'PageUp' || e.key === 'PageDown')) { e.preventDefault(); cycleFloor(e.key === 'PageUp' ? -1 : 1); return; }
   if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undoHistory(); }
@@ -4151,6 +4169,7 @@ window.addEventListener('keydown', (e) => {
 autoRestoreSession();   // silently reopen the last session before the first paint
 restoreFileHandle();    // pick the autosave file back up (or offer to resume it)
 render();
+setTimeout(focusWalkInput, 0);
 window.addEventListener('beforeunload', writeAutosave);  // flush the debounce gap on reload/close
 
 // Register service worker for offline PWA install. Skipped on file:// (no SW support there).
