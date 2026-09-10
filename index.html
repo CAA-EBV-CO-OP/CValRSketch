@@ -24,7 +24,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>CValRSketch</title>
+<title>CValR-Sketch</title>
 <script src="core.js?v=0.21.0"></script>
 <script src="dictation.js?v=0.21.0"></script>
 <style>
@@ -140,9 +140,10 @@
 </head>
 <body>
 <header>
-  <h1>Sketch Walker</h1>
+  <h1>CValR-Sketch</h1>
   <span class="version-chip" id="app-version">v0.21.0</span>
-  <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">Part of <b>OSASI</b> · osasi.org</a>
+  <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">shared to <b>osasi.org</b></a>
+  <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -155,7 +156,6 @@
   <button id="btn-redo" onclick="redoHistory()" title="Redo (Ctrl+Y)">↷ Redo</button>
   <div class="sep"></div>
   <button onclick="openSettings()">⚙ Settings</button>
-  <button onclick="openAbout()" title="About CValRSketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openExportPreview()" title="Preview the printable sheet, pick a page size, and export">🖨 Export / Preview</button>
   <button onclick="newProject()" title="Clear current sketch and start a new project (Ctrl+Z to recover)">🗋 New</button>
   <button onclick="saveJSON()" title="Save to the current file (Ctrl+S) — opens Save As if there is no file yet">Save</button>
@@ -3073,7 +3073,7 @@ function openAbout() {
   div.style.maxWidth = '560px';
   const ver = (document.getElementById('app-version') || {}).textContent || '';
   div.innerHTML = `
-    <h3>CValRSketch ${escapeHtml(ver)}</h3>
+    <h3>CValR-Sketch ${escapeHtml(ver)}</h3>
     <p><strong>Browser-based floor plan sketching for residential appraisal.</strong> Walk the perimeter by typing wall segments; the app draws the plan, totals the areas above and below grade, and exports a labelled sketch.</p>
     <p>Part of <a href="https://osasi.org" target="_blank" rel="noopener"><strong>OSASI</strong> — the Open Source Appraisal Software Initiative</a>, a co-operative of real estate appraisers building shared, open tools. Developed for the CAA-EBV-CO-OP community.</p>
     <p>Copyright &copy; 2026 CAA-EBV-CO-OP and the CValRSketch contributors.</p>
