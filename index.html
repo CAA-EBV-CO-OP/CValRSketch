@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.25.1"></script>
-<script src="dictation.js?v=0.25.1"></script>
+<script src="core.js?v=0.26.0"></script>
+<script src="dictation.js?v=0.26.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -81,6 +81,12 @@
   .row-buttons button:hover { background: #7d8c9d; }
   .row-buttons button.primary { background: #2e8b57; }
   /* Compass pad: click a direction instead of typing u/d/l/r */
+  .bm-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .bm-table th, .bm-table td { padding: 5px 6px; border-bottom: 1px solid #e3e8ee; text-align: left; vertical-align: middle; }
+  .bm-table th { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #666; }
+  .bm-btn { background: #6c7a8a; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+  .bm-btn.bm-danger { background: #c0392b; }
+  .bm-merge { font-size: 11px; padding: 3px 4px; margin: 0 4px; border: 1px solid #c0c8d0; border-radius: 4px; max-width: 130px; }
   .compass { display: grid; grid-template-columns: repeat(3, 34px); grid-template-rows: repeat(3, 30px); gap: 3px; margin-top: 8px; justify-content: start; align-items: stretch; }
   .compass button { background: #eef2f6; color: #2b3a4a; border: 1px solid #c0c8d0; border-radius: 4px; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
   .compass button:hover { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
@@ -156,7 +162,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.25.1</span>
+  <span class="version-chip" id="app-version">v0.26.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -197,6 +203,7 @@
   <select id="building-select" onchange="setViewBuilding(this.value)" title="Show one building on the canvas, fitted to the window. All shows every building; with several in the file, All is a gallery — click a building to edit it."></select>
   <button class="small-btn" onclick="addBuilding()" title="Add a named building to this file (Shop, Barn, Guest cabin…) and switch to it">+ Building</button>
   <button class="small-btn" onclick="renameBuilding()" title="Rename the building shown on the canvas (its shapes and basement setting follow)">Rename</button>
+  <button class="small-btn" onclick="openBuildingsModal()" title="List every building: rename, merge duplicates, delete unwanted ones, drop unused names">Manage&hellip;</button>
   <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Size of the dimension, area, and note labels on the drawing">
     Label size:
     <input type="range" id="sketch-font-bar" min="0.6" max="2" step="0.1" style="width:120px;">
@@ -710,18 +717,110 @@ function addBuilding() {
   state.buildings.push(name);
   setViewBuilding(name);
 }
-function renameBuilding() {
-  const cur = viewBuildingOrAll();
+function buildingStats(b) {
+  const shs = state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === b);
+  return { count: shs.length, area: shs.reduce((a, sh) => a + polygonArea(sh.points), 0) };
+}
+function renameBuilding(cur) {
+  cur = cur || viewBuildingOrAll();
   if (cur === 'all') { alert('Pick a building in the Building dropdown first, then Rename.'); return; }
   const name = (prompt('Rename "' + cur + '" to:', cur) || '').trim();
   if (!name || name === cur) return;
-  if (buildingList().includes(name)) { alert('A building named "' + name + '" already exists.'); return; }
+  if (buildingList().includes(name)) {
+    if (!confirm('A building named "' + name + '" already exists.\n\nMerge "' + cur + '" into it? Its shapes move across; the existing basement setting is kept.')) return;
+    mergeBuilding(cur, name);
+    return;
+  }
   pushUndo();
   state.buildings = state.buildings.map(b => b === cur ? name : b);
   state.shapes.forEach(sh => { if ((sh.building || DEFAULT_BUILDING) === cur) sh.building = name; });
   if (state.basements[cur]) { state.basements[name] = state.basements[cur]; delete state.basements[cur]; }
-  state.viewBuilding = name;
+  if (state.viewBuilding === cur) state.viewBuilding = name;
   render();
+  refreshBuildingsModal();
+}
+// Move every shape of `from` into `into`, then drop the `from` name. One undo step.
+function mergeBuilding(from, into) {
+  if (!from || !into || from === into) return;
+  pushUndo();
+  state.shapes.forEach(sh => { if ((sh.building || DEFAULT_BUILDING) === from) sh.building = into; });
+  if (state.basements[from]) { if (!state.basements[into]) state.basements[into] = state.basements[from]; delete state.basements[from]; }
+  state.buildings = buildingList().filter(b => b !== from);
+  if (state.viewBuilding === from) state.viewBuilding = into;
+  state.selection = null;
+  render();
+  refreshBuildingsModal();
+}
+// Delete a building: its shapes, its basement setting and its name. One undo step.
+function deleteBuilding(b) {
+  const st = buildingStats(b);
+  if (st.count && state.settings.confirmDelete &&
+      !confirm('Delete "' + b + '" and its ' + st.count + ' shape' + (st.count === 1 ? '' : 's') + ' (' + Math.round(st.area) + ' sf)?\n\nUndo (Ctrl+Z) restores it.')) return;
+  pushUndo();
+  state.shapes = state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) !== b);
+  delete state.basements[b];
+  state.buildings = buildingList().filter(x => x !== b);
+  if (state.viewBuilding === b) state.viewBuilding = 'all';
+  state.selection = null;
+  render();
+  refreshBuildingsModal();
+}
+// Drop every name that has no shapes (they only clutter the dropdown).
+function pruneUnusedBuildings() {
+  const present = new Set(buildingsPresent());
+  const unused = buildingList().filter(b => !present.has(b));
+  if (!unused.length) { alert('Every building name is in use.'); return; }
+  if (!confirm('Remove ' + unused.length + ' unused name' + (unused.length === 1 ? '' : 's') + ': ' + unused.join(', ') + '?')) return;
+  pushUndo();
+  state.buildings = buildingList().filter(b => present.has(b));
+  unused.forEach(b => delete state.basements[b]);
+  render();
+  refreshBuildingsModal();
+}
+function refreshBuildingsModal() {
+  if (document.getElementById('buildings-modal')) openBuildingsModal();
+}
+function openBuildingsModal() {
+  const m = createModal();
+  const div = document.createElement('div');
+  div.className = 'modal';
+  div.id = 'buildings-modal';
+  div.style.maxWidth = '640px';
+  const names = buildingList();
+  const rows = names.map(b => {
+    const st = buildingStats(b);
+    const others = names.filter(x => x !== b);
+    return `<tr>
+      <td><strong>${escapeHtml(b)}</strong>${b === viewBuildingOrAll() ? ' <span style="color:#2b6cb0;font-size:11px;">(on canvas)</span>' : ''}</td>
+      <td style="text-align:right;">${st.count}</td>
+      <td style="text-align:right;">${st.count ? Math.round(st.area).toLocaleString() + ' sf' : '<span style="color:#999;">unused</span>'}</td>
+      <td style="white-space:nowrap;">
+        <button type="button" class="bm-btn" data-bm="rename" data-b="${escapeHtml(b)}">Rename</button>
+        <select class="bm-merge" data-from="${escapeHtml(b)}" title="Merge this building into another" ${st.count ? '' : 'disabled'}>
+          <option value="">Merge into&hellip;</option>${others.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}
+        </select>
+        <button type="button" class="bm-btn bm-danger" data-bm="delete" data-b="${escapeHtml(b)}">Delete</button>
+      </td></tr>`;
+  }).join('');
+  div.innerHTML = `
+    <h3>Buildings</h3>
+    <div class="help" style="margin-bottom:8px;">Rename, merge duplicates (the shapes move across), delete a building with its shapes, or drop names nothing uses. Every action is one undo step.</div>
+    <table class="bm-table"><thead><tr><th>Building</th><th style="text-align:right;">Shapes</th><th style="text-align:right;">Area</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="modal-buttons">
+      <button type="button" onclick="pruneUnusedBuildings()">Remove unused names</button>
+      <button type="button" onclick="addBuilding(); refreshBuildingsModal();">+ Add building</button>
+      <button type="button" class="primary" onclick="closeModal()">Close</button>
+    </div>`;
+  m.appendChild(div);
+  div.querySelectorAll('[data-bm]').forEach(btn => btn.addEventListener('click', () => {
+    if (btn.dataset.bm === 'rename') renameBuilding(btn.dataset.b); else deleteBuilding(btn.dataset.b);
+  }));
+  div.querySelectorAll('.bm-merge').forEach(sel => sel.addEventListener('change', () => {
+    const from = sel.dataset.from, into = sel.value;
+    if (!into) return;
+    if (confirm('Merge "' + from + '" into "' + into + '"? Its shapes move across; "' + from + '" is removed.')) mergeBuilding(from, into);
+    else sel.value = '';
+  }));
 }
 
 function syncBuildingSelect() {
@@ -3576,6 +3675,7 @@ function sidebarGallery() {
   return `<div class="section"><h2>Buildings</h2>
     <div class="help">Every building in this file is shown as a gallery. Click one on the canvas, or pick it here, to edit it on its own — the canvas fits that building to the window and new shapes are tagged to it. Use the Building dropdown in the floor bar to come back to All.</div>
     <div class="row-buttons">${present.map(b => `<button data-building="${escapeHtml(b)}" onclick="setViewBuilding(this.dataset.building)">${escapeHtml(b)}</button>`).join('')}</div>
+    <div class="row-buttons" style="margin-top:6px;"><button onclick="openBuildingsModal()" title="Rename, merge duplicates, delete unwanted buildings, drop unused names">Manage buildings&hellip;</button></div>
   </div>`;
 }
 
