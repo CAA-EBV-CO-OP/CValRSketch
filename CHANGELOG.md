@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.23.2] — 2026-09-10
+
+### Fixed
+- **Sidebar crowding on the right.** The New Segment row (input + Add / Dictate / Train) and the Start Point row overflowed the 360 px sidebar, clipping the last button and adding a horizontal scrollbar. Text inputs have an intrinsic minimum width; they now shrink (`min-width: 0`), buttons keep their size and wrap only when the panel is genuinely too narrow, and the sidebar hides horizontal overflow.
+
+---
+
 ## [0.23.1] — 2026-09-10
 
 ### Fixed
