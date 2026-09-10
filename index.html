@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.21.0"></script>
-<script src="dictation.js?v=0.21.0"></script>
+<script src="core.js?v=0.22.0"></script>
+<script src="dictation.js?v=0.22.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -35,7 +35,11 @@
   header .version-chip { font-size: 11px; color: #9fb0c2; font-family: ui-monospace, monospace; }
   header .osasi-chip { font-size: 11px; color: #cfe0f0; text-decoration: none; border: 1px solid #5a7388; border-radius: 10px; padding: 2px 8px; white-space: nowrap; }
   header .osasi-chip:hover { background: #4a6377; color: #fff; }
-  header .osasi-chip b { color: #ffd166; font-weight: 700; }
+  header .osasi-chip b { color: #FF7440; font-weight: 700; }
+  header .osasi-chip:hover b { color: #FF8A5F; }
+  .whatsnew-modal ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; }
+  .whatsnew-modal li { margin-bottom: 6px; }
+  .whatsnew-modal .ver { font-family: ui-monospace, monospace; color: #2b6cb0; font-weight: 700; }
   .about-modal p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; }
   .about-modal a { color: #2b6cb0; }
   header button, header label.btn { background: #4a6377; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
@@ -141,8 +145,9 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.21.0</span>
+  <span class="version-chip" id="app-version">v0.22.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
+  <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">shared to <b>osasi.org</b></a>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
@@ -166,6 +171,7 @@
   </label>
   <button onclick="document.getElementById('add-json').click()" title="Append one or more sketch files' buildings to this one (pick several at once; you name each building as it comes in; each drawing is placed beside what is here)">➕ Add files…</button>
   <input type="file" id="add-json" accept=".json" multiple style="display:none">
+  <span id="brand-header" style="margin-left:auto; display:flex; align-items:center; gap:8px; font-size:12px; color:#dfe7ef;"></span>
   <span id="autosave-chip" class="autosave-chip"></span>
 </header>
 
@@ -533,6 +539,7 @@ function stepStartAlign(axis, step) {
 // Load settings from localStorage
 try {
   const saved = JSON.parse(localStorage.getItem('sketchWalkerSettings') || '{}');
+  loadBrand();
   Object.assign(state.settings, saved);
 } catch (e) {}
 
@@ -2995,12 +3002,14 @@ function openSettings() {
             <button type="button" data-pal-reset="${k}" title="Built-in default" style="padding:2px 8px;">↺</button>`; }).join('')}
         </div>
       </div>
+      ${settingsBrandRows()}
       <div class="modal-buttons">
         <button onclick="cancelSettings()">Cancel</button>
         <button class="primary" onclick="applySettings()">Save</button>
       </div>
     </div>
   `;
+  wireBrandSettings(m);
   m.querySelectorAll('[data-pal-reset]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.palReset, d = typeStyleDefault(k);
     m.querySelector(`[data-pal-color="${k}"]`).value = d.color;
@@ -3028,6 +3037,66 @@ function cancelSettings() {
   closeModal();
 }
 
+// ----- Branding: the user's own firm name / logo, and an optional osasi.org credit -----
+// Kept in this browser (localStorage), NOT in sketch files, so a shared sketch never
+// carries someone else's logo. Shown in the app header and the export title block.
+const BRAND_KEY = 'cvalrsketch:brand';
+let brand = { firmName: '', logo: '', logoW: 0, logoH: 0, osasiCredit: false };
+let _brandPending = null;
+function loadBrand() {
+  try { brand = { ...brand, ...JSON.parse(localStorage.getItem(BRAND_KEY) || '{}') }; } catch (e) { /* ignore */ }
+  renderBrandHeader();
+}
+function saveBrand() {
+  try { localStorage.setItem(BRAND_KEY, JSON.stringify(brand)); }
+  catch (e) { alert('Could not save the branding in this browser (storage full?). Try a smaller logo.'); }
+  renderBrandHeader();
+}
+function renderBrandHeader() {
+  const el = document.getElementById('brand-header');
+  if (!el) return;
+  el.innerHTML = (brand.logo ? `<img src="${brand.logo}" alt="" style="height:22px; max-width:120px; object-fit:contain; background:#fff; border-radius:3px; padding:1px 3px;">` : '') +
+    (brand.firmName ? `<span>${escapeHtml(brand.firmName)}</span>` : '');
+}
+function settingsBrandRows() {
+  const b = brand;
+  return `
+      <div style="margin-top:14px;">
+        <div style="font-size:12px; font-weight:bold; margin-bottom:2px;">Your branding <span style="font-weight:normal; color:#888;">(saved in this browser, not in sketch files)</span></div>
+        <div class="help">Your name and logo go on the app header and in the title block of every export. Exports carry no other notice unless you tick the credit.</div>
+        <label style="font-size:12px; display:flex; align-items:center; gap:8px; margin-top:6px;">Firm name
+          <input id="set-brand-name" value="${escapeHtml(b.firmName || '')}" style="flex:1;" placeholder="e.g. Rayburn Appraisals Ltd."></label>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:6px; font-size:12px;">
+          <span>Logo</span>
+          <img id="set-brand-logo-preview" src="${b.logo || ''}" alt="" style="height:28px; max-width:140px; object-fit:contain; border:1px solid #ddd; background:#fff; ${b.logo ? '' : 'display:none;'}">
+          <input type="file" id="set-brand-logo" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="font-size:11px; flex:1;">
+          <button type="button" id="set-brand-logo-clear" style="padding:2px 8px;">Remove</button>
+        </div>
+        <label style="font-size:12px; display:flex; align-items:center; gap:6px; margin-top:6px;"><input type="checkbox" id="set-brand-osasi" ${b.osasiCredit ? 'checked' : ''}> Add a small “shared to osasi.org” credit at the foot of exports</label>
+      </div>`;
+}
+function wireBrandSettings(m) {
+  _brandPending = { logo: brand.logo, logoW: brand.logoW, logoH: brand.logoH };
+  const file = m.querySelector('#set-brand-logo'), prev = m.querySelector('#set-brand-logo-preview'), clr = m.querySelector('#set-brand-logo-clear');
+  if (!file) return;
+  file.addEventListener('change', () => {
+    const f = file.files[0]; if (!f) return;
+    if (f.size > 400 * 1024) { alert('Logo is over 400 KB — please use a smaller image (a PNG or SVG a few hundred pixels wide is plenty).'); file.value = ''; return; }
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        _brandPending = { logo: r.result, logoW: img.naturalWidth || 1, logoH: img.naturalHeight || 1 };
+        prev.src = r.result; prev.style.display = '';
+      };
+      img.onerror = () => { alert('That file could not be read as an image.'); file.value = ''; };
+      img.src = r.result;
+    };
+    r.readAsDataURL(f);
+  });
+  clr.addEventListener('click', () => { _brandPending = { logo: '', logoW: 0, logoH: 0 }; prev.src = ''; prev.style.display = 'none'; file.value = ''; });
+}
+
 function settingRow(key, label) {
   return `<div class="row"><label><input type="checkbox" id="set-${key}" ${state.settings[key]?'checked':''}> ${label}</label></div>`;
 }
@@ -3048,6 +3117,14 @@ function applySettings() {
   });
   state.settings.typeStyles = ts;
   saveSettings();
+  // Branding (browser-local)
+  const bn = document.getElementById('set-brand-name');
+  if (bn) {
+    brand.firmName = bn.value.trim();
+    if (_brandPending) { brand.logo = _brandPending.logo || ''; brand.logoW = _brandPending.logoW || 0; brand.logoH = _brandPending.logoH || 0; }
+    brand.osasiCredit = !!document.getElementById('set-brand-osasi').checked;
+    saveBrand();
+  }
   closeModal();
   render();
   renderAutosaveChip();
@@ -3066,6 +3143,26 @@ function exportFilename(ext) {
 }
 // Print-preview modal: shows the printable sheet, lets you pick page size + what's
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
+// Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
+const WHATS_NEW = [
+  ['0.22.0', '2026-09-10', 'Your branding: firm name and logo in the header and on every export title block (Settings); optional "shared to osasi.org" credit on exports, off by default.'],
+  ['0.21.0', '2026-09-10', 'Floor menu: double-click a blank spot to switch floors; PageUp / PageDown cycle them. Header renamed CValR-Sketch.'],
+  ['0.20.x', '2026-09-10', 'Named buildings and a Building dropdown; All shows a click-to-edit gallery of every building; Add files… merges one-building-per-file sketches; per-building export; About dialog, OSASI attribution and full AGPL-3.0 licence text.'],
+  ['0.19.x', '2026-09-10', 'Export layout choice, autosave to file (Chrome/Edge), draggable dimension labels, Move shape by offset or by picking points, fill palette with a deck-plank pattern, Re-walk this wall.'],
+];
+function openWhatsNew() {
+  const m = createModal();
+  const div = document.createElement('div');
+  div.className = 'modal whatsnew-modal';
+  div.style.maxWidth = '560px';
+  div.innerHTML = `
+    <h3>What's new</h3>
+    <ul>${WHATS_NEW.map(([v, d, t]) => `<li><span class="ver">${escapeHtml(v)}</span> <span style="color:#888; font-size:11px;">${escapeHtml(d)}</span><br>${escapeHtml(t)}</li>`).join('')}</ul>
+    <p style="font-size:12px; color:#666; margin:10px 0 0;">Full history: <a href="https://github.com/CAA-EBV-CO-OP/CValRSketch/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG.md</a></p>
+    <div class="modal-buttons"><button class="primary" onclick="closeModal()">Close</button></div>`;
+  m.appendChild(div);
+}
+
 function openAbout() {
   const m = createModal();
   const div = document.createElement('div');
@@ -3404,6 +3501,7 @@ function svgForExport() {
 
   // ---- 1. Decide what's on the export ----
   const includeTitle = state.settings.exportIncludeTitle && (state.subject || '').trim().length > 0;
+  const hasBrand = !!(brand.firmName || brand.logo);
   const usedTypes = [...new Set(visibleShapes().map(s => s.type))].filter(k => k in TYPES);
   const includeLegend = state.settings.exportIncludeLegend && usedTypes.length > 0;
 
@@ -3423,7 +3521,7 @@ function svgForExport() {
   })();
 
   // Title + legend layout in PAGE coords (slimmed so the drawing gets more room).
-  const titleH = includeTitle ? 48 : 0;
+  const titleH = (includeTitle || hasBrand) ? 48 : 0;
   const legendRowH = 20;
   const legendFooterH = 24;
   const legendPad = 10;
@@ -3498,6 +3596,20 @@ function svgForExport() {
 
   // Page background
   out.appendChild(mk('rect', { width: pageW, height: pageH, fill: '#fff' }));
+
+  // Your branding: logo at the left of the title block, firm name at the right.
+  if (hasBrand) {
+    if (brand.logo && brand.logoW && brand.logoH) {
+      const lh = 34, lw = Math.min(160, lh * brand.logoW / brand.logoH);
+      out.appendChild(mk('image', { href: brand.logo, x: sideMargin, y: 7, width: lw, height: lh, preserveAspectRatio: 'xMidYMid meet' }));
+    }
+    if (brand.firmName) {
+      out.appendChild(mk('text', {
+        x: pageW - sideMargin, y: 26, 'text-anchor':'end', 'font-family':'Arial, sans-serif',
+        'font-size': 12, 'font-weight':'bold', fill:'#333'
+      }, brand.firmName));
+    }
+  }
 
   // Title block in page coords (slimmed)
   if (includeTitle) {
@@ -3601,6 +3713,14 @@ function svgForExport() {
     out.appendChild(mk('text', {
       x: x0 + 236, y: footerY + 9, 'font-family':'Arial, sans-serif', 'font-size': 10, fill:'#222'
     }, 'Open / dashed edge'));
+  }
+
+  // Optional credit in the bottom margin (Settings → Your branding). Off by default.
+  if (brand.osasiCredit) {
+    out.appendChild(mk('text', {
+      x: pageW - sideMargin, y: pageH - 8, 'text-anchor':'end', 'font-family':'Arial, sans-serif',
+      'font-size': 9, fill:'#888'
+    }, 'Sketch: CValR-Sketch · shared to osasi.org'));
   }
 
   return out;

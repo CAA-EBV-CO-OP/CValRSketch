@@ -14,6 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.22.0] — 2026-09-10
+
+### Added
+- **What's new** button in the header: a short list of recent releases, linking to this changelog.
+- **Your branding.** Settings gains a *Your branding* section: firm name, a logo (PNG/JPG/SVG/WebP up to 400 KB), and a checkbox for a small *shared to osasi.org* credit at the foot of exports (off by default). Name and logo appear in the app header and in the title block of every SVG/PNG export (logo left, name right, the subject title stays centred). Stored in this browser under `cvalrsketch:brand`, never in sketch files, so a shared sketch carries no one else's logo.
+
+### Changed
+- The osasi.org chip uses the OSASI site's orange. Service-worker cache name and the mobile UI's version stamp catch up to the desktop version (they had stayed at 0.19.3 through 0.20–0.21).
+
+---
+
 ## [0.21.0] — 2026-09-10
 
 ### Changed

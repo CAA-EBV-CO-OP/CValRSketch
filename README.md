@@ -3,7 +3,7 @@
 **Floor plan sketching for residential appraisal that runs entirely in the browser.** Use it offline from a local download or host it yourself; your sketches never leave your machine.
 Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
 
-**Version:** 0.21.0 (2026-09-10)
+**Version:** 0.22.0 (2026-09-10)
 **License:** [AGPL-3.0](./LICENSE)
 **Repo:** https://github.com/CAA-EBV-CO-OP/CValRSketch
 **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
@@ -131,7 +131,7 @@ What that means in practice:
 - **Keep the notices.** The copyright, licence and no-warranty notices in `NOTICE`, the file headers, and the About dialog must stay with every copy; modified files must say they were changed and when (AGPL §5).
 - **Credit is required, not optional.** Under additional terms adopted per AGPL §7(b) and §7(c) (see `NOTICE`; the licence text itself is `LICENSE`), every copy and every derivative must preserve and display the attribution *"Built on CValRSketch, an OSASI project — https://osasi.org"* wherever it shows its own name, version or legal notices, and a modified version must not be presented as the original or as endorsed by OSASI or CAA-EBV-CO-OP.
 
-**Your own branding is welcome.** You may put your firm's name and logo on the app, restyle it, and even rename it — the licence permits modification, and the exported sketch pages carry no required notice at all, so client-facing output is entirely yours. Two things stay: the attribution *Built on CValRSketch, an OSASI project* remains wherever the app shows its own name, version or legal notices (the About dialog is enough), and a rebranded version must not be presented as the original or as endorsed by OSASI. If you share or host your branded version for others, the same source-sharing rule applies to it.
+**Your own branding is welcome.** Settings → *Your branding* takes your firm name and logo (kept in your browser, not in sketch files) and puts them in the app header and the title block of every export; the *shared to osasi.org* credit on exports is off unless you tick it. Beyond that you may restyle the app and even rename it — the licence permits modification, and the exported sketch pages carry no required notice at all, so client-facing output is entirely yours. Two things stay: the attribution *Built on CValRSketch, an OSASI project* remains wherever the app shows its own name, version or legal notices (the About dialog is enough), and a rebranded version must not be presented as the original or as endorsed by OSASI. If you share or host your branded version for others, the same source-sharing rule applies to it.
 
 The names *CValRSketch* and *OSASI* are not licensed for use on derivative works in a way that suggests endorsement; please rename your fork if it diverges.
 
