@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.21.0] — 2026-09-10
+
+### Added
+- **Floor menu.** Double-click a blank spot on the canvas and a small menu pops at the cursor listing the floors, each with the viewed building's area on that floor; click one to switch. Escape or a click elsewhere closes it. **PageUp / PageDown** cycle floors from the keyboard (wrapping). In Walk mode the double-click's two clicks would have dropped a start point; it is put back before the menu opens.
+
+---
+
 ## [0.20.1] — 2026-09-10
 
 ### Changed

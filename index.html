@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.20.1"></script>
-<script src="dictation.js?v=0.20.1"></script>
+<script src="core.js?v=0.21.0"></script>
+<script src="dictation.js?v=0.21.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -123,6 +123,15 @@
   .visible-vertex.pickable { fill: #d4edda; stroke: #2e8b57; stroke-width: 2; }
   .ghost { opacity: var(--ghost-opacity, 0.45); pointer-events: none; }
   /* Building gallery (Building: All with several buildings in the file) */
+  /* Floor menu: double-click a blank spot on the canvas */
+  .floor-menu { position: fixed; background: #fff; border: 1px solid #c0c8d0; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.18); padding: 6px; z-index: 200; font-size: 12px; min-width: 190px; }
+  .floor-menu h4 { margin: 0 0 4px; padding: 0 8px; font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+  .floor-menu button { display: flex; width: 100%; justify-content: space-between; gap: 14px; background: #fff; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; text-align: left; font-size: 12px; }
+  .floor-menu button:hover { background: #eef2f6; }
+  .floor-menu button.active { background: #2b6cb0; color: #fff; }
+  .floor-menu button span.area { color: #888; font-family: ui-monospace, monospace; }
+  .floor-menu button.active span.area { color: #dbe7f3; }
+  .floor-menu .hint { padding: 4px 8px 0; font-size: 10px; color: #888; }
   .gallery-frame { fill: #fff; stroke: #c0c8d0; stroke-width: 1.5; cursor: pointer; }
   .gallery-panel:hover .gallery-frame { stroke: #2b6cb0; stroke-width: 2.5; }
   .gallery-caption { font: bold 13px Arial, sans-serif; fill: #2b3a4a; pointer-events: none; }
@@ -132,7 +141,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.20.1</span>
+  <span class="version-chip" id="app-version">v0.21.0</span>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">Part of <b>OSASI</b> · osasi.org</a>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
@@ -2801,6 +2810,61 @@ document.querySelectorAll('#mode-tabs button').forEach(b => {
   });
 });
 
+// ----- Floor menu: double-click a blank spot to switch floors -----------------
+// Lists the floors with the viewed building's area on each; PageUp / PageDown
+// cycle floors from the keyboard. A double-click's two single clicks would have
+// dropped a Walk start point, so that is put back first.
+let _startBeforeClick = undefined;
+function closeFloorMenu() { const m = document.getElementById('floor-menu'); if (m) m.remove(); }
+function openFloorMenu(clientX, clientY) {
+  closeFloorMenu();
+  const menu = document.createElement('div');
+  menu.id = 'floor-menu';
+  menu.className = 'floor-menu';
+  const b = viewBuildingOrAll();
+  const areaOn = f => visibleShapes().filter(sh => sh.floor === f).reduce((a, sh) => a + polygonArea(sh.points), 0);
+  menu.innerHTML = '<h4>Floor' + (b === 'all' ? '' : ' — ' + escapeHtml(b)) + '</h4>' +
+    state.floors.map(f => {
+      const a = areaOn(f);
+      return '<button data-floor="' + escapeHtml(f) + '" class="' + (f === state.activeFloor ? 'active' : '') + '">' +
+        '<span>' + escapeHtml(floorCaption(f)) + '</span><span class="area">' + (a > 0 ? Math.round(a).toLocaleString() + ' sf' : '—') + '</span></button>';
+    }).join('') +
+    '<div class="hint">PageUp / PageDown also cycle floors</div>';
+  document.body.appendChild(menu);
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(4, Math.min(clientX, window.innerWidth - r.width - 4)) + 'px';
+  menu.style.top = Math.max(4, Math.min(clientY, window.innerHeight - r.height - 4)) + 'px';
+  menu.querySelectorAll('button[data-floor]').forEach(btn => btn.addEventListener('click', () => {
+    setActiveFloor(btn.dataset.floor);
+    closeFloorMenu();
+  }));
+  const away = ev => { if (!menu.contains(ev.target)) { closeFloorMenu(); window.removeEventListener('mousedown', away, true); } };
+  setTimeout(() => window.addEventListener('mousedown', away, true), 0);
+}
+function setActiveFloor(f) {
+  if (!state.floors.includes(f) || f === state.activeFloor) return;
+  state.activeFloor = f;
+  state.selection = null; state.splitSelection = null; state.fenceSelection = null;
+  render();
+}
+function cycleFloor(step) {
+  const i = state.floors.indexOf(state.activeFloor);
+  if (i < 0 || state.floors.length < 2) return;
+  setActiveFloor(state.floors[(i + step + state.floors.length) % state.floors.length]);
+}
+svg.addEventListener('dblclick', (e) => {
+  if (e.target !== svg || galleryActive()) return;
+  if (state.mode === 'walk' && state.segments.length === 0 && _startBeforeClick !== undefined) {
+    // Undo the two start-point drops the double-click's clicks made.
+    state.startPoint = _startBeforeClick;
+    state.undoStack.splice(-2, 2);
+    _startBeforeClick = undefined;
+    render();
+  }
+  e.preventDefault();
+  openFloorMenu(e.clientX, e.clientY);
+});
+
 svg.addEventListener('click', (e) => {
   // Gallery: a click on a building panel selects that building for editing.
   const gp = e.target.closest ? e.target.closest('[data-gallery-building]') : null;
@@ -2816,7 +2880,9 @@ svg.addEventListener('click', (e) => {
   }
   if (state.mode === 'walk' && state.segments.length === 0) {
     // Blank-canvas click in Walk mode drops the start point here; Shift+Arrow then
-    // steps it onto aligned active-floor vertices.
+    // steps it onto aligned active-floor vertices. Remember the previous start so a
+    // double-click (floor menu) can put it back.
+    if (e.detail <= 1) _startBeforeClick = state.startPoint ? { ...state.startPoint } : null;
     setStartPoint(screenToWorld(e.clientX, e.clientY));
     return;
   }
@@ -3908,6 +3974,8 @@ window.addEventListener('keydown', (e) => {
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   const mod = e.ctrlKey || e.metaKey;
+  if (e.key === 'Escape' && document.getElementById('floor-menu')) { closeFloorMenu(); return; }
+  if (!mod && (e.key === 'PageUp' || e.key === 'PageDown')) { e.preventDefault(); cycleFloor(e.key === 'PageUp' ? -1 : 1); return; }
   if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undoHistory(); }
   else if (mod && !e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); saveJSON(); }
   else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoHistory(); }
