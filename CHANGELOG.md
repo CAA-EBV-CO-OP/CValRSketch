@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.27.0] — 2026-09-10
+
+### Added
+- **Mark and delete, visually.** Every gallery panel carries a tick box at its corner; ticking marks that building for deletion (red dashed frame) without opening it. Opening a building shows *Mark for deletion* and *Delete this building…* on the floor bar, so you can look at it full-screen — no ambiguity about which one — and either mark it or delete it there and then; marks survive going back to the gallery. *Delete marked (n)* — floor bar and gallery sidebar — removes every marked building's shapes, basement settings and names after one confirmation listing them, as a single undo step. *Clear marks* unticks everything. Marks are session-only and cleared by Load / New.
+
+---
+
 ## [0.26.0] — 2026-09-10
 
 ### Added

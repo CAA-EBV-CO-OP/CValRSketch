@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.26.0"></script>
-<script src="dictation.js?v=0.26.0"></script>
+<script src="core.js?v=0.27.0"></script>
+<script src="dictation.js?v=0.27.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -156,13 +156,22 @@
   .gallery-frame { fill: #fff; stroke: #c0c8d0; stroke-width: 1.5; cursor: pointer; }
   .gallery-panel:hover .gallery-frame { stroke: #2b6cb0; stroke-width: 2.5; }
   .gallery-caption { font: bold 13px Arial, sans-serif; fill: #2b3a4a; pointer-events: none; }
+  .gallery-mark { cursor: pointer; }
+  .gallery-mark rect { fill: #fff; stroke: #c0392b; stroke-width: 1.5; }
+  .gallery-mark:hover rect { fill: #fdecea; }
+  .gallery-mark text { font: bold 15px Arial, sans-serif; fill: #c0392b; pointer-events: none; }
+  .gallery-panel.marked .gallery-frame { stroke: #c0392b; stroke-width: 2.5; stroke-dasharray: 8 5; fill: #fff5f4; }
+  .gallery-panel.marked .gallery-caption { fill: #c0392b; }
+  #floor-bar .mark-box { display: none; align-items: center; gap: 5px; margin-left: 10px; font-size: 11px; color: #c0392b; white-space: nowrap; }
+  #floor-bar .mark-box.show { display: flex; }
+  #floor-bar .small-btn.danger { background: #c0392b; color: #fff; border-color: #a93226; }
   #floor-bar #building-select { font-size: 12px; padding: 3px 6px; border: 1px solid #c0c8d0; border-radius: 4px; background: #fff; }
 </style>
 </head>
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.26.0</span>
+  <span class="version-chip" id="app-version">v0.27.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -204,6 +213,9 @@
   <button class="small-btn" onclick="addBuilding()" title="Add a named building to this file (Shop, Barn, Guest cabin…) and switch to it">+ Building</button>
   <button class="small-btn" onclick="renameBuilding()" title="Rename the building shown on the canvas (its shapes and basement setting follow)">Rename</button>
   <button class="small-btn" onclick="openBuildingsModal()" title="List every building: rename, merge duplicates, delete unwanted ones, drop unused names">Manage&hellip;</button>
+  <label class="mark-box" id="mark-box" title="Mark the building on the canvas for deletion; delete all marked buildings at once from here or the gallery"><input type="checkbox" id="mark-current" onchange="toggleMark(viewBuildingOrAll(), this.checked)"> Mark for deletion</label>
+  <button class="small-btn danger" id="btn-delete-current" style="display:none;" onclick="deleteBuilding(viewBuildingOrAll())" title="Delete the building on the canvas — the one you are looking at — with its shapes">Delete this building&hellip;</button>
+  <button class="small-btn danger" id="btn-delete-marked" style="display:none;" onclick="deleteMarkedBuildings()">Delete marked</button>
   <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Size of the dimension, area, and note labels on the drawing">
     Label size:
     <input type="range" id="sketch-font-bar" min="0.6" max="2" step="0.1" style="width:120px;">
@@ -765,6 +777,43 @@ function deleteBuilding(b) {
   render();
   refreshBuildingsModal();
 }
+// ----- Marked for deletion: tick buildings in the gallery (or on the canvas), delete them in one go -----
+let markedBuildings = new Set();   // session-only; cleared by Load / New
+function toggleMark(b, on) {
+  if (!b || b === 'all') return;
+  if (on === undefined) on = !markedBuildings.has(b);
+  if (on) markedBuildings.add(b); else markedBuildings.delete(b);
+  render();
+}
+function clearMarks() { markedBuildings.clear(); render(); }
+function syncMarkControls() {
+  const names = new Set(buildingList());
+  [...markedBuildings].forEach(b => { if (!names.has(b)) markedBuildings.delete(b); });
+  const cur = viewBuildingOrAll();
+  const box = document.getElementById('mark-box'), chk = document.getElementById('mark-current'), del = document.getElementById('btn-delete-marked');
+  if (box) box.classList.toggle('show', cur !== 'all');
+  const delCur = document.getElementById('btn-delete-current');
+  if (delCur) delCur.style.display = cur !== 'all' ? '' : 'none';
+  if (chk) chk.checked = cur !== 'all' && markedBuildings.has(cur);
+  if (del) { del.style.display = markedBuildings.size ? '' : 'none'; del.textContent = 'Delete marked (' + markedBuildings.size + ')'; }
+}
+function deleteMarkedBuildings() {
+  const list = [...markedBuildings].filter(b => buildingList().includes(b));
+  if (!list.length) { alert('Nothing is marked. Tick the box on a gallery panel, or "Mark for deletion" with a building on the canvas.'); return; }
+  const lines = list.map(b => { const st = buildingStats(b); return '  ' + b + ' — ' + st.count + ' shape' + (st.count === 1 ? '' : 's') + ', ' + Math.round(st.area) + ' sf'; });
+  if (!confirm('Delete ' + list.length + ' building' + (list.length === 1 ? '' : 's') + '?\n\n' + lines.join('\n') + '\n\nUndo (Ctrl+Z) restores them all.')) return;
+  pushUndo();
+  const gone = new Set(list);
+  state.shapes = state.shapes.filter(sh => !gone.has(sh.building || DEFAULT_BUILDING));
+  list.forEach(b => delete state.basements[b]);
+  state.buildings = buildingList().filter(b => !gone.has(b));
+  if (gone.has(state.viewBuilding)) state.viewBuilding = 'all';
+  state.selection = null;
+  markedBuildings.clear();
+  render();
+  refreshBuildingsModal();
+}
+
 // Drop every name that has no shapes (they only clutter the dropdown).
 function pruneUnusedBuildings() {
   const present = new Set(buildingsPresent());
@@ -875,6 +924,7 @@ function render() {
     `<button class="${f===state.activeFloor?'active':''}" onclick="state.activeFloor='${f}'; state.selection=null; state.splitSelection=null; render();">${f}</button>`
   ).join('');
   syncBuildingSelect();
+  syncMarkControls();
   document.getElementById('floor-help').textContent =
     galleryActive() ? 'Gallery: every building in the file, each fitted to its panel. Click one to edit it on its own.' :
     state.mode==='text' ? 'Click a blank spot to add a text label. Click a label to select it; drag to move it; double-click to edit.' :
@@ -3033,6 +3083,8 @@ svg.addEventListener('dblclick', (e) => {
 
 svg.addEventListener('click', (e) => {
   // Gallery: a click on a building panel selects that building for editing.
+  const mk = e.target.closest ? e.target.closest('[data-mark-building]') : null;
+  if (mk) { toggleMark(mk.getAttribute('data-mark-building')); return; }
   const gp = e.target.closest ? e.target.closest('[data-gallery-building]') : null;
   if (gp) { setViewBuilding(gp.getAttribute('data-gallery-building')); return; }
   if (galleryActive()) return;
@@ -3641,7 +3693,7 @@ function renderGallery() {
     const fw = p.tight.w * sc, fh = p.tight.h * sc;
     const px = cx + (cellW - fw) / 2, py = cy + (availH - fh) / 2;
     const g = document.createElementNS(ns, 'g');
-    g.setAttribute('class', 'gallery-panel ui-overlay');
+    g.setAttribute('class', 'gallery-panel ui-overlay' + (markedBuildings.has(p.building) ? ' marked' : ''));
     g.setAttribute('data-gallery-building', p.building);
     const frame = document.createElementNS(ns, 'rect');
     frame.setAttribute('x', cx); frame.setAttribute('y', cy); frame.setAttribute('width', cellW); frame.setAttribute('height', cellH);
@@ -3663,10 +3715,29 @@ function renderGallery() {
     cap.textContent = p.building + ' — ' + floorCaption(p.floor) + (area > 0 ? ' ' + Math.round(area) + ' sf' : '') +
       (p.floor !== state.activeFloor ? ' (nothing on ' + state.activeFloor + ')' : '');
     g.appendChild(cap);
+    // Tick box (bottom-right of the panel): mark this building for deletion without opening it
+    const mk = document.createElementNS(ns, 'g');
+    mk.setAttribute('class', 'gallery-mark');
+    mk.setAttribute('data-mark-building', p.building);
+    const bx = cx + cellW - 26, by = cy + cellH - 26;
+    const box = document.createElementNS(ns, 'rect');
+    box.setAttribute('x', bx); box.setAttribute('y', by); box.setAttribute('width', 18); box.setAttribute('height', 18); box.setAttribute('rx', 3);
+    mk.appendChild(box);
+    if (markedBuildings.has(p.building)) {
+      const tick = document.createElementNS(ns, 'text');
+      tick.setAttribute('x', bx + 9); tick.setAttribute('y', by + 14); tick.setAttribute('text-anchor', 'middle');
+      tick.textContent = '\u2715';
+      mk.appendChild(tick);
+    }
+    const title = document.createElementNS(ns, 'title');
+    title.textContent = (markedBuildings.has(p.building) ? 'Unmark ' : 'Mark ') + p.building + ' for deletion';
+    mk.appendChild(title);
+    g.appendChild(mk);
     svg.appendChild(g);
   });
   // The inner renders ran with one building selected; put the bar back to "All".
   syncBuildingSelect();
+  syncMarkControls();
   document.getElementById('floor-help').textContent = 'Gallery: every building in the file, each fitted to its panel. Click one to edit it on its own.';
 }
 
@@ -3675,7 +3746,12 @@ function sidebarGallery() {
   return `<div class="section"><h2>Buildings</h2>
     <div class="help">Every building in this file is shown as a gallery. Click one on the canvas, or pick it here, to edit it on its own — the canvas fits that building to the window and new shapes are tagged to it. Use the Building dropdown in the floor bar to come back to All.</div>
     <div class="row-buttons">${present.map(b => `<button data-building="${escapeHtml(b)}" onclick="setViewBuilding(this.dataset.building)">${escapeHtml(b)}</button>`).join('')}</div>
-    <div class="row-buttons" style="margin-top:6px;"><button onclick="openBuildingsModal()" title="Rename, merge duplicates, delete unwanted buildings, drop unused names">Manage buildings&hellip;</button></div>
+    <div class="help" style="margin-top:8px;">Tick the box at the corner of a panel to mark that building for deletion (or open it and tick <em>Mark for deletion</em> on the floor bar), then delete them all at once.</div>
+    <div class="row-buttons" style="margin-top:6px;">
+      <button class="danger" onclick="deleteMarkedBuildings()" ${markedBuildings.size ? '' : 'disabled'} style="background:${markedBuildings.size ? '#c0392b' : '#b8bec5'};">Delete marked (${markedBuildings.size})</button>
+      <button onclick="clearMarks()" ${markedBuildings.size ? '' : 'disabled'}>Clear marks</button>
+      <button onclick="openBuildingsModal()" title="Rename, merge duplicates, delete unwanted buildings, drop unused names">Manage buildings&hellip;</button>
+    </div>
   </div>`;
 }
 
@@ -4169,6 +4245,7 @@ function newProject() {
   state.floors = ['basement', 'main', 'upper', 'other'];
   state.buildings = [...BUILDINGS];
   state.viewBuilding = 'all';
+  markedBuildings.clear();
   state.activeFloor = 'main';
   state.nextShapeId = 1;
   state.selection = null;
@@ -4193,6 +4270,7 @@ function applyLoadedProject(text) {
   state.basements = d.basements || {};
   state.buildings = normalizeBuildings(d.buildings);      // older files: the five defaults plus whatever the shapes use
   state.viewBuilding = d.viewBuilding || 'all';
+  markedBuildings.clear();
   state.selectedLabel = null; state.labelDrag = null; state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null;
   const subjInp = document.getElementById('subject-input');
   if (subjInp) subjInp.value = state.subject || '';
