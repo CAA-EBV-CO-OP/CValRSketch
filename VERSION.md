@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.22.0`
+**Current version:** `0.23.0`
 **Released:** 2026-09-10
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.23.0  | 2026-09-10 | minor  | **Save app copy.** Header button saves a frozen, self-contained HTML (scripts inlined, PWA hooks removed, version-stamped) of the running app for the job folder. Needs a served copy; explains itself when opened from disk. |
 | 0.22.0  | 2026-09-10 | minor  | **Your branding.** Settings → *Your branding*: firm name and logo (browser-local, never in sketch files) shown in the app header and the export title block; optional *shared to osasi.org* credit at the foot of exports, off by default. |
 | 0.21.0  | 2026-09-10 | minor  | **Floor menu.** Double-click a blank spot on the canvas for a pop-up listing the floors with the viewed building's area on each; click to switch. **PageUp / PageDown** cycle floors. A double-click in Walk mode puts the start point back where it was. |
 | 0.20.1  | 2026-09-10 | patch  | `LICENSE` is now the bare official AGPL-3.0 text so GitHub and licence scanners detect it; the copyright notice and the Section 7(b)/(c) additional terms moved to `NOTICE`, which the file headers and About dialog reference. No functional change. |

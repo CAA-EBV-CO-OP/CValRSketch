@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.23.0] — 2026-09-10
+
+### Added
+- **Save app copy** (header). Fetches the running app's own `index.html`, `core.js` and `dictation.js`, inlines the scripts, removes the manifest link and service-worker registration, stamps the version, date and source address in a comment, and saves one self-contained HTML named `CValR-Sketch-v<version>.html`. Keep it in the job folder beside the sketch JSON. Works from osasi.org or any served copy; a copy opened from disk cannot read its own source and says so.
+
+---
+
 ## [0.22.0] — 2026-09-10
 
 ### Added
