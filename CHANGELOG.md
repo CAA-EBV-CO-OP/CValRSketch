@@ -14,6 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.18.0] — 2026-09-09
+
+### Added
+- **Fill palette.** ⚙ Settings has a *Fill palette* table: a colour picker and a pattern (Solid, Wood planks, Diagonal hatch, Cross-hatch, Dots) for every area type, with ↺ per row to restore the built-in default. Overrides are saved with your settings and travel inside each sketch file, so exports look the same on any machine.
+- **Per-shape fill.** The Edit-mode shape panel has a Fill row: pick a colour and pattern for just that shape (untick *type default*), or tick it again to fall back to the type's palette entry.
+- **Wood planks pattern**, used by default for **Open deck** on a lighter tan, so decks read as decking at a glance. Porch and unfinished keep their hatches.
+
+### Changed
+- Pattern fills are generated on demand into `<defs>`, one per pattern + colour, replacing the two fixed hatch patterns. Legend swatches use the palette, and multi-floor exports gather the patterns every panel used so nothing renders black.
+
+---
+
 ## [0.17.0] — 2026-09-09
 
 ### Added

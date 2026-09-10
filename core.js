@@ -44,6 +44,7 @@ const SETTINGS_DEFAULTS = {
   exportPageSize: 'auto',  // 'auto' | 'letter-portrait' | 'letter-landscape'
   exportLayout: 'active',  // 'active' (live canvas) | 'horizontal' | 'vertical' (every floor as its own panel)
   autosaveToFile: true,    // after Save As / Load via the picker, rewrite that file after every change (Chrome/Edge)
+  typeStyles: {},          // fill palette overrides per area type: { [typeKey]: { color: '#rrggbb', pattern: 'none'|'planks'|'hatch'|'crosshatch'|'dots' } }
   confirmDelete: true,
   askOnLengthEdit: true,
   defaultLengthEditMode: 'stretch-end',

@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.17.0"></script>
-<script src="dictation.js?v=0.17.0"></script>
+<script src="core.js?v=0.18.0"></script>
+<script src="dictation.js?v=0.18.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -105,7 +105,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.17.0</span>
+  <span class="version-chip" id="app-version">v0.18.0</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -748,6 +748,66 @@ function addEl(tag, attrs, text) {
   return el;
 }
 
+// ----- Fill styles: colour + pattern -----------------------------------------
+// Precedence: per-shape override (sh.style) → Settings palette (settings.typeStyles)
+// → built-in default for the type. Patterns are generated into <defs> on demand,
+// one per (pattern, colour) pair, so any colour can carry any pattern; exports
+// copy <defs>, so they carry over unchanged.
+const FILL_PATTERNS = { none: 'Solid', planks: 'Wood planks', hatch: 'Diagonal hatch', crosshatch: 'Cross-hatch', dots: 'Dots' };
+const TYPE_STYLE_DEFAULTS = {
+  porch:      { color: '#ffffff', pattern: 'hatch', line: '#9bb3cc' },
+  unfinished: { color: '#ffffff', pattern: 'hatch', line: '#888888' },
+  deck:       { color: '#f6efe3', pattern: 'planks' },
+};
+function typeStyleDefault(key) {
+  const t = TYPES[key] || TYPES.living;
+  const d = TYPE_STYLE_DEFAULTS[key];
+  return d ? { ...d } : { color: t.fill.startsWith('url(') ? '#ffffff' : t.fill, pattern: 'none' };
+}
+function typeStyle(key) {   // effective style for a type: palette override on top of the default
+  const base = typeStyleDefault(key);
+  const o = (state.settings.typeStyles || {})[key] || {};
+  return { ...base, color: o.color || base.color, pattern: o.pattern || base.pattern, dashed: !!(TYPES[key] || TYPES.living).dashed };
+}
+function shapeStyle(sh) {   // effective style for a shape: per-shape override on top of the type style
+  const ts = typeStyle(sh.type);
+  const o = sh.style || {};
+  return { ...ts, color: o.color || ts.color, pattern: o.pattern || ts.pattern };
+}
+function shadeHex(hex, amt) {   // darken (#rrggbb, 0..1)
+  const n = parseInt(hex.slice(1), 16);
+  const f = v => Math.max(0, Math.min(255, Math.round(v * (1 - amt)))).toString(16).padStart(2, '0');
+  return '#' + f((n >> 16) & 255) + f((n >> 8) & 255) + f(n & 255);
+}
+// SVG fill for a style. Pattern fills are registered in the live <defs> the first
+// time they're needed (per pattern + colour), so a shape can reference them by id.
+function fillFor(st) {
+  if (!st.pattern || st.pattern === 'none' || !FILL_PATTERNS[st.pattern]) return st.color;
+  const line = st.line || shadeHex(st.color, 0.3);
+  const id = `fp-${st.pattern}-${st.color.slice(1)}-${line.slice(1)}`;
+  const defs = svg.querySelector('defs');
+  if (defs && !defs.querySelector('#' + id)) {
+    const c = st.color;
+    const tiles = {
+      planks:     { w: 24, h: 24, rot: 0,  inner: `<rect width="24" height="24" fill="${c}"/><line x1="0" y1="0.5" x2="24" y2="0.5" stroke="${line}" stroke-width="1"/><line x1="0" y1="12.5" x2="24" y2="12.5" stroke="${line}" stroke-width="1"/><line x1="6.5" y1="0" x2="6.5" y2="12" stroke="${line}" stroke-width="1" opacity="0.55"/><line x1="18.5" y1="12" x2="18.5" y2="24" stroke="${line}" stroke-width="1" opacity="0.55"/>` },
+      hatch:      { w: 10, h: 10, rot: 45, inner: `<rect width="10" height="10" fill="${c}"/><line x1="0" y1="0" x2="0" y2="10" stroke="${line}" stroke-width="1"/>` },
+      crosshatch: { w: 10, h: 10, rot: 45, inner: `<rect width="10" height="10" fill="${c}"/><line x1="0" y1="0" x2="0" y2="10" stroke="${line}" stroke-width="1"/><line x1="0" y1="0" x2="10" y2="0" stroke="${line}" stroke-width="1"/>` },
+      dots:       { w: 8,  h: 8,  rot: 0,  inner: `<rect width="8" height="8" fill="${c}"/><circle cx="4" cy="4" r="1.1" fill="${line}"/>` },
+    }[st.pattern];
+    const pat = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+    pat.setAttribute('id', id);
+    pat.setAttribute('patternUnits', 'userSpaceOnUse');
+    pat.setAttribute('width', tiles.w); pat.setAttribute('height', tiles.h);
+    if (tiles.rot) pat.setAttribute('patternTransform', `rotate(${tiles.rot})`);
+    pat.innerHTML = tiles.inner;
+    defs.appendChild(pat);
+  }
+  return `url(#${id})`;
+}
+function patternOptions(selected) {
+  return Object.entries(FILL_PATTERNS).map(([k, v]) => `<option value="${k}"${k === selected ? ' selected' : ''}>${v}</option>`).join('');
+}
+
 function renderShape(sh, W, isGhost) {
   const t = TYPES[sh.type] || TYPES.living;
   const screenPts = sh.points.map(W);
@@ -756,7 +816,8 @@ function renderShape(sh, W, isGhost) {
 
   // Fill (active floor only). Ghosts of other floors are drawn as a no-fill dashed
   // outline so they read as a faint overlay without obscuring the active floor.
-  const poly = addEl('path', { d, fill: isGhost ? 'none' : t.fill, stroke: isGhost ? '#2b6cb0' : 'black', 'stroke-width': isGhost ? 1.5 : 2, class: cls });
+  const st = shapeStyle(sh);
+  const poly = addEl('path', { d, fill: isGhost ? 'none' : fillFor(st), stroke: isGhost ? '#2b6cb0' : 'black', 'stroke-width': isGhost ? 1.5 : 2, class: cls });
   if (isGhost) poly.setAttribute('stroke-dasharray', '6,4');
   else if (t.dashed) poly.setAttribute('stroke-dasharray', '8,5');
   if (!isGhost) {
@@ -1658,6 +1719,12 @@ function sidebarEdit() {
         <div class="field"><label>Building</label><select id="sh-building">
           ${BUILDINGS.map(b=>`<option value="${b}"${b===(sh.building||DEFAULT_BUILDING)?' selected':''}>${b}</option>`).join('')}
         </select></div>
+        <div class="field"><label>Fill</label>
+          <input type="color" id="sh-color" value="${shapeStyle(sh).color}" title="Fill colour for this shape" style="width:40px; height:26px; padding:0; border:1px solid #bbb;">
+          <select id="sh-pattern">${patternOptions(shapeStyle(sh).pattern)}</select>
+          <label style="flex:0 0 auto; display:flex; align-items:center; gap:4px;"><input type="checkbox" id="sh-style-default" ${sh.style ? '' : 'checked'}> type default</label>
+        </div>
+        <div class="help">Uncheck "type default" to give just this shape its own colour/pattern. The palette for every type lives in ⚙ Settings.</div>
         <div class="row-buttons">
           <button data-act="applyShape" class="primary">Apply</button>
           <button data-act="deleteShape" class="danger">Delete shape</button>
@@ -2085,6 +2152,9 @@ function applyShapeEdit() {
   sh.type = document.getElementById('sh-type').value;
   sh.floor = document.getElementById('sh-floor').value;
   sh.building = document.getElementById('sh-building').value;
+  const useDefault = document.getElementById('sh-style-default');
+  if (useDefault && useDefault.checked) delete sh.style;
+  else if (useDefault) sh.style = { color: document.getElementById('sh-color').value, pattern: document.getElementById('sh-pattern').value };
   render();
 }
 
@@ -2643,12 +2713,28 @@ function openSettings() {
           <span id="set-ghost-opacity-val" style="font-family:monospace; min-width:36px; text-align:right;">${Math.round(s.ghostOpacity*100)}%</span>
         </label>
       </div>
+      <div style="margin-top:14px;">
+        <div style="font-size:12px; font-weight:bold; margin-bottom:2px;">Fill palette</div>
+        <div style="font-size:11px; color:#666; margin-bottom:6px;">Colour and pattern for each area type. Saved with your settings and with each sketch file; ↺ restores the built-in default.</div>
+        <div style="display:grid; grid-template-columns:auto auto auto auto; gap:4px 10px; align-items:center; font-size:12px;">
+          ${Object.keys(TYPES).map(k => { const st = typeStyle(k); return `
+            <span>${TYPES[k].name}</span>
+            <input type="color" data-pal-color="${k}" value="${st.color}" style="width:40px; height:24px; padding:0; border:1px solid #bbb;">
+            <select data-pal-pattern="${k}">${patternOptions(st.pattern)}</select>
+            <button type="button" data-pal-reset="${k}" title="Built-in default" style="padding:2px 8px;">↺</button>`; }).join('')}
+        </div>
+      </div>
       <div class="modal-buttons">
         <button onclick="cancelSettings()">Cancel</button>
         <button class="primary" onclick="applySettings()">Save</button>
       </div>
     </div>
   `;
+  m.querySelectorAll('[data-pal-reset]').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.palReset, d = typeStyleDefault(k);
+    m.querySelector(`[data-pal-color="${k}"]`).value = d.color;
+    m.querySelector(`[data-pal-pattern="${k}"]`).value = d.pattern;
+  }));
   const slider = document.getElementById('set-ghost-opacity');
   const valEl = document.getElementById('set-ghost-opacity-val');
   const originalOpacity = s.ghostOpacity;
@@ -2682,6 +2768,14 @@ function applySettings() {
   state.settings.defaultLengthEditMode = document.getElementById('set-default-mode').value;
   state.settings.autoCloseFeet = parseFloat(document.getElementById('set-close').value) || 0.05;
   state.settings.ghostOpacity = parseFloat(document.getElementById('set-ghost-opacity').value) || 0.45;
+  // Fill palette: store only what differs from the built-in default for each type
+  const ts = {};
+  document.querySelectorAll('[data-pal-color]').forEach(inp => {
+    const k = inp.dataset.palColor, d = typeStyleDefault(k);
+    const color = inp.value.toLowerCase(), pattern = document.querySelector(`[data-pal-pattern="${k}"]`).value;
+    if (color !== d.color.toLowerCase() || pattern !== d.pattern) ts[k] = { color, pattern };
+  });
+  state.settings.typeStyles = ts;
   saveSettings();
   closeModal();
   render();
@@ -2840,6 +2934,7 @@ function captureLivePanel() {
     };
   }
 
+  const patterns = [...svg.querySelectorAll('defs pattern')].map(n => n.cloneNode(true));  // fills this panel references
   const content = svg.cloneNode(true);
   // Strip UI-only elements that shouldn't appear in exports
   ['.hit-wall', '.hit-vertex', '.visible-vertex', '.ui-overlay'].forEach(sel => {
@@ -2850,7 +2945,7 @@ function captureLivePanel() {
   // Drop the defs (the outer export SVG carries its own copy)
   const cloneDefs = content.querySelector('defs');
   if (cloneDefs) cloneDefs.remove();
-  return { tight, content };
+  return { tight, content, patterns };
 }
 
 // Temporarily draw `floor` alone (ghosts off, no in-progress walk or start marker),
@@ -2963,6 +3058,7 @@ function svgForExport() {
   const blockY = titleH + sideMargin + (canvasAvailH - blockH) / 2;
 
   // ---- 4. Build the export SVG: page-coord outer, nested SVG for the canvas ----
+  usedTypes.forEach(k => fillFor(typeStyle(k)));   // legend swatch patterns must exist before <defs> is cloned
   const liveDefs = svg.querySelector('defs');
   const out = document.createElementNS(ns, 'svg');
   out.setAttribute('xmlns', ns);
@@ -2970,7 +3066,13 @@ function svgForExport() {
   out.setAttribute('height', pageH);
   out.setAttribute('viewBox', `0 0 ${pageW} ${pageH}`);
 
-  if (liveDefs) out.appendChild(liveDefs.cloneNode(true));
+  if (liveDefs) {
+    const defs = liveDefs.cloneNode(true);
+    // Multi-floor layouts: each panel was rendered separately, so gather every
+    // pattern any panel used (the live <defs> only holds the last render's).
+    panels.forEach(p => (p.patterns || []).forEach(pat => { if (!defs.querySelector('#' + pat.id)) defs.appendChild(pat); }));
+    out.appendChild(defs);
+  }
 
   // Page background
   out.appendChild(mk('rect', { width: pageW, height: pageH, fill: '#fff' }));
@@ -3031,13 +3133,14 @@ function svgForExport() {
     const colW = lw / (usedTypes.length > 4 ? 2 : 1);
     usedTypes.forEach((key, i) => {
       const t = TYPES[key];
+      const st = typeStyle(key);
       const col = Math.floor(i / usePerColumn);
       const rowInCol = i % usePerColumn;
       const rowX = x0 + 12 + col * colW;
       const rowY = y0 + 16 + rowInCol * legendRowH;
       const swatch = mk('rect', {
         x: rowX, y: rowY, width: 22, height: 13,
-        fill: t.fill, stroke: 'black', 'stroke-width': 1
+        fill: fillFor(st), stroke: 'black', 'stroke-width': 1
       });
       if (t.dashed) swatch.setAttribute('stroke-dasharray','5,3');
       out.appendChild(swatch);
@@ -3328,6 +3431,12 @@ async function saveBlob(blob, filename, mime) {
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 window.addEventListener('resize', render);
+// Touching the shape's colour/pattern controls means "own style" — untick "type default" for the user.
+document.addEventListener('input', (e) => {
+  if (e.target && (e.target.id === 'sh-color' || e.target.id === 'sh-pattern')) {
+    const cb = document.getElementById('sh-style-default'); if (cb) cb.checked = false;
+  }
+});
 
 window.addEventListener('keydown', (e) => {
   const t = e.target;
