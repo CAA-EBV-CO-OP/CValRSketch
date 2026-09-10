@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.27.1"></script>
-<script src="dictation.js?v=0.27.1"></script>
+<script src="core.js?v=0.28.0"></script>
+<script src="dictation.js?v=0.28.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -87,6 +87,20 @@
   .bm-btn { background: #6c7a8a; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
   .bm-btn.bm-danger { background: #c0392b; }
   .bm-merge { font-size: 11px; padding: 3px 4px; margin: 0 4px; border: 1px solid #c0c8d0; border-radius: 4px; max-width: 130px; }
+  .rose-row { display: flex; gap: 10px; align-items: flex-start; margin-top: 8px; }
+  .rose-row svg { flex: 0 0 auto; }
+  .rose-side { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+  .rose-step { font-size: 11px; color: #555; display: flex; align-items: center; gap: 6px; }
+  .rose-step select, #rose-list { font-size: 11px; border: 1px solid #c0c8d0; border-radius: 4px; background: #fff; }
+  #rose-list { width: 100%; padding: 2px; }
+  .rose-wedge { fill: #eef2f6; stroke: #fff; stroke-width: 1.5; cursor: pointer; }
+  .rose-wedge.cardinal { fill: #e3e9f0; }
+  .rose-wedge:hover, .rose-wedge.hover { fill: #cfe0f4; }
+  .rose-wedge.sel { fill: #2b6cb0; }
+  .rose-label { font: 600 10px Arial, sans-serif; fill: #2b3a4a; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+  .rose-label.fine { font-size: 8px; font-weight: 500; }
+  .rose-label.sel { fill: #fff; }
+  .rose-hub { fill: #fff; stroke: #c0c8d0; }
   .compass { display: grid; grid-template-columns: repeat(3, 34px); grid-template-rows: repeat(3, 30px); gap: 3px; margin-top: 8px; justify-content: start; align-items: stretch; }
   .compass button { background: #eef2f6; color: #2b3a4a; border: 1px solid #c0c8d0; border-radius: 4px; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
   .compass button:hover { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
@@ -171,7 +185,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.27.1</span>
+  <span class="version-chip" id="app-version">v0.28.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -1919,20 +1933,21 @@ function sidebarWalk() {
         <button id="btnMic" type="button" title="Dictate measurements">Dictate</button>
         <button id="btnTrain" type="button" title="Teach a correction for the last mishearing">Train</button>
       </div>
-      <div class="compass-row">
-        <div class="compass" aria-label="Direction pad">
-          <span></span><button type="button" onclick="compassDir('u')" title="Up — adds the typed length going up (empty box: pen-jump up)">&#8593;</button><span></span>
-          <button type="button" onclick="compassDir('l')" title="Left — adds the typed length going left (empty box: pen-jump left)">&#8592;</button><span></span><button type="button" onclick="compassDir('r')" title="Right — adds the typed length going right (empty box: pen-jump right)">&#8594;</button>
-          <span></span><button type="button" onclick="compassDir('d')" title="Down — adds the typed length going down (empty box: pen-jump down)">&#8595;</button><span></span>
-        </div>
-        <div class="compass-angle">
-          <label for="compass-angle-sel">Angle</label>
-          <select id="compass-angle-sel" onchange="compassAngle = this.value" title="Added after the direction: a turn from the previous wall (right/left), or degrees clockwise from up/down on the first wall">
-            ${['', '22.5', '45', '67.5'].map(a => `<option value="${a}"${a === compassAngle ? ' selected' : ''}>${a || '0'}&deg;</option>`).join('')}
+      <div class="rose-row">
+        ${roseSvg()}
+        <div class="rose-side">
+          <label class="rose-step">Steps
+            <select id="rose-step" onchange="setRoseStep(this.value)" title="How fine the compass is: 45° gives 8 directions, 22.5° gives 16">
+              <option value="45"${roseStep === 45 ? ' selected' : ''}>45&deg;</option>
+              <option value="22.5"${roseStep === 22.5 ? ' selected' : ''}>22.5&deg;</option>
+            </select>
+          </label>
+          <select id="rose-list" size="6" onchange="setRoseHeading(parseFloat(this.value))" title="Directions, clockwise from up. Pick one here or on the compass; the typed command it stands for is shown in brackets.">
+            ${roseHeadings().map(d => `<option value="${d}"${roseHeading === d ? ' selected' : ''}>${roseLabel(d).arrow} ${roseLabel(d).text} (${roseLabel(d).cmd})</option>`).join('')}
           </select>
         </div>
       </div>
-      <div class="help">Type a length, then click a direction or press <code>&#8592; &#8593; &#8594; &#8595;</code> — the wall is added that way. Pick an angle first for a 45&deg; or 22.5&deg; wall (it works like typing <code>16 r 45</code>). With the box empty the same keys pen-jump to the next aligned vertex.</div>
+      <div class="help">Type a length, then click a direction on the compass (or pick it in the list) — the wall goes that way. Directions are absolute: up is the top of the drawing, always. Pick the direction first and Enter adds the wall the same way; <code>&#8592; &#8593; &#8594; &#8595;</code> still work for the four cardinals. The bracketed command is what you would type or say.</div>
       <div id="micStatus" style="font-size:11px;color:#666;margin-top:4px;min-height:14px;"></div>
       <pre id="micLog" style="font-size:10px;color:#777;background:#f4f7fa;border:1px solid #e0e6ec;border-radius:4px;margin-top:4px;padding:4px 6px;max-height:120px;overflow:auto;white-space:pre-wrap;line-height:1.35;"></pre>
       <div class="row-buttons">
@@ -2684,20 +2699,95 @@ function handleSplitClick(shapeId, vIdx) {
 // =============================================================================
 // WALK MODE COMMANDS
 // =============================================================================
-let compassAngle = '';   // angle picker beside the compass pad; survives sidebar redraws
+// ----- Compass rose: absolute directions, clockwise from up (0 = up, 90 = right) -----
+// Users pick a wedge (or a list entry) instead of remembering the r/l/u/d + angle
+// grammar. Each heading maps to an ABSOLUTE typed command: cardinals to u/r/d/l,
+// everything else to "u <angle>" / "d <angle>" (degrees clockwise from up/down),
+// which the parser treats as absolute regardless of the previous wall.
+let roseStep = 45;        // 45 -> 8 directions, 22.5 -> 16
+let roseHeading = null;   // selected heading in degrees clockwise from up, or null
+function roseHeadings() { const out = []; for (let d = 0; d < 360; d += roseStep) out.push(d); return out; }
+function fmtDeg(x) { return (Math.round(x * 100) / 100).toString(); }
+function headingToCmd(deg) {
+  deg = ((deg % 360) + 360) % 360;
+  if (deg === 0) return 'u'; if (deg === 90) return 'r'; if (deg === 180) return 'd'; if (deg === 270) return 'l';
+  // screen heading (CW from east) = deg - 90; u covers the upper half, d the lower
+  const th = deg - 90;
+  return th < 0 || th > 180 ? 'u ' + fmtDeg(deg > 270 ? deg - 360 : deg) : 'd ' + fmtDeg(deg - 180);
+}
+function roseLabel(deg) {
+  const arrows = { 0: '\u2191', 45: '\u2197', 90: '\u2192', 135: '\u2198', 180: '\u2193', 225: '\u2199', 270: '\u2190', 315: '\u2196' };
+  const names = { 0: 'up', 45: 'up-right', 90: 'right', 135: 'down-right', 180: 'down', 225: 'down-left', 270: 'left', 315: 'up-left' };
+  const near = Math.round(deg / 45) * 45 % 360;
+  const exact = deg % 45 === 0;
+  return { arrow: arrows[near], text: exact ? names[deg] : (fmtDeg(deg) + '\u00b0 clockwise from up'), cmd: headingToCmd(deg) };
+}
+function roseSvg() {
+  const R = 68, C = 72, W = 144, hub = 13;
+  const rad = a => (a - 90) * Math.PI / 180;   // compass deg (CW from up) -> screen radians
+  const pt = (a, r) => [C + Math.cos(rad(a)) * r, C + Math.sin(rad(a)) * r];
+  let out = `<svg id="compass-rose" width="${W}" height="${W}" viewBox="0 0 ${W} ${W}" aria-label="Compass: click a direction">`;
+  roseHeadings().forEach(d => {
+    const a0 = d - roseStep / 2, a1 = d + roseStep / 2;
+    const [x0, y0] = pt(a0, R), [x1, y1] = pt(a1, R), [ix0, iy0] = pt(a0, hub), [ix1, iy1] = pt(a1, hub);
+    const large = roseStep > 180 ? 1 : 0;
+    const path = `M ${ix0} ${iy0} L ${x0} ${y0} A ${R} ${R} 0 ${large} 1 ${x1} ${y1} L ${ix1} ${iy1} A ${hub} ${hub} 0 ${large} 0 ${ix0} ${iy0} Z`;
+    const cls = 'rose-wedge' + (d % 90 === 0 ? ' cardinal' : '') + (roseHeading === d ? ' sel' : '');
+    out += `<path class="${cls}" d="${path}" data-deg="${d}" onclick="roseClick(${d})" onmouseenter="roseHover(${d})" onmouseleave="roseHover(null)"><title>${roseLabel(d).text} (${roseLabel(d).cmd})</title></path>`;
+  });
+  roseHeadings().forEach(d => {
+    const [lx, ly] = pt(d, R * 0.72);
+    const fine = !(roseStep === 45 || d % 45 === 0);
+    const lab = fine ? fmtDeg(d) : roseLabel(d).arrow;
+    out += `<text class="rose-label${fine ? ' fine' : ''}${roseHeading === d ? ' sel' : ''}" x="${lx}" y="${ly}">${lab}</text>`;
+  });
+  out += `<circle class="rose-hub" cx="${C}" cy="${C}" r="${hub - 1}"/></svg>`;
+  return out;
+}
+// Redraw the sidebar (which rebuilds the command box) without losing what is typed in it.
+function roseRerender() {
+  const input = document.getElementById('cmd');
+  const v = input ? input.value : '';
+  render();
+  const again = document.getElementById('cmd');
+  if (again && v) again.value = v;
+  focusWalkInput();
+}
+function setRoseStep(v) {
+  roseStep = parseFloat(v) === 22.5 ? 22.5 : 45;
+  if (roseHeading !== null && roseHeading % roseStep !== 0) roseHeading = null;
+  roseRerender();
+}
+function setRoseHeading(deg) {
+  roseHeading = (deg === null || isNaN(deg)) ? null : deg;
+  roseRerender();
+}
+function roseHover(deg) {
+  document.querySelectorAll('#compass-rose .rose-wedge').forEach(w => w.classList.toggle('hover', deg !== null && parseFloat(w.dataset.deg) === deg));
+  const list = document.getElementById('rose-list');
+  if (list) list.value = deg !== null ? String(deg) : (roseHeading !== null ? String(roseHeading) : '');
+}
+function roseClick(deg) {
+  if (state.mode !== 'walk') return;
+  roseHeading = deg;
+  const input = document.getElementById('cmd');
+  const v = input ? input.value.trim() : '';
+  if (v && isLengthOnly(v)) { input.value = v + ' ' + headingToCmd(deg); addCmd(); }
+  else if (!v && deg % 90 === 0) { handleAutoExtendKey(headingToCmd(deg), /*asJump=*/true); focusWalkInput(); }
+  else roseRerender();
+}
 // A "length only" entry: digits, feet/inch marks, dot, dash, slash — no direction yet.
 function isLengthOnly(v) { return /^[\d'"\s.\-\/]+$/.test(v.trim()) && /\d/.test(v); }
-// Compass pad / arrow keys: with a length typed, add the wall that way; with the
-// box empty, behave like the pen-jump arrows.
+// Arrow keys: the four cardinals, with a length typed -> add the wall; empty -> pen-jump.
 function compassDir(dir) {
   if (state.mode !== 'walk') return;
   const input = document.getElementById('cmd');
   if (!input) return;
   const v = input.value.trim();
+  roseHeading = { u: 0, r: 90, d: 180, l: 270 }[dir];
   if (v === '') { handleAutoExtendKey(dir, /*asJump=*/true); input.focus(); return; }
-  if (!isLengthOnly(v)) { input.focus(); return; }   // already has a direction or angle — leave it to Enter
-  const ang = compassAngle ? ' ' + compassAngle : '';
-  input.value = v + ' ' + dir + ang;
+  if (!isLengthOnly(v)) { input.focus(); return; }
+  input.value = v + ' ' + dir;
   addCmd();
   input.focus();
 }
@@ -2705,6 +2795,7 @@ function compassDir(dir) {
 function addCmd() {
   const input = document.getElementById('cmd');
   if (!input) return;
+  if (roseHeading !== null && isLengthOnly(input.value)) input.value = input.value.trim() + ' ' + headingToCmd(roseHeading);
   const raw = input.value.trim();
 
   // Empty input + active preview → commit it
@@ -3356,6 +3447,8 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.28.0', '2026-09-10', 'Compass rose: click a direction (8 at 45° or 16 at 22.5°) with a length typed and the wall goes that way; the list beside it shows the typed command for each direction and highlights with the wedge. Directions are absolute (up is always up).'],
+  ['0.24–0.27', '2026-09-10', 'Walk box focuses on click; arrow keys add cardinal walls; Manage buildings (rename, merge, delete); mark buildings for deletion from the gallery or full-screen; gallery export prints every building on one sheet.'],
   ['0.23.0', '2026-09-10', 'Save app copy: one click saves a frozen, self-contained HTML of the running version into the job folder (from osasi.org or any served copy).'],
   ['0.22.0', '2026-09-10', 'Your branding: firm name and logo in the header and on every export title block (Settings); optional "provided by osasi.org" credit on exports, off by default.'],
   ['0.21.0', '2026-09-10', 'Floor menu: double-click a blank spot to switch floors; PageUp / PageDown cycle them. Header renamed CValR-Sketch.'],
