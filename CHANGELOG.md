@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.20.1] — 2026-09-10
+
+### Changed
+- **Licence files split.** `LICENSE` is the unmodified AGPL-3.0 text (GitHub and licence scanners now detect it); the copyright notice and the Section 7(b)/(c) additional terms live in `NOTICE`, referenced from the file headers and the About dialog as Section 7 requires. No functional change.
+
+---
+
 ## [0.20.0] — 2026-09-10
 
 ### Added

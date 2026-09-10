@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Free software under the GNU AGPL v3 (or later); distributed WITHOUT ANY WARRANTY.
 // Additional terms under AGPL Section 7(b)/(c) (preserved attribution, no misrepresentation
-// of origin) are stated in the LICENSE file. Source and licence: https://github.com/CAA-EBV-CO-OP/CValRSketch
+// of origin) are stated in the NOTICE file; licence text in LICENSE. Source: https://github.com/CAA-EBV-CO-OP/CValRSketch
 // =============================================================================
 // CValRSketch core — pure logic shared by desktop and mobile UIs.
 // No DOM access, no global state. Each function takes everything it needs

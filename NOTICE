@@ -1,0 +1,47 @@
+CValRSketch - NOTICE
+
+Copyright (C) 2026 CAA-EBV-CO-OP and the CValRSketch contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program (the LICENSE file).  If not, see
+<https://www.gnu.org/licenses/>.
+
+This NOTICE file is referenced from the source-file headers and the About
+dialog, as Section 7 of the License requires for additional terms.
+
+-----------------------------------------------------------------------
+ADDITIONAL TERMS UNDER SECTION 7 OF THE GNU AFFERO GENERAL PUBLIC LICENSE
+-----------------------------------------------------------------------
+
+In accordance with Section 7 of the GNU Affero General Public License,
+version 3, the copyright holders supplement the License with the following
+additional terms. They apply to this program and to every work based on it,
+and under Section 7 they may not be removed by any recipient.
+
+(b) Preservation of attribution.  Every copy of this program, and every work
+    based on it, must preserve the following attribution and display it
+    wherever the work displays its own name, version, or legal notices (for
+    example an "About" dialog, a start-up screen, a page footer, or the
+    README of a distributed copy):
+
+        Built on CValRSketch, an OSASI project - https://osasi.org
+        Source: https://github.com/CAA-EBV-CO-OP/CValRSketch
+
+(c) No misrepresentation of origin.  A modified version of this program must
+    not be represented as the original CValRSketch, and must not be described
+    as produced by, endorsed by, or affiliated with OSASI or CAA-EBV-CO-OP
+    without their written permission.  Modified versions must be marked in a
+    reasonable manner as different from the original.
+
+These terms are additional terms permitted by Section 7(b) and 7(c) of the
+License and do not otherwise restrict any right the License grants.
