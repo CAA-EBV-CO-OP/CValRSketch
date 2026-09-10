@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.14.0"></script>
-<script src="dictation.js?v=0.14.0"></script>
+<script src="core.js?v=0.15.0"></script>
+<script src="dictation.js?v=0.15.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -23,6 +23,11 @@
   header button:hover, header label.btn:hover { background: #5a7388; }
   header button:disabled { background: #3a4554; color: #6a7484; cursor: not-allowed; }
   header .sep { width: 1px; background: #4a6377; height: 22px; }
+  header .autosave-chip { font-size: 11px; color: #9fb0c2; font-family: ui-monospace, monospace; padding: 4px 9px; border-radius: 10px; background: #34465a; white-space: nowrap; max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
+  header .autosave-chip.saved { color: #b7e4c7; }
+  header .autosave-chip.saving { color: #ffe08a; }
+  header .autosave-chip.paused { color: #ffd166; cursor: pointer; }
+  header .autosave-chip.error { color: #ffb4a2; cursor: pointer; }
   .mode-tabs { display: flex; gap: 0; border: 1px solid #4a6377; border-radius: 4px; overflow: hidden; }
   .mode-tabs button { background: #3a4d61; border-radius: 0; padding: 6px 14px; }
   .mode-tabs button.active { background: #2b6cb0; }
@@ -100,7 +105,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.14.0</span>
+  <span class="version-chip" id="app-version">v0.15.0</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -115,11 +120,13 @@
   <button onclick="openSettings()">⚙ Settings</button>
   <button onclick="openExportPreview()" title="Preview the printable sheet, pick a page size, and export">🖨 Export / Preview</button>
   <button onclick="newProject()" title="Clear current sketch and start a new project (Ctrl+Z to recover)">🗋 New</button>
-  <button onclick="saveJSON()">Save</button>
+  <button onclick="saveJSON()" title="Save to the current file (Ctrl+S) — opens Save As if there is no file yet">Save</button>
+  <button onclick="saveJSONAs()" title="Save under a new name; autosave follows the new file">Save As…</button>
   <button onclick="openRecentsModal()" title="Open from recent projects (stored in this browser)">📂 Recent</button>
-  <label class="btn">Load
+  <label class="btn" id="load-label">Load
     <input type="file" id="load-json" accept=".json" style="display:none">
   </label>
+  <span id="autosave-chip" class="autosave-chip"></span>
 </header>
 
 <div id="floor-bar">
@@ -243,6 +250,7 @@ function writeAutosave() {
   catch (e) { /* quota / private mode — non-fatal */ }
 }
 function scheduleAutosave() {
+  scheduleFileAutosave();                // file autosave rides the same change signal
   if (_autosaveTimer) return;            // coalesce bursts of renders into one write
   _autosaveTimer = setTimeout(() => { _autosaveTimer = null; writeAutosave(); }, 800);
 }
@@ -259,6 +267,146 @@ function autoRestoreSession() {
     if (subjInp) subjInp.value = state.subject || '';
   }
   catch (e) { /* corrupt slot — ignore and start fresh */ }
+}
+
+// ----- File autosave (File System Access API — Chrome / Edge) ----------------
+// After a Save As, or a Load through the file picker, we keep the file's handle
+// and rewrite the file a moment after every change, so the JSON in the workfile
+// is always current. The handle is remembered in IndexedDB so the next visit can
+// offer "resume" — the browser insists on one click to re-grant write access.
+// Session autosave (above) stays independent: that is the crash net, this is the file.
+const FILE_AUTOSAVE_DEBOUNCE_MS = 2000;
+const fileAutosaveSupported = !!(window.showSaveFilePicker && window.showOpenFilePicker);
+const fileAutosave = { handle: null, name: '', status: 'off', lastAt: null, lastPayload: null, timer: null, writing: false };
+
+// What Save writes and what autosave keeps current. Undo history and transient UI
+// state are per-session and deliberately left out of the file.
+function serializeProject() {
+  const data = { ...state };
+  ['undoStack', 'redoStack', 'selection', 'splitSelection', 'preview', 'splitPreview',
+   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'offsetPick', 'fenceDraw', 'fenceSelection']
+    .forEach(k => delete data[k]);
+  return JSON.stringify(data, null, 2);
+}
+
+function setFileHandle(handle) {
+  fileAutosave.handle = handle;
+  fileAutosave.name = handle ? handle.name : '';
+  fileAutosave.status = handle ? 'armed' : 'off';
+  fileAutosave.lastAt = null;
+  fileAutosave.lastPayload = null;
+  idbSet('fileHandle', handle || null);
+  renderAutosaveChip();
+}
+function dropFileHandle() { if (fileAutosave.handle) setFileHandle(null); }
+
+function scheduleFileAutosave() {
+  if (!fileAutosave.handle || !state.settings.autosaveToFile) return;
+  if (fileAutosave.status === 'paused' || fileAutosave.timer) return;
+  fileAutosave.timer = setTimeout(() => { fileAutosave.timer = null; writeFileAutosave(); }, FILE_AUTOSAVE_DEBOUNCE_MS);
+}
+async function writeFileAutosave(force) {
+  const h = fileAutosave.handle;
+  if (!h) return false;
+  const payload = serializeProject();
+  if (!force && payload === fileAutosave.lastPayload) return true;   // nothing changed since the last write
+  if (fileAutosave.writing) { scheduleFileAutosave(); return false; } // a write is in flight; go again after it
+  fileAutosave.writing = true;
+  fileAutosave.status = 'saving'; renderAutosaveChip();
+  try {
+    const w = await h.createWritable();
+    await w.write(payload);
+    await w.close();
+    fileAutosave.lastPayload = payload;
+    fileAutosave.lastAt = Date.now();
+    fileAutosave.status = 'saved';
+    return true;
+  } catch (e) {
+    // Permission lapses (new browser session, revoked grant) pause rather than fail.
+    fileAutosave.status = (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) ? 'paused' : 'error';
+    console.warn('File autosave failed:', e);
+    return false;
+  } finally {
+    fileAutosave.writing = false;
+    renderAutosaveChip();
+  }
+}
+// Re-grant write access to the remembered file (must run from a click) and resume.
+async function resumeFileAutosave() {
+  const h = fileAutosave.handle;
+  if (!h) return;
+  try {
+    const perm = await h.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') return;
+    fileAutosave.status = 'armed';
+    await writeFileAutosave(true);
+  } catch (e) { fileAutosave.status = 'error'; renderAutosaveChip(); }
+}
+// On startup: pick the remembered handle back up. If the grant is still live (same
+// browser session) autosave just carries on; otherwise the chip offers "resume".
+async function restoreFileHandle() {
+  if (!fileAutosaveSupported) { renderAutosaveChip(); return; }
+  const h = await idbGet('fileHandle');
+  if (h && typeof h.queryPermission === 'function') {
+    fileAutosave.handle = h;
+    fileAutosave.name = h.name;
+    let perm = 'prompt';
+    try { perm = await h.queryPermission({ mode: 'readwrite' }); } catch (e) { /* treat as prompt */ }
+    fileAutosave.status = perm === 'granted' ? 'armed' : 'paused';
+  }
+  renderAutosaveChip();
+}
+function renderAutosaveChip() {
+  const el = document.getElementById('autosave-chip');
+  if (!el) return;
+  const fa = fileAutosave;
+  const at = fa.lastAt ? new Date(fa.lastAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+  let cls = '', txt = '', title = '';
+  if (!fileAutosaveSupported) { txt = 'autosave n/a'; title = 'File autosave needs Chrome or Edge. Session autosave still protects against reloads.'; }
+  else if (!state.settings.autosaveToFile) { txt = 'autosave off'; title = 'File autosave is turned off in Settings.'; }
+  else if (!fa.handle) { txt = 'autosave: no file yet'; title = 'Save As… or Load a file to start autosaving to it.'; }
+  else if (fa.status === 'paused') { cls = 'paused'; txt = `⏸ resume autosave → ${fa.name}`; title = 'Click to re-grant write access and resume autosaving to this file.'; }
+  else if (fa.status === 'error') { cls = 'error'; txt = `⚠ autosave failed → ${fa.name}`; title = 'The last write failed. Click to retry.'; }
+  else if (fa.status === 'saving') { cls = 'saving'; txt = `… saving ${fa.name}`; title = 'Writing…'; }
+  else if (fa.status === 'saved') { cls = 'saved'; txt = `● autosaved ${fa.name} · ${at}`; title = `Last written ${at}. Each change is written about 2 s later.`; }
+  else { cls = 'saved'; txt = `● autosaving → ${fa.name}`; title = 'Armed. The next change will be written to this file.'; }
+  el.className = 'autosave-chip' + (cls ? ' ' + cls : '');
+  el.textContent = txt;
+  el.title = title;
+}
+document.getElementById('autosave-chip').addEventListener('click', () => {
+  if (fileAutosave.status === 'paused') resumeFileAutosave();
+  else if (fileAutosave.status === 'error') writeFileAutosave(true);
+});
+
+// Minimal IndexedDB key/value store — file handles survive a reload here, localStorage can't hold them.
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) return reject(new Error('no indexedDB'));
+    const req = indexedDB.open('cvalrsketch', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('kv');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbSet(key, val) {
+  try {
+    const db = await idbOpen();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(val, key);
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { /* non-fatal: autosave just won't survive a reload */ }
+}
+async function idbGet(key) {
+  try {
+    const db = await idbOpen();
+    return await new Promise((resolve, reject) => {
+      const r = db.transaction('kv', 'readonly').objectStore('kv').get(key);
+      r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
+    });
+  } catch (e) { return undefined; }
 }
 
 function pushUndo() {
@@ -2316,6 +2464,7 @@ function openSettings() {
         ${settingRow('confirmDelete', 'Confirm before deleting walls/vertices/shapes')}
         ${settingRow('askOnLengthEdit', 'Ask which mode to use when changing a wall length')}
         ${settingRow('snapAngleTo90', 'Snap angles to 90° when entering segments (TODO)')}
+        ${settingRow('autosaveToFile', 'Autosave to the current file after Save As / Load (Chrome/Edge)')}
       </div>
       <div style="margin-top:14px;">
         <label style="font-size:12px;">Default length-edit mode:
@@ -2371,7 +2520,7 @@ function settingRow(key, label) {
 }
 
 function applySettings() {
-  ['showSegmentLabels','showCentroidLabels','showVertexDots','showFloorGhosts','exportIncludeTitle','exportIncludeLegend','confirmDelete','askOnLengthEdit','snapAngleTo90'].forEach(k => {
+  ['showSegmentLabels','showCentroidLabels','showVertexDots','showFloorGhosts','exportIncludeTitle','exportIncludeLegend','confirmDelete','askOnLengthEdit','snapAngleTo90','autosaveToFile'].forEach(k => {
     state.settings[k] = document.getElementById('set-'+k).checked;
   });
   state.settings.defaultLengthEditMode = document.getElementById('set-default-mode').value;
@@ -2380,6 +2529,7 @@ function applySettings() {
   saveSettings();
   closeModal();
   render();
+  renderAutosaveChip();
 }
 
 function saveSettings() {
@@ -2818,11 +2968,13 @@ function loadFromRecents(key) {
   try {
     const d = JSON.parse(raw);
     Object.assign(state, d);
+    state.settings = { ...SETTINGS_DEFAULTS, ...(d.settings || {}) };
     state.undoStack = []; state.redoStack = [];
     state.selection = null; state.fenceSelection = null; state.fenceDraw = null;
     state.offsetPick = null; state.preview = null;
     state.splitSelection = null; state.splitPreview = null;
     const subjInp = document.getElementById('subject-input'); if (subjInp) subjInp.value = state.subject || '';
+    dropFileHandle();   // recents are browser copies, not the file that was armed
     closeModal();
     render();
   } catch (e) { alert('Load failed: ' + e.message); }
@@ -2873,10 +3025,28 @@ function openRecentsModal() {
   m.querySelectorAll('[data-recent-del]').forEach(b => b.onclick = () => deleteFromRecents(b.dataset.recentDel));
 }
 
+// Save = write the current file in place (no dialog) once one is known; otherwise Save As.
 async function saveJSON() {
   saveToRecents();
-  const data = { ...state };
-  await saveBlob(new Blob([JSON.stringify(data,null,2)], { type:'application/json' }), exportFilename('json'), 'application/json');
+  if (fileAutosaveSupported && fileAutosave.handle) {
+    if (fileAutosave.status === 'paused') await resumeFileAutosave();
+    else await writeFileAutosave(true);
+    if (fileAutosave.status === 'saved') return;
+    // couldn't write the known file — fall through to Save As
+  }
+  await saveJSONAs();
+}
+async function saveJSONAs() {
+  saveToRecents();
+  const payload = serializeProject();
+  const handle = await saveBlob(new Blob([payload], { type:'application/json' }), exportFilename('json'), 'application/json');
+  if (handle) {
+    setFileHandle(handle);
+    fileAutosave.lastPayload = payload;
+    fileAutosave.lastAt = Date.now();
+    fileAutosave.status = 'saved';
+    renderAutosaveChip();
+  }
 }
 
 function newProject() {
@@ -2909,26 +3079,52 @@ function newProject() {
   state.offsetPick = null;
   state.mode = 'walk';
   const subjInp = document.getElementById('subject-input'); if (subjInp) subjInp.value = '';
+  dropFileHandle();   // a fresh project must never autosave over the previous file
   render();
 }
+function applyLoadedProject(text) {
+  const d = JSON.parse(text);
+  Object.assign(state, d);
+  state.settings = { ...SETTINGS_DEFAULTS, ...(d.settings || {}) };   // older files lack newer keys
+  state.selection = null; state.splitSelection = null;
+  state.labels = d.labels || []; state.nextLabelId = d.nextLabelId || 1;
+  state.basements = d.basements || {};
+  state.selectedLabel = null; state.labelDrag = null; state.shapeLabelDrag = null;
+  const subjInp = document.getElementById('subject-input');
+  if (subjInp) subjInp.value = state.subject || '';
+  saveToRecents();  // also add loaded sketch to recents so it's reloadable
+  render();
+}
+// Plain <input type=file> path (Firefox/Safari, or when the picker is unavailable): no handle, so no file autosave.
 document.getElementById('load-json').addEventListener('change', (e) => {
   const f = e.target.files[0]; if (!f) return;
   const r = new FileReader();
   r.onload = () => {
-    try {
-      const d = JSON.parse(r.result);
-      Object.assign(state, d);
-      state.selection = null; state.splitSelection = null;
-      state.labels = d.labels || []; state.nextLabelId = d.nextLabelId || 1;
-      state.basements = d.basements || {};
-      state.selectedLabel = null; state.labelDrag = null; state.shapeLabelDrag = null;
-      const subjInp = document.getElementById('subject-input');
-      if (subjInp) subjInp.value = state.subject || '';
-      saveToRecents();  // also add loaded sketch to recents so it's reloadable
-      render();
-    } catch (err) { alert('Load failed: '+err.message); }
+    try { applyLoadedProject(r.result); dropFileHandle(); }
+    catch (err) { alert('Load failed: '+err.message); }
   };
   r.readAsText(f);
+  e.target.value = '';
+});
+// Chrome/Edge: open through the file picker instead, so we get a writable handle
+// and can autosave straight back to the file that was loaded.
+document.getElementById('load-label').addEventListener('click', async (e) => {
+  if (!fileAutosaveSupported) return;   // let the <input type=file> open as usual
+  e.preventDefault();
+  let handle;
+  try {
+    [handle] = await window.showOpenFilePicker({
+      types: [{ description: 'CValRSketch JSON', accept: { 'application/json': ['.json'] } }],
+      multiple: false,
+    });
+  } catch (err) { return; }             // cancelled
+  try {
+    const file = await handle.getFile();
+    applyLoadedProject(await file.text());
+    setFileHandle(handle);
+    fileAutosave.lastPayload = serializeProject();   // file and state agree right now; write on the next change
+    renderAutosaveChip();
+  } catch (err) { alert('Load failed: ' + err.message); }
 });
 
 function triggerDownload(blob, filename) {
@@ -2957,8 +3153,8 @@ async function saveBlob(blob, filename, mime) {
       const writable = await handle.createWritable();
       await writable.write(blob);
       await writable.close();
-      return;
-    } catch (e) { if (e && e.name === 'AbortError') return; }
+      return handle;   // callers that want to keep writing here (file autosave) get the handle
+    } catch (e) { if (e && e.name === 'AbortError') return null; }
   }
   if (typeof File !== 'undefined') {
     try {
@@ -2970,6 +3166,7 @@ async function saveBlob(blob, filename, mime) {
     } catch (e) { /* fall through */ }
   }
   triggerDownload(blob, filename);
+  return null;
 }
 
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -2981,6 +3178,7 @@ window.addEventListener('keydown', (e) => {
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   const mod = e.ctrlKey || e.metaKey;
   if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undoHistory(); }
+  else if (mod && !e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); saveJSON(); }
   else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoHistory(); }
   else if (e.key === 'Escape' && state.offsetPick) { cancelOffsetPick(); }
   else if (e.key === 'Escape' && state.mode === 'fence' && (state.fenceSelection || state.fenceDraw)) { state.fenceDraw = null; state.fenceSelection = null; render(); }
@@ -2997,6 +3195,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 autoRestoreSession();   // silently reopen the last session before the first paint
+restoreFileHandle();    // pick the autosave file back up (or offer to resume it)
 render();
 window.addEventListener('beforeunload', writeAutosave);  // flush the debounce gap on reload/close
 

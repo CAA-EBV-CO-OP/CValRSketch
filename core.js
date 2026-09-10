@@ -43,6 +43,7 @@ const SETTINGS_DEFAULTS = {
   exportIncludeLegend: true,
   exportPageSize: 'auto',  // 'auto' | 'letter-portrait' | 'letter-landscape'
   exportLayout: 'active',  // 'active' (live canvas) | 'horizontal' | 'vertical' (every floor as its own panel)
+  autosaveToFile: true,    // after Save As / Load via the picker, rewrite that file after every change (Chrome/Edge)
   confirmDelete: true,
   askOnLengthEdit: true,
   defaultLengthEditMode: 'stretch-end',

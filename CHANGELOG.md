@@ -14,6 +14,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.15.0] — 2026-09-09
+
+### Added
+- **Autosave to file (Chrome / Edge).** After a **Save As…**, or a **Load** through the file picker, the app keeps the file's handle and rewrites the file about 2 seconds after every change, so the JSON in the workfile is always current. A chip in the header shows the state: the file name and last write time, "saving…", or a warning. Nothing is written while nothing has changed.
+- **Save vs Save As…** **Save** (also **Ctrl+S**) now writes the current file in place with no dialog once a file is known, and falls back to Save As when there is none. **Save As…** picks a new file and autosave follows it.
+- **Resume after a restart.** The file handle is remembered in IndexedDB. The browser will not silently re-grant write access on a new visit, so the chip shows "⏸ resume autosave → name" and one click re-authorises it. Within the same browser session (a plain reload) autosave carries straight on.
+- **Setting:** *Autosave to the current file after Save As / Load* (on by default). Firefox and Safari don't offer the File System Access API; there the chip reads "autosave n/a" and Load/Save behave as before.
+
+### Changed
+- **New** and loading from **Recent** drop the file handle, so a fresh or different project can never autosave over the previous file.
+- Saved JSON no longer includes the undo/redo stacks or transient UI state (selection, previews, drags). Files are smaller and reopen cleanly; older files still load.
+- Load and Recent now re-merge `SETTINGS_DEFAULTS` under the file's settings, so a file written by an older version can't strip settings keys added since.
+
+---
+
 ## [0.14.0] — 2026-09-09
 
 ### Added

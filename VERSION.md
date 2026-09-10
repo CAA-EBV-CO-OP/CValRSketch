@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.14.0`
+**Current version:** `0.15.0`
 **Released:** 2026-09-09
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.15.0  | 2026-09-09 | minor  | **Autosave to file** (Chrome/Edge): after **Save As…** or a **Load** through the file picker the app keeps the file's handle and rewrites the file ~2 s after every change; header chip shows the file name + last write; **Save** now writes the current file in place (Ctrl+S), **Save As…** picks a new one; the handle is remembered in IndexedDB so the next visit offers one-click *resume*; **New** and *Recent* drop the handle. Files no longer carry undo history or transient UI state. Setting `autosaveToFile`. Loaders re-merge `SETTINGS_DEFAULTS` so old files can't strip newer settings keys. |
 | 0.14.0  | 2026-09-09 | minor  | **Export layout choice**: the Export / Preview modal gains a Layout selector — *Active floor* (unchanged), *All floors — side by side*, or *All floors — stacked vertically*. Multi-floor layouts re-render each floor on its own (ghosts off), tile the panels on one sheet at a common scale with a caption (floor name + sq ft) under each, basement last. Fix: the walk-mode start marker no longer leaks into exports. New setting `exportLayout`. |
 | 0.13.0  | 2026-09-09 | minor  | Desktop **session autosave / crash recovery** (localStorage mirror, silent restore on reload or after an accidental Ctrl+R); **click-to-drop start point** with **Shift+Arrow** stepping onto aligned active-floor vertices plus faint guide lines; **comma** replaces `&` as the diagonal-components separator (`5'd, 2'l`; `&` still accepted); mobile gains the **Building / dwelling** dropdown (splits inherit it) and its version stamp is synced to the release (was 0.11.47). Work dated 2026-07-09, released 2026-09-09. |
 | 0.12.0  | 2026-06-25 | minor  | Desktop sketch + export overhaul: **click-to-snap** closing; **free-text notes** (Text mode — multi-line, optional heading, placeable over areas, per-floor); **basement declaration** with % finished + **Above/Below-Grade** summary on sheet and totals; **🖨 Export / Print-preview** modal (page size, title/legend, per-floor "dimensions + notes" surfacing); **draggable area labels**; floor-bar **label-size slider**; other-floor **ghosts** redrawn as a faded dashed-outline overlay; export crop tightened to rendered text. JSON gains `labels`/`basements`/`labelOffset` (backward-compatible). |
