@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.19.1`
+**Current version:** `0.19.2`
 **Released:** 2026-09-10
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.19.2  | 2026-09-10 | patch  | Decking pattern redrawn: narrow boards running the full width with a staggered joint every 96 px (the old 12 px stagger read as brick pavers). Second orientation added: *Decking (boards N–S)* (`planksv`). |
 | 0.19.1  | 2026-09-10 | patch  | **Keyboard focus survives sidebar redraws.** Typing a bare direction (`u` + Enter) previewed a snap and rebuilt the sidebar, which replaced the input and dropped the caret, so every leg needed a click back into the box. `renderSidebar()` now remembers the focused field by id and re-focuses it after the rebuild (caret at the end). Also fixed the Re-walk action focusing a non-existent input id. |
 | 0.19.0  | 2026-09-09 | minor  | **Re-walk this wall** (Edit mode, wall panel): removes the wall and reopens the shape as a walk in progress ending at the wall's start, keeping label/type/floor/building/fill; type the replacement legs (any number), then Close Shape. Cancel puts the original back. Complements *Merge*, which joins the neighbours with one straight wall (and produced the diagonal slash when used to rebuild a section). `segmentBetween()` added to core.js. |
 | 0.18.1  | 2026-09-09 | patch  | Edit mode: a **blank-canvas click no longer clears the selection**, so the shape/wall/vertex panel stays put while you look around; **Esc** deselects. **Undo/Redo keep the selection** when the shape still exists. |

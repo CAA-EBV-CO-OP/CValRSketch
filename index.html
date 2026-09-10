@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.19.1"></script>
-<script src="dictation.js?v=0.19.1"></script>
+<script src="core.js?v=0.19.2"></script>
+<script src="dictation.js?v=0.19.2"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -105,7 +105,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.19.1</span>
+  <span class="version-chip" id="app-version">v0.19.2</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -759,7 +759,7 @@ function addEl(tag, attrs, text) {
 // → built-in default for the type. Patterns are generated into <defs> on demand,
 // one per (pattern, colour) pair, so any colour can carry any pattern; exports
 // copy <defs>, so they carry over unchanged.
-const FILL_PATTERNS = { none: 'Solid', planks: 'Wood planks', hatch: 'Diagonal hatch', crosshatch: 'Cross-hatch', dots: 'Dots' };
+const FILL_PATTERNS = { none: 'Solid', planks: 'Decking (boards E–W)', planksv: 'Decking (boards N–S)', hatch: 'Diagonal hatch', crosshatch: 'Cross-hatch', dots: 'Dots' };
 const TYPE_STYLE_DEFAULTS = {
   porch:      { color: '#ffffff', pattern: 'hatch', line: '#9bb3cc' },
   unfinished: { color: '#ffffff', pattern: 'hatch', line: '#888888' },
@@ -795,7 +795,11 @@ function fillFor(st) {
   if (defs && !defs.querySelector('#' + id)) {
     const c = st.color;
     const tiles = {
-      planks:     { w: 24, h: 24, rot: 0,  inner: `<rect width="24" height="24" fill="${c}"/><line x1="0" y1="0.5" x2="24" y2="0.5" stroke="${line}" stroke-width="1"/><line x1="0" y1="12.5" x2="24" y2="12.5" stroke="${line}" stroke-width="1"/><line x1="6.5" y1="0" x2="6.5" y2="12" stroke="${line}" stroke-width="1" opacity="0.55"/><line x1="18.5" y1="12" x2="18.5" y2="24" stroke="${line}" stroke-width="1" opacity="0.55"/>` },
+      // Decking: narrow boards (6 px) running the full tile, with a staggered butt joint
+      // per board every 96 px — long lines read as boards; the brick look came from
+      // joints every 12 px.
+      planks:     { w: 96, h: 12, rot: 0,  inner: `<rect width="96" height="12" fill="${c}"/><line x1="0" y1="0.5" x2="96" y2="0.5" stroke="${line}" stroke-width="1" opacity="0.8"/><line x1="0" y1="6.5" x2="96" y2="6.5" stroke="${line}" stroke-width="1" opacity="0.8"/><line x1="30.5" y1="0" x2="30.5" y2="6" stroke="${line}" stroke-width="1" opacity="0.5"/><line x1="78.5" y1="6" x2="78.5" y2="12" stroke="${line}" stroke-width="1" opacity="0.5"/>` },
+      planksv:    { w: 12, h: 96, rot: 0,  inner: `<rect width="12" height="96" fill="${c}"/><line x1="0.5" y1="0" x2="0.5" y2="96" stroke="${line}" stroke-width="1" opacity="0.8"/><line x1="6.5" y1="0" x2="6.5" y2="96" stroke="${line}" stroke-width="1" opacity="0.8"/><line x1="0" y1="30.5" x2="6" y2="30.5" stroke="${line}" stroke-width="1" opacity="0.5"/><line x1="6" y1="78.5" x2="12" y2="78.5" stroke="${line}" stroke-width="1" opacity="0.5"/>` },
       hatch:      { w: 10, h: 10, rot: 45, inner: `<rect width="10" height="10" fill="${c}"/><line x1="0" y1="0" x2="0" y2="10" stroke="${line}" stroke-width="1"/>` },
       crosshatch: { w: 10, h: 10, rot: 45, inner: `<rect width="10" height="10" fill="${c}"/><line x1="0" y1="0" x2="0" y2="10" stroke="${line}" stroke-width="1"/><line x1="0" y1="0" x2="10" y2="0" stroke="${line}" stroke-width="1"/>` },
       dots:       { w: 8,  h: 8,  rot: 0,  inner: `<rect width="8" height="8" fill="${c}"/><circle cx="4" cy="4" r="1.1" fill="${line}"/>` },

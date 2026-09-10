@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.19.2] — 2026-09-10
+
+### Changed
+- **Decking pattern redrawn.** The wood-plank tile staggered its joints every 12 px, which reads as brick pavers. Boards are now narrow and run the full tile with one staggered butt joint per board every 96 px, so the fill reads as long decking boards. A second orientation, **Decking (boards N–S)**, is available in the palette and per-shape Fill menus; the default for Open deck stays boards E–W.
+
+---
+
 ## [0.19.1] — 2026-09-10
 
 ### Fixed
