@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [0.30.2] — 2026-09-11
+## [0.30.2] — 2026-09-10
 
 ### Changed
 - **New-area dialog simplified.** Two text boxes read as two places for free text. Now: **1. Type** (the buttons — fill, legend entry, which totals it counts in), then **2. Label** (your own wording, e.g. *Enclosed porch / sunroom*). The “Or type it” box, which only matched a type name and silently ignored anything else, is gone.
@@ -22,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [0.30.1] — 2026-09-11
+## [0.30.1] — 2026-09-10
 
 ### Fixed
 - **New-area label did not stick after clicking a type.** Clicking a type button left the keyboard on that button, and the walk-mode rule “a printable key with nothing focused starts typing in the segment box” pulled the label text into the walk box behind the dialog, so the shape kept its default *Area n* name. Dialogs now own the keyboard, and a type click hands the caret back to the label field.
@@ -31,14 +31,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [0.30.0] — 2026-09-11
+## [0.30.0] — 2026-09-10
 
 ### Added
 - **Fence can delete.** The Fence tab already captured vertices for a group move; it now has *Delete fenced* (and the Delete / Backspace key) which removes whatever the fence captured *whole*: shapes with every vertex inside, an unfinished walk with all its points inside, offset measurements with both ends inside. Partly captured things are left alone, so a fence that clips a corner of the house cannot take the house. The button names what it will remove, the confirmation lists it, and it is one undo step. Handy for a stray unfinished walk sitting far from the drawing — fence it and delete.
 
 ---
 
-## [0.29.0] — 2026-09-11
+## [0.29.0] — 2026-09-10
 
 ### Added
 - **Enclosed-area offer.** Walking a few legs that end on an existing wall used to leave *Close Shape* with only one move — a straight line back to the start — which cut a triangle through the room. Now, whenever the pen sits on an existing wall or vertex (and the walk started on one), the app looks for runs of existing walls from the pen back to the start. The region the walk fences off is highlighted in highlighter yellow with its area, and the run of walls it would borrow is drawn thick. **Enter** with an empty box, or *Close along walls*, closes the shape along those walls; when several regions qualify (smallest first, never one that swallows an existing shape) **N** or *Next option* cycles them; keep typing walls to ignore the offer, or **Esc** to drop it so *Close Shape* falls back to the straight line. The offer reappears at the next qualifying vertex. Works from a single walked leg across a notch.
