@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.29.0] — 2026-09-11
+
+### Added
+- **Enclosed-area offer.** Walking a few legs that end on an existing wall used to leave *Close Shape* with only one move — a straight line back to the start — which cut a triangle through the room. Now, whenever the pen sits on an existing wall or vertex (and the walk started on one), the app looks for runs of existing walls from the pen back to the start. The region the walk fences off is highlighted in highlighter yellow with its area, and the run of walls it would borrow is drawn thick. **Enter** with an empty box, or *Close along walls*, closes the shape along those walls; when several regions qualify (smallest first, never one that swallows an existing shape) **N** or *Next option* cycles them; keep typing walls to ignore the offer, or **Esc** to drop it so *Close Shape* falls back to the straight line. The offer reappears at the next qualifying vertex. Works from a single walked leg across a notch.
+- **New-area picker.** Closing a shape opens one dialog instead of two prompt boxes: the label, a grid of type buttons with fill swatches, and a text box that accepts a key or the first letters of a name. The type is pre-suggested from the floor and building (basement → finished, a building named Barn/Shop/Shed/Garage/Carport → that type). Enter = OK, Esc = cancel and keep the walk. Types stay a fixed list because each has its own fill and legend entry.
+
+---
+
 ## [0.28.0] — 2026-09-10
 
 ### Changed
