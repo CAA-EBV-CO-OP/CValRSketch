@@ -79,10 +79,10 @@ A single syntax error (missing parenthesis, mismatched brace, stray comma) silen
 Always syntax-check after non-trivial JavaScript edits:
 
 ```bash
-awk 'NR>=146 && NR<=2119' index.html > /tmp/sw.js && node --check /tmp/sw.js && node --check core.js
+node scripts/check-inline.js index.html && node scripts/check-inline.js m/index.html && node --check core.js && node --check dictation.js
 ```
 
-Adjust the line range if the `<script>`/`</script>` boundaries have moved.
+Run from the repository root. The helper extracts inline script blocks by tag, skips scripts with a `src` attribute, and runs `node --check` on a temporary file that it then removes. It fails if no inline script blocks are found. This checks both desktop and mobile pages without depending on line numbers. In Windows PowerShell 5.1, run each command separately and stop if one fails (`&&` requires PowerShell 7 or another compatible shell).
 
 ### 4.2 state.segments vs shape.segments
 
