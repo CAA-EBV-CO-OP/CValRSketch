@@ -129,7 +129,7 @@ What that means in practice:
 - **Use it freely.** Anyone may run, study and modify CValRSketch, personally or commercially.
 - **Share alike.** If you redistribute it, modified or not, you must provide the complete corresponding source under AGPL-3.0. If you modify it and let others use it over a network (a hosted copy), those users must be offered the source too (AGPL §13).
 - **Keep the notices.** The copyright, licence and no-warranty notices in `LICENSE`, the file headers, and the About dialog must stay with every copy; modified files must say they were changed and when (AGPL §5).
-- **Credit.** Forks and derivative tools should retain the AGPL-3.0 licence and credit CValRSketch and OSASI with a link to this repository.
+- **Credit is required, not optional.** Under additional terms adopted per AGPL §7(b) and §7(c) (see `LICENSE`), every copy and every derivative must preserve and display the attribution *"Built on CValRSketch, an OSASI project — https://osasi.org"* wherever it shows its own name, version or legal notices, and a modified version must not be presented as the original or as endorsed by OSASI or CAA-EBV-CO-OP.
 
 The names *CValRSketch* and *OSASI* are not licensed for use on derivative works in a way that suggests endorsement; please rename your fork if it diverges.
 

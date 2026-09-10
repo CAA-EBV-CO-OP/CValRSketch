@@ -14,6 +14,33 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+-----------------------------------------------------------------------
+ADDITIONAL TERMS UNDER SECTION 7 OF THE GNU AFFERO GENERAL PUBLIC LICENSE
+-----------------------------------------------------------------------
+
+In accordance with Section 7 of the GNU Affero General Public License,
+version 3, the copyright holders supplement the License with the following
+additional terms. They apply to this program and to every work based on it,
+and under Section 7 they may not be removed by any recipient.
+
+(b) Preservation of attribution.  Every copy of this program, and every work
+    based on it, must preserve the following attribution and display it
+    wherever the work displays its own name, version, or legal notices (for
+    example an "About" dialog, a start-up screen, a page footer, or the
+    README of a distributed copy):
+
+        Built on CValRSketch, an OSASI project - https://osasi.org
+        Source: https://github.com/CAA-EBV-CO-OP/CValRSketch
+
+(c) No misrepresentation of origin.  A modified version of this program must
+    not be represented as the original CValRSketch, and must not be described
+    as produced by, endorsed by, or affiliated with OSASI or CAA-EBV-CO-OP
+    without their written permission.  Modified versions must be marked in a
+    reasonable manner as different from the original.
+
+These terms are additional terms permitted by Section 7(b) and 7(c) of the
+License and do not otherwise restrict any right the License grants.
+
 ================================================================================
   ATTRIBUTION NOTICE
 ================================================================================
