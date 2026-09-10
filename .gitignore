@@ -40,3 +40,5 @@ sketch.png
 *.log
 *.tmp
 tmp/
+# Demo set contains third-party drawings — not for the public repo without permission
+demo-rural-acreage/
