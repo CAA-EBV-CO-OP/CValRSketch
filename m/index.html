@@ -1845,7 +1845,7 @@ function openShapeEditor(sh) {
     `<option value="${k}"${k === sh.type ? ' selected' : ''}>${v.name}</option>`).join('');
   const floorOpts = state.floors.map(f =>
     `<option value="${f}"${f === sh.floor ? ' selected' : ''}>${f}</option>`).join('');
-  const buildingOpts = BUILDINGS.map(b =>
+  const buildingOpts = (Array.isArray(state.buildings) && state.buildings.length ? state.buildings : BUILDINGS).map(b =>
     `<option value="${b}"${b === (sh.building || DEFAULT_BUILDING) ? ' selected' : ''}>${b}</option>`).join('');
   showModal(`
     <h3>Shape "${escapeHtml(sh.label)}"</h3>

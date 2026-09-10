@@ -3,9 +3,10 @@
 **A browser-based floor plan sketching tool for residential property appraisal.**
 Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
 
-**Version:** 0.19.3 (2026-09-10)
+**Version:** 0.20.0 (2026-09-10)
 **License:** [AGPL-3.0](./LICENSE)
 **Repo:** https://github.com/CAA-EBV-CO-OP/CValRSketch
+**Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
 
 ---
 
@@ -15,7 +16,7 @@ Create a sketch with simple distance and direction into the tool to produce a cl
 
 The file requires no installation, no server, and no account. Sketches are saved and loaded as JSON files on the local machine.
 
-Developed for the CAA-EBV-CO-OP community.
+Developed for the CAA-EBV-CO-OP community as part of [OSASI](https://osasi.org), the Open Source Appraisal Software Initiative — a co-operative of real estate appraisers building shared, open tools that run entirely in the browser.
 
 ---
 
@@ -123,7 +124,14 @@ Released under the [GNU Affero General Public License v3.0 (AGPL-3.0)](./LICENSE
 
 You may use, modify, and redistribute this software. Modified versions — including network-deployed instances — must remain under AGPL-3.0 with source available.
 
-Forks and derivative tools should retain the AGPL-3.0 license and credit the original project with a link to this repository.
+What that means in practice:
+
+- **Use it freely.** Anyone may run, study and modify CValRSketch, personally or commercially.
+- **Share alike.** If you redistribute it, modified or not, you must provide the complete corresponding source under AGPL-3.0. If you modify it and let others use it over a network (a hosted copy), those users must be offered the source too (AGPL §13).
+- **Keep the notices.** The copyright, licence and no-warranty notices in `LICENSE`, the file headers, and the About dialog must stay with every copy; modified files must say they were changed and when (AGPL §5).
+- **Credit is required, not optional.** Under additional terms adopted per AGPL §7(b) and §7(c) (see `LICENSE`), every copy and every derivative must preserve and display the attribution *"Built on CValRSketch, an OSASI project — https://osasi.org"* wherever it shows its own name, version or legal notices, and a modified version must not be presented as the original or as endorsed by OSASI or CAA-EBV-CO-OP.
+
+The names *CValRSketch* and *OSASI* are not licensed for use on derivative works in a way that suggests endorsement; please rename your fork if it diverges.
 
 ---
 

@@ -14,6 +14,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.20.0] — 2026-09-10
+
+### Added
+- **Named buildings.** A file now carries its own building list (`buildings` in the JSON): the five defaults plus any you add. **+ Building** on the floor bar adds one (Shop, Barn, Guest cabin…) and switches to it; **Rename** renames the building on the canvas and carries its shapes and basement setting along. The shape panel's Building menu lists the file's buildings and offers *New building…*. Older files load with the defaults plus whatever their shapes use.
+- **Building view filter.** A **Building** dropdown on the floor bar scopes the canvas to one building: it is fitted to the window on its own, floor tabs, ghosts, snapping, fence and the Areas panel follow the same scope, and new shapes are tagged to it. Persisted in the file as `viewBuilding`.
+- **Building gallery.** With several buildings in the file, *All* shows each building in its own panel, fitted as large as its cell allows (the active floor, or the building's main level when it has nothing on the active floor). Click a panel to edit that building.
+- **Add files…** (header) appends one or more sketch files' buildings to the open one (pick several at once; a naming dialog per file, in order): you name each incoming building (pre-filled from the file), the drawing is shifted to sit beside what is already here, and basement settings, labels and offset measurements come along. One undo step. This is how files drawn one-building-per-file are combined.
+- **About dialog and OSASI attribution.** Header shows the OSASI chip (link to osasi.org) and an **About** button with the copyright, AGPL-3.0 licence summary, source and licence links (the AGPL "appropriate legal notices"). `index.html` and `core.js` carry SPDX / copyright file headers; README explains the licence obligations in plain terms. `LICENSE` adopts additional terms under AGPL §7(b)/(c): the attribution *Built on CValRSketch, an OSASI project* must be preserved in every copy and derivative, and modified versions may not be represented as the original or as endorsed by OSASI; file headers and the About dialog point to them.
+- **Per-building export.** The Export / Print preview gains a **Building** choice: as shown on the canvas, one named building at full page size, or *Each building — one file per building*. The title and file name carry the building name. Legend and grade totals cover only the exported building.
+
+### Changed
+- `visibleShapes()` sits under `shapesOnFloor` / `shapesOnOtherFloors` / `fitView` / walk snapping; floor rename/delete and the Totals panel still see every shape.
+
+---
+
 ## [0.19.3] — 2026-09-10
 
 ### Fixed
