@@ -1,7 +1,7 @@
 # Version
 
-**Current version:** `0.19.0`
-**Released:** 2026-09-09
+**Current version:** `0.19.1`
+**Released:** 2026-09-10
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 While the project is below 1.0, the public "API" (segment syntax, JSON save format) may still change between minor versions; breaking changes will be called out in [CHANGELOG.md](./CHANGELOG.md).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.19.1  | 2026-09-10 | patch  | **Keyboard focus survives sidebar redraws.** Typing a bare direction (`u` + Enter) previewed a snap and rebuilt the sidebar, which replaced the input and dropped the caret, so every leg needed a click back into the box. `renderSidebar()` now remembers the focused field by id and re-focuses it after the rebuild (caret at the end). Also fixed the Re-walk action focusing a non-existent input id. |
 | 0.19.0  | 2026-09-09 | minor  | **Re-walk this wall** (Edit mode, wall panel): removes the wall and reopens the shape as a walk in progress ending at the wall's start, keeping label/type/floor/building/fill; type the replacement legs (any number), then Close Shape. Cancel puts the original back. Complements *Merge*, which joins the neighbours with one straight wall (and produced the diagonal slash when used to rebuild a section). `segmentBetween()` added to core.js. |
 | 0.18.1  | 2026-09-09 | patch  | Edit mode: a **blank-canvas click no longer clears the selection**, so the shape/wall/vertex panel stays put while you look around; **Esc** deselects. **Undo/Redo keep the selection** when the shape still exists. |
 | 0.18.0  | 2026-09-09 | minor  | **Fill palette**: Settings gains a colour + pattern chooser per area type (solid, wood planks, diagonal hatch, cross-hatch, dots; ↺ per row restores the default), and the Edit-mode shape panel gains a per-shape override. Decks default to a light wood-plank pattern. Patterns are generated per colour into `<defs>`; legend swatches and every export panel carry them. Settings key `typeStyles`; per-shape `style`. |

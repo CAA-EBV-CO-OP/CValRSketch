@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.19.1] — 2026-09-10
+
+### Fixed
+- **The walk input lost the caret after every bare-direction entry.** Typing `u` + Enter previews a snap; the preview redraws the sidebar, which replaced the input box and dropped keyboard focus, so each new leg needed a click back into the field. The sidebar redraw now remembers which field had focus and hands it back with the caret at the end. This covers every action that redraws the sidebar, not just previews.
+- Re-walk this wall tried to focus an input id that doesn't exist; it now focuses the walk input.
+
+---
+
 ## [0.19.0] — 2026-09-09
 
 ### Added

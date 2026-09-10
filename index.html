@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.19.0"></script>
-<script src="dictation.js?v=0.19.0"></script>
+<script src="core.js?v=0.19.1"></script>
+<script src="dictation.js?v=0.19.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -105,7 +105,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.19.0</span>
+  <span class="version-chip" id="app-version">v0.19.1</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -1039,6 +1039,11 @@ function renderInProgress(W) {
 // =============================================================================
 function renderSidebar() {
   const aside = document.getElementById('sidebar');
+  // The sidebar is rebuilt from scratch on every render, which replaces the
+  // element that had keyboard focus. Remember it by id and hand focus back, so
+  // e.g. the walk input keeps the caret through a preview/accept/undo cycle.
+  const active = document.activeElement;
+  const refocusId = (active && active.id && aside.contains(active)) ? active.id : null;
   let html = '';
   if (state.mode === 'walk') html += sidebarWalk();
   if (state.mode === 'edit') html += sidebarEdit();
@@ -1049,6 +1054,15 @@ function renderSidebar() {
   html += sidebarShapes() + sidebarBasement() + sidebarTotals();
   aside.innerHTML = html;
   attachSidebarHandlers();
+  if (refocusId) {
+    const el = document.getElementById(refocusId);
+    if (el && typeof el.focus === 'function') {
+      el.focus();
+      if (typeof el.setSelectionRange === 'function' && typeof el.value === 'string') {
+        try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) { /* not a text field */ }
+      }
+    }
+  }
 }
 
 function sidebarText() {
@@ -2499,7 +2513,7 @@ function rewalkSelectedWall() {
   state.activeFloor = sh.floor;
   state.mode = 'walk';
   render();
-  const inp = document.getElementById('seg-input'); if (inp) inp.focus();
+  const inp = document.getElementById('cmd'); if (inp) inp.focus();
 }
 
 function cancelShape() {
