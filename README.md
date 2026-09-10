@@ -131,6 +131,8 @@ What that means in practice:
 - **Keep the notices.** The copyright, licence and no-warranty notices in `NOTICE`, the file headers, and the About dialog must stay with every copy; modified files must say they were changed and when (AGPL §5).
 - **Credit is required, not optional.** Under additional terms adopted per AGPL §7(b) and §7(c) (see `NOTICE`; the licence text itself is `LICENSE`), every copy and every derivative must preserve and display the attribution *"Built on CValRSketch, an OSASI project — https://osasi.org"* wherever it shows its own name, version or legal notices, and a modified version must not be presented as the original or as endorsed by OSASI or CAA-EBV-CO-OP.
 
+**Your own branding is welcome.** You may put your firm's name and logo on the app, restyle it, and even rename it — the licence permits modification, and the exported sketch pages carry no required notice at all, so client-facing output is entirely yours. Two things stay: the attribution *Built on CValRSketch, an OSASI project* remains wherever the app shows its own name, version or legal notices (the About dialog is enough), and a rebranded version must not be presented as the original or as endorsed by OSASI. If you share or host your branded version for others, the same source-sharing rule applies to it.
+
 The names *CValRSketch* and *OSASI* are not licensed for use on derivative works in a way that suggests endorsement; please rename your fork if it diverges.
 
 ---
