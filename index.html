@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.16.0"></script>
-<script src="dictation.js?v=0.16.0"></script>
+<script src="core.js?v=0.17.0"></script>
+<script src="dictation.js?v=0.17.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -105,7 +105,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.16.0</span>
+  <span class="version-chip" id="app-version">v0.17.0</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -194,6 +194,7 @@ let state = {
   labelDrag: null,      // transient: { id, grabX, grabY, moved } while dragging a label
   shapeLabelDrag: null, // transient: while dragging a shape's area/centroid label
   dimLabelDrag: null,   // transient: while dragging a wall's dimension label
+  shapeMovePick: null,  // transient: { shapeId, anchor } while moving a shape by picking anchor -> destination
   offsetPick: null,     // null | { first: {x,y}|null } — active picking state for offset tool
   fenceDraw: null,      // null | { start:{x,y}, end:{x,y} } in WORLD coords while dragging
   fenceSelection: null, // null | { shapeVerts:[{shapeId,idx}], inProgVerts:[idx], annEnds:[{idx,end}] }
@@ -233,7 +234,7 @@ function restoreState(snap) {
   state.selection = null;
   state.selectedLabel = null;
   state.labelDrag = null;
-  state.shapeLabelDrag = null; state.dimLabelDrag = null;
+  state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null;
   state.fenceSelection = null;
   state.fenceDraw = null;
   state.splitSelection = null;
@@ -285,7 +286,7 @@ const fileAutosave = { handle: null, name: '', status: 'off', lastAt: null, last
 function serializeProject() {
   const data = { ...state };
   ['undoStack', 'redoStack', 'selection', 'splitSelection', 'preview', 'splitPreview',
-   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'dimLabelDrag', 'offsetPick', 'fenceDraw', 'fenceSelection']
+   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'dimLabelDrag', 'shapeMovePick', 'offsetPick', 'fenceDraw', 'fenceSelection']
     .forEach(k => delete data[k]);
   return JSON.stringify(data, null, 2);
 }
@@ -642,7 +643,7 @@ function render() {
   document.getElementById('floor-help').textContent =
     state.mode==='text' ? 'Click a blank spot to add a text label. Click a label to select it; drag to move it; double-click to edit.' :
     state.mode==='split' ? 'Click two vertices in a shape to split it.' :
-    state.mode==='edit' ? 'Click a wall or vertex to edit. Drag a dimension or area label to move it; double-click a dimension label to snap it back.' :
+    state.mode==='edit' ? 'Click a wall or vertex to edit, or the body of a shape to move/copy/retype it. Drag a dimension or area label to move it; double-click a dimension label to snap it back.' :
     (state.segments.length === 0
       ? 'Type segments to build a shape — or click any vertex (green) to start from there. Click a blank spot to drop the start, then Shift+Arrow to snap it onto aligned vertices.'
       : 'Type segments to extend the path, or click any vertex to draw a straight line to it. Close Shape when you return to start.');
@@ -760,7 +761,13 @@ function renderShape(sh, W, isGhost) {
   else if (t.dashed) poly.setAttribute('stroke-dasharray', '8,5');
   if (!isGhost) {
     poly.style.cursor = 'pointer';
-    poly.addEventListener('click', () => { state.selection = { kind:'shape', shapeId: sh.id }; render(); });
+    poly.addEventListener('click', (ev) => {
+      if (state.shapeMovePick) {   // picking a destination inside a shape counts as a blank spot
+        if (state.shapeMovePick.anchor) finishShapeMove(screenToWorld(ev.clientX, ev.clientY));
+        return;
+      }
+      state.selection = { kind:'shape', shapeId: sh.id }; render();
+    });
   }
 
   const canPickStart = state.mode === 'walk' && state.segments.length === 0;
@@ -827,21 +834,25 @@ function renderShape(sh, W, isGhost) {
 
   // Vertices: dots visible on non-ghost (per settings/mode), and on ghosts when picking start.
   // Hit areas: in edit/split (non-ghost only), and in walk mode for picking start (all shapes).
-  const showDots = !isGhost ? (state.settings.showVertexDots || state.mode !== 'walk' || canSnapTo) : canPickStart;
-  const addHits = canPickStart || (!isGhost && (canSnapTo || state.mode === 'edit' || state.mode === 'split'));
+  const movePicking = !!state.shapeMovePick;   // move-by-picking: every vertex, ghosts included, is a candidate
+  const showDots = !isGhost ? (state.settings.showVertexDots || state.mode !== 'walk' || canSnapTo) : (canPickStart || movePicking);
+  const addHits = canPickStart || movePicking || (!isGhost && (canSnapTo || state.mode === 'edit' || state.mode === 'split'));
   if (showDots || addHits) {
     for (let i = 0; i < sh.points.length - 1; i++) {
       const p = screenPts[i];
       const isSel = !isGhost && state.selection && state.selection.kind === 'vertex' && state.selection.shapeId === sh.id && state.selection.idx === i;
       const isSplitPicked = !isGhost && state.splitSelection && state.splitSelection.shapeId === sh.id && state.splitSelection.idx === i;
       if (showDots) {
-        const dotClass = 'visible-vertex' + (isSel || isSplitPicked ? ' selected' : '') + (canPickStart || canSnapTo ? ' pickable' : '');
+        const mp = state.shapeMovePick;
+        const isAnchor = !!(mp && mp.anchor && sh.id === mp.shapeId && Math.abs(sh.points[i].x - mp.anchor.x) < 1e-9 && Math.abs(sh.points[i].y - mp.anchor.y) < 1e-9);
+        const dotClass = 'visible-vertex' + (isSel || isSplitPicked || isAnchor ? ' selected' : '') + (canPickStart || canSnapTo || movePicking ? ' pickable' : '');
         addEl('circle', { cx: p.x, cy: p.y, r: canPickStart ? 5 : 4, class: dotClass });
       }
       if (addHits) {
         const hit = addEl('circle', { cx: p.x, cy: p.y, r: 12, class: 'hit-vertex' });
         hit.addEventListener('click', (ev) => {
           ev.stopPropagation();
+          if (state.shapeMovePick) { handleShapeMovePick(sh, i); return; }
           if (state.offsetPick) { handleOffsetPick(sh.points[i]); return; }
           if (canPickStart) setStartPoint(sh.points[i]);
           else if (canSnapTo) snapWalkToPoint(sh.points[i]);
@@ -1404,7 +1415,7 @@ function startShapeLabelDrag(ev, shapeId) {
 function shapeLabelDragMove(e) {
   if (!state.shapeLabelDrag) return;
   const sh = state.shapes.find(s => s.id === state.shapeLabelDrag.shapeId);
-  if (!sh) { state.shapeLabelDrag = null; state.dimLabelDrag = null; return; }
+  if (!sh) { state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null; return; }
   if (!state.shapeLabelDrag.moved) { pushUndo(); state.shapeLabelDrag.moved = true; }
   const base = polygonCentroid(sh.points);
   const w = screenToWorld(e.clientX, e.clientY);
@@ -1413,7 +1424,7 @@ function shapeLabelDragMove(e) {
 }
 function shapeLabelDragUp() {
   if (!state.shapeLabelDrag) return;
-  state.shapeLabelDrag = null; state.dimLabelDrag = null;
+  state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null;
 }
 
 // Dimension labels: per-wall manual nudge, dragged in Edit mode. Stored on the shape
@@ -1659,9 +1670,33 @@ function sidebarEdit() {
           <input id="copy-offset" placeholder="offset, e.g. 10' r  or  5'd 3'l">
           <button data-act="copyShape" class="primary">Copy + place</button>
         </div>
+      </div>
+      <div class="section">
+        <h2>Move shape</h2>
+        <div class="help">Slide the whole shape by a typed offset, or pick a vertex on it and then the point it should land on — a vertex on any floor (ghosts included) or a blank spot.</div>
+        <div class="input-row" style="margin-top:6px;">
+          <input id="move-offset" placeholder="offset, e.g. 3' r  or  2'6 d 1' l">
+          <button data-act="moveShape" class="primary">Move</button>
+        </div>
+        ${sidebarShapeMovePick(sh)}
       </div>`;
   }
   return '';
+}
+function sidebarShapeMovePick(sh) {
+  const mp = state.shapeMovePick;
+  if (!mp || mp.shapeId !== sh.id) {
+    return `<div class="row-buttons" style="margin-top:6px;"><button data-act="startShapeMovePick">Move by picking points</button></div>`;
+  }
+  const hint = mp.anchor
+    ? `Anchor set. Now click the <b>destination</b>: any vertex on any floor, or a blank spot. Esc cancels.`
+    : `Click a <b>vertex of this shape</b> to use as the anchor. Esc cancels.`;
+  return `
+    <div class="section" style="background:#fff4e6;border:2px solid #ff8800;margin-top:8px;">
+      <h2 style="color:#cc5500;">Move by picking — step ${mp.anchor ? 2 : 1} of 2</h2>
+      <div class="help">${hint}</div>
+      <div class="row-buttons" style="margin-top:6px;"><button data-act="cancelShapeMovePick" class="danger">Cancel</button></div>
+    </div>`;
 }
 
 function sidebarSplit() {
@@ -1890,6 +1925,9 @@ function sidebarAction(e) {
     case 'applyShape': applyShapeEdit(); break;
     case 'deleteShape': deleteSelectedShape(); break;
     case 'copyShape': copySelectedShape(); break;
+    case 'moveShape': moveSelectedShapeByOffset(); break;
+    case 'startShapeMovePick': startShapeMovePick(); break;
+    case 'cancelShapeMovePick': cancelShapeMovePick(); break;
     case 'selectShape': state.mode='edit'; state.selection = {kind:'shape', shapeId: parseInt(id)}; render(); break;
     case 'editShape': state.mode='edit'; state.selection = {kind:'shape', shapeId: parseInt(id)}; render(); break;
     case 'deleteShapeById': deleteShapeById(parseInt(id)); break;
@@ -2047,6 +2085,58 @@ function applyShapeEdit() {
   sh.type = document.getElementById('sh-type').value;
   sh.floor = document.getElementById('sh-floor').value;
   sh.building = document.getElementById('sh-building').value;
+  render();
+}
+
+// ----- Move a whole shape ----------------------------------------------------
+// Points move; segments carry only dx/dy so nothing to rebuild; label nudges are
+// relative to the geometry and travel with it.
+function translateShape(sh, dx, dy) {
+  pushUndo();
+  sh.points = sh.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+}
+function moveSelectedShapeByOffset() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'shape') return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  if (!sh) return;
+  const input = document.getElementById('move-offset');
+  if (!input) return;
+  const raw = input.value.trim();
+  if (!raw) { alert("Enter an offset like 3' r or 2'6 d 1' l"); return; }
+  let seg;
+  try { seg = parseSegment(raw); } catch (err) { alert(err.message); return; }
+  if (seg.autoExtend) { alert("Provide a length and direction (e.g. 3' r)."); return; }
+  translateShape(sh, seg.dx, seg.dy);
+  render();
+}
+// Move by picking: first click = anchor vertex on the shape being moved, second
+// click = destination (any vertex on any floor — ghosts are clickable while picking —
+// or a blank spot on the canvas). The shape translates so the anchor lands there.
+function startShapeMovePick() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'shape') return;
+  state.shapeMovePick = { shapeId: sel.shapeId, anchor: null };
+  render();
+}
+function cancelShapeMovePick() { state.shapeMovePick = null; render(); }
+function handleShapeMovePick(sh, i) {
+  const mp = state.shapeMovePick;
+  if (!mp) return;
+  if (!mp.anchor) {
+    if (sh.id !== mp.shapeId) { alert('Pick the anchor on the shape you are moving first.'); return; }
+    mp.anchor = { x: sh.points[i].x, y: sh.points[i].y };
+    render();
+    return;
+  }
+  finishShapeMove(sh.points[i]);
+}
+function finishShapeMove(dest) {
+  const mp = state.shapeMovePick;
+  if (!mp || !mp.anchor) return;
+  const sh = state.shapes.find(s => s.id === mp.shapeId);
+  if (sh) translateShape(sh, dest.x - mp.anchor.x, dest.y - mp.anchor.y);
+  state.shapeMovePick = null;
   render();
 }
 
@@ -2435,7 +2525,7 @@ document.querySelectorAll('#mode-tabs button').forEach(b => {
     state.selection = null;
     state.selectedLabel = null;
     state.labelDrag = null;
-    state.shapeLabelDrag = null; state.dimLabelDrag = null;
+    state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null;
     state.splitSelection = null;
     state.preview = null;
     state.splitPreview = null;
@@ -2456,6 +2546,11 @@ svg.addEventListener('click', (e) => {
     // Blank-canvas click in Walk mode drops the start point here; Shift+Arrow then
     // steps it onto aligned active-floor vertices.
     setStartPoint(screenToWorld(e.clientX, e.clientY));
+    return;
+  }
+  if (state.shapeMovePick) {
+    // Blank spot as the move destination; before the anchor is picked, ignore it.
+    if (state.shapeMovePick.anchor) finishShapeMove(screenToWorld(e.clientX, e.clientY));
     return;
   }
   state.selection = null;
@@ -3125,7 +3220,7 @@ function newProject() {
   state.nextLabelId = 1;
   state.selectedLabel = null;
   state.labelDrag = null;
-  state.shapeLabelDrag = null; state.dimLabelDrag = null;
+  state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null;
   state.subject = '';
   state.subtitle = '';
   state.floors = ['basement', 'main', 'upper', 'other'];
@@ -3150,7 +3245,7 @@ function applyLoadedProject(text) {
   state.selection = null; state.splitSelection = null;
   state.labels = d.labels || []; state.nextLabelId = d.nextLabelId || 1;
   state.basements = d.basements || {};
-  state.selectedLabel = null; state.labelDrag = null; state.shapeLabelDrag = null; state.dimLabelDrag = null;
+  state.selectedLabel = null; state.labelDrag = null; state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null;
   const subjInp = document.getElementById('subject-input');
   if (subjInp) subjInp.value = state.subject || '';
   saveToRecents();  // also add loaded sketch to recents so it's reloadable
@@ -3242,6 +3337,7 @@ window.addEventListener('keydown', (e) => {
   else if (mod && !e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); saveJSON(); }
   else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoHistory(); }
   else if (e.key === 'Escape' && state.offsetPick) { cancelOffsetPick(); }
+  else if (e.key === 'Escape' && state.shapeMovePick) { cancelShapeMovePick(); }
   else if (e.key === 'Escape' && state.mode === 'fence' && (state.fenceSelection || state.fenceDraw)) { state.fenceDraw = null; state.fenceSelection = null; render(); }
   else if (state.mode === 'text' && state.selectedLabel !== null && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); deleteLabel(state.selectedLabel); }
   else if (e.key === 'Escape' && state.mode === 'text' && state.selectedLabel !== null) { state.selectedLabel = null; render(); }

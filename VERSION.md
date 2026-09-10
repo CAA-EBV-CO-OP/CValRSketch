@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.16.0`
+**Current version:** `0.17.0`
 **Released:** 2026-09-09
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.17.0  | 2026-09-09 | minor  | **Move shape** (Edit mode, shape panel): slide a whole shape by a typed offset (`3' r`, `2'6 d 1' l`), or **move by picking points** — click an anchor vertex on the shape, then the destination (any vertex on any floor, ghosts included, or a blank spot); the shape translates so the anchor lands there. Esc cancels; undo-able. Replaces the copy-then-delete workaround for lining a floor up over another. |
 | 0.16.0  | 2026-09-09 | minor  | **Dimension labels**: placement fixed so a label beside a vertical wall is anchored just off the wall (was centred on the offset point and straddled the wall line, colliding with the next wall on short jogs); and labels are now **draggable in Edit mode** (double-click snaps back). Nudges are saved per wall as `dimOffsets` (world feet), survive vertex insert/delete via index remapping, and export with the drawing. |
 | 0.15.0  | 2026-09-09 | minor  | **Autosave to file** (Chrome/Edge): after **Save As…** or a **Load** through the file picker the app keeps the file's handle and rewrites the file ~2 s after every change; header chip shows the file name + last write; **Save** now writes the current file in place (Ctrl+S), **Save As…** picks a new one; the handle is remembered in IndexedDB so the next visit offers one-click *resume*; **New** and *Recent* drop the handle. Files no longer carry undo history or transient UI state. Setting `autosaveToFile`. Loaders re-merge `SETTINGS_DEFAULTS` so old files can't strip newer settings keys. |
 | 0.14.0  | 2026-09-09 | minor  | **Export layout choice**: the Export / Preview modal gains a Layout selector — *Active floor* (unchanged), *All floors — side by side*, or *All floors — stacked vertically*. Multi-floor layouts re-render each floor on its own (ghosts off), tile the panels on one sheet at a common scale with a caption (floor name + sq ft) under each, basement last. Fix: the walk-mode start marker no longer leaks into exports. New setting `exportLayout`. |

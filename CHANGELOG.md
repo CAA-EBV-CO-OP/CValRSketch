@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.17.0] — 2026-09-09
+
+### Added
+- **Move shape (Edit mode).** Click the body of a shape and the panel now has a **Move shape** section. Type an offset (`3' r`, `2'6 d 1' l`) and press Move to slide the whole shape, or press **Move by picking points**: click a vertex on the shape as the anchor, then click where it should land — a vertex on any floor (other floors' ghost vertices become clickable while picking), or a blank spot. The shape translates so the anchor sits on the destination. Esc cancels; the move is one undo step. Dimension and area label nudges travel with the shape. This is the direct way to line an upper floor up over the main floor, which previously needed the Fence tool or copy-then-delete.
+
+---
+
 ## [0.16.0] — 2026-09-09
 
 ### Added
