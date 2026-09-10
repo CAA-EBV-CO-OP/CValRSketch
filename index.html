@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.12.0"></script>
-<script src="dictation.js?v=0.12.0"></script>
+<script src="core.js?v=0.13.0"></script>
+<script src="dictation.js?v=0.13.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -100,7 +100,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.12.0</span>
+  <span class="version-chip" id="app-version">v0.13.0</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -230,6 +230,30 @@ function restoreState(snap) {
   state.fenceDraw = null;
   state.splitSelection = null;
 }
+
+// ----- Session autosave / crash recovery (localStorage-backed) --------------
+// Mirrors the working sketch to localStorage so a reload, tab-close, or crash
+// (e.g. an accidental Ctrl+R) doesn't lose in-progress work. The slot always
+// reflects the latest state, so startup silently restores exactly where you left
+// off — no prompt. Separate from the named "recent projects" store.
+const AUTOSAVE_KEY = 'cvalrsketch:autosave';
+let _autosaveTimer = null;
+function writeAutosave() {
+  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ at: Date.now(), snap: snapshotState() })); }
+  catch (e) { /* quota / private mode — non-fatal */ }
+}
+function scheduleAutosave() {
+  if (_autosaveTimer) return;            // coalesce bursts of renders into one write
+  _autosaveTimer = setTimeout(() => { _autosaveTimer = null; writeAutosave(); }, 800);
+}
+function autoRestoreSession() {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); } catch (e) { return; }
+  if (!saved || !saved.snap) return;
+  try { restoreState(saved.snap); }       // restoreState resets transient UI fields itself
+  catch (e) { /* corrupt slot — ignore and start fresh */ }
+}
+
 function pushUndo() {
   state.undoStack.push(snapshotState());
   if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
@@ -264,6 +288,35 @@ function offsetStart() {
     input.value = '';
     render();
   } catch (err) { alert(err.message); }
+}
+
+// --- Start-point alignment (walk mode) ---------------------------------------
+// Click a blank spot to drop the start, then Shift+Arrow to step it onto the next
+// active-floor vertex along that axis. Each axis steps independently, so a
+// horizontal step followed by a vertical one lands on the intersection without
+// dropping the earlier alignment.
+function activeFloorVertices() {
+  const pts = [];
+  for (const sh of shapesOnFloor(state.activeFloor))
+    for (let i = 0; i < sh.points.length - 1; i++) pts.push(sh.points[i]);
+  return pts;
+}
+function stepStartAlign(axis, step) {
+  if (state.startPoint === null || state.mode !== 'walk' || state.segments.length) return;
+  const verts = activeFloorVertices();
+  if (!verts.length) return;
+  const tol = 1e-4;
+  const cur = state.startPoint;
+  const curVal = axis === 'x' ? cur.x : cur.y;
+  const coords = [...new Set(verts.map(p => axis === 'x' ? p.x : p.y))].sort((a, b) => a - b);
+  let target = null;
+  if (step > 0) { for (const c of coords) if (c > curVal + tol) { target = c; break; } }
+  else { for (let i = coords.length - 1; i >= 0; i--) if (coords[i] < curVal - tol) { target = coords[i]; break; } }
+  if (target === null) return; // no further vertex that way — keep the current alignment
+  // Mutate in place (no pushUndo per keypress; the initial click already snapshotted,
+  // so a single undo clears the whole placement).
+  state.startPoint = axis === 'x' ? { x: target, y: cur.y } : { x: cur.x, y: target };
+  render();
 }
 
 // Load settings from localStorage
@@ -435,7 +488,7 @@ function render() {
     state.mode==='split' ? 'Click two vertices in a shape to split it.' :
     state.mode==='edit' ? 'Click a wall or vertex to edit.' :
     (state.segments.length === 0
-      ? 'Type segments to build a shape — or click any vertex (green) to start from there.'
+      ? 'Type segments to build a shape — or click any vertex (green) to start from there. Click a blank spot to drop the start, then Shift+Arrow to snap it onto aligned vertices.'
       : 'Type segments to extend the path, or click any vertex to draw a straight line to it. Close Shape when you return to start.');
 
   // SVG render
@@ -474,7 +527,17 @@ function render() {
   // Current in-progress segments
   if (state.segments.length) renderInProgress(W);
   else if (state.mode === 'walk') {
-    const startScreen = W(getStart());
+    const start = getStart();
+    const startScreen = W(start);
+    // Alignment guides: faint extension lines when the picked start shares an axis
+    // with an active-floor vertex. ui-overlay → stripped from exports (§4.6).
+    if (state.startPoint) {
+      const tol = 1e-4, verts = activeFloorVertices();
+      if (verts.some(p => Math.abs(p.x - start.x) < tol))
+        addEl('line', { x1: startScreen.x, y1: 0, x2: startScreen.x, y2: svg.clientHeight, stroke: '#2e8b57', 'stroke-width': 1, 'stroke-dasharray': '4,4', opacity: 0.45, class: 'ui-overlay' });
+      if (verts.some(p => Math.abs(p.y - start.y) < tol))
+        addEl('line', { x1: 0, y1: startScreen.y, x2: svg.clientWidth, y2: startScreen.y, stroke: '#2e8b57', 'stroke-width': 1, 'stroke-dasharray': '4,4', opacity: 0.45, class: 'ui-overlay' });
+    }
     addEl('circle', { cx: startScreen.x, cy: startScreen.y, r: 6, fill: '#2e8b57', stroke: '#fff', 'stroke-width': 2 });
     const lbl = state.startPoint ? 'start (picked)' : 'start';
     addEl('text', { x: startScreen.x+10, y: startScreen.y+4, 'font-size': 12, fill: '#666' }, lbl);
@@ -513,6 +576,7 @@ function render() {
   }
 
   renderSidebar();
+  scheduleAutosave();
 }
 
 // Global sketch-area label scale (dimension + area labels). Header/legend on
@@ -1292,7 +1356,7 @@ function sidebarWalk() {
         Length: <code>16'4</code>, <code>3'6"</code>, <code>8</code>, <code>0.5</code><br>
         Direction: <code>r l u d</code>. Angle (after <code>r</code>/<code>l</code>): degrees turned from your previous heading — <code>r</code> turns right, <code>l</code> turns left. (First segment, or <code>u</code>/<code>d</code> with angle: degrees CW from cardinal base.)<br>
         Batch (separate walls): <code>16'4 u, 26'9 r, 8 d</code><br>
-        Diagonal from components (one wall): <code>5'd 2'l</code> or <code>5'd &amp; 2'l</code><br>
+        Diagonal from components (one wall): <code>5'd 2'l</code> or <code>5'd, 2'l</code><br>
         <b>Snap-to-vertex:</b> type just <code>r</code> (no length) + Enter to <i>preview</i> the next aligned vertex. Press <code>r</code>+Enter again to cycle. Press Enter on an empty input to accept — accepting also lines up the next snap in that direction, so <code>r⏎ ⏎ ⏎</code> walks three alignments right, then <code>u⏎ ⏎</code> two up. Esc stops stepping.<br>
         <b>Pen-jump (arrow keys):</b> with the input empty, press <code>← ↑ → ↓</code> to <i>jump</i> the pen to the next aligned vertex without drawing a wall. Press the same arrow again to skip further. Enter accepts (and arms the next jump), Esc cancels.
       </div>
@@ -2174,6 +2238,12 @@ svg.addEventListener('click', (e) => {
     addLabelAt(screenToWorld(e.clientX, e.clientY));
     return;
   }
+  if (state.mode === 'walk' && state.segments.length === 0) {
+    // Blank-canvas click in Walk mode drops the start point here; Shift+Arrow then
+    // steps it onto aligned active-floor vertices.
+    setStartPoint(screenToWorld(e.clientX, e.clientY));
+    return;
+  }
   state.selection = null;
   render();
 });
@@ -2829,9 +2899,19 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'Escape' && state.mode === 'fence' && (state.fenceSelection || state.fenceDraw)) { state.fenceDraw = null; state.fenceSelection = null; render(); }
   else if (state.mode === 'text' && state.selectedLabel !== null && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); deleteLabel(state.selectedLabel); }
   else if (e.key === 'Escape' && state.mode === 'text' && state.selectedLabel !== null) { state.selectedLabel = null; render(); }
+  else if (e.shiftKey && !mod && state.mode === 'walk' && state.segments.length === 0 && state.startPoint !== null &&
+           (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    if (e.key === 'ArrowLeft') stepStartAlign('x', -1);
+    else if (e.key === 'ArrowRight') stepStartAlign('x', 1);
+    else if (e.key === 'ArrowUp') stepStartAlign('y', -1);
+    else if (e.key === 'ArrowDown') stepStartAlign('y', 1);
+  }
 });
 
+autoRestoreSession();   // silently reopen the last session before the first paint
 render();
+window.addEventListener('beforeunload', writeAutosave);  // flush the debounce gap on reload/close
 
 // Register service worker for offline PWA install. Skipped on file:// (no SW support there).
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

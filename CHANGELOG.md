@@ -14,6 +14,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.13.0] — 2026-09-09
+
+### Added
+- **Session autosave / crash recovery (desktop).** The working sketch is mirrored to `localStorage` (coalesced ~800 ms after each render, flushed on tab close / reload). Reloading, closing the tab, or an accidental Ctrl+R silently reopens exactly where you left off — no prompt. Separate from the named "recent projects" store; a corrupt or missing slot just starts fresh.
+- **Click-to-drop start point with Shift+Arrow alignment (desktop walk mode).** With no segments entered yet, clicking a blank spot drops the walk's start there; **Shift+Arrow** then steps it onto the next active-floor vertex along that axis. Each axis steps independently, so a horizontal step followed by a vertical one lands on the intersection without losing the earlier alignment. Faint green guide lines appear when the start shares an X or Y with an existing vertex (tagged `ui-overlay`, never exported). One undo clears the whole placement.
+- **Mobile: Building / dwelling dropdown** in the shape editor; splits inherit the parent's building. The mobile version stamp is now synced to the release version (was stuck at 0.11.47).
+
+### Changed
+- **Comma is the diagonal-components separator.** `5'd, 2'l` draws one diagonal segment with summed dx/dy (was `5'd & 2'l`; `&` is still accepted). Walk-mode help text and error messages updated.
+- Mobile offset / move placeholders now read `e.g. 3'6 r  or  5'd 2'l` so the example isn't misread as a comma-combined pair.
+- Cache-bust queries (`core.js?v=`, `dictation.js?v=`) and the service-worker `CACHE_NAME` bumped to 0.13.0 so installed PWAs pick up the new `core.js` parser.
+
+---
 ## [0.12.0] — 2026-06-25
 
 ### Added

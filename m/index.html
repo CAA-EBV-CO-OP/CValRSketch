@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
 <link rel="apple-touch-icon" href="../icon-192.png">
 <title>CValRSketch — Mobile</title>
-<script src="../core.js?v=0.11.46"></script>
-<script src="../dictation.js?v=0.11.46"></script>
+<script src="../core.js?v=0.13.0"></script>
+<script src="../dictation.js?v=0.13.0"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -434,7 +434,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.11.46'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.13.0'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -798,7 +798,7 @@ function renderEditPanel() {
       </div>
       <div class="hint">Or move by typed offset</div>
       <div class="row">
-        <input id="edit-offset" type="text" readonly class="measure dir" placeholder="e.g. 3'6 r, 5'd 2'l">
+        <input id="edit-offset" type="text" readonly class="measure dir" placeholder="e.g. 3'6 r  or  5'd 2'l">
         <button id="edit-apply-offset">Apply</button>
       </div>
       <div class="row">
@@ -859,7 +859,7 @@ function renderEditPanel() {
       </div>
       <div class="hint">Or move whole wall by typed offset</div>
       <div class="row">
-        <input id="edit-offset" type="text" readonly class="measure dir" placeholder="e.g. 3'6 r, 5'd 2'l">
+        <input id="edit-offset" type="text" readonly class="measure dir" placeholder="e.g. 3'6 r  or  5'd 2'l">
         <button id="edit-apply-offset">Apply</button>
         <button class="danger" id="edit-delete">Delete wall</button>
       </div>
@@ -1291,6 +1291,7 @@ function splitShapeAtIntersection(sh, intersection) {
     label: sh.label + ' (split)',
     type: sh.type,
     floor: sh.floor,
+    building: sh.building || DEFAULT_BUILDING,
     points: ptsB,
     segments: [],
   };
@@ -1768,7 +1769,7 @@ function openWallEditor(sh, wallIdx) {
 
       <p style="font-size:11px; color:#888; margin:8px 0 0; text-transform:uppercase;">Or move whole wall by typed offset</p>
       <div class="row" style="display:flex; gap:6px;">
-        <input id="wall-move-input" type="text" readonly class="measure dir" placeholder="e.g. 3'6 r, 5'd 2'l"
+        <input id="wall-move-input" type="text" readonly class="measure dir" placeholder="e.g. 3'6 r  or  5'd 2'l"
           style="flex:1; padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">
         <button class="primary" id="wall-apply-move-btn" style="padding:0 14px;">Apply</button>
       </div>
@@ -1844,6 +1845,8 @@ function openShapeEditor(sh) {
     `<option value="${k}"${k === sh.type ? ' selected' : ''}>${v.name}</option>`).join('');
   const floorOpts = state.floors.map(f =>
     `<option value="${f}"${f === sh.floor ? ' selected' : ''}>${f}</option>`).join('');
+  const buildingOpts = BUILDINGS.map(b =>
+    `<option value="${b}"${b === (sh.building || DEFAULT_BUILDING) ? ' selected' : ''}>${b}</option>`).join('');
   showModal(`
     <h3>Shape "${escapeHtml(sh.label)}"</h3>
     <label style="font-size:12px; color:#666;">Label</label>
@@ -1853,6 +1856,8 @@ function openShapeEditor(sh) {
     <select id="sh-type" style="padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">${typeOpts}</select>
     <label style="font-size:12px; color:#666;">Floor</label>
     <select id="sh-floor" style="padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">${floorOpts}</select>
+    <label style="font-size:12px; color:#666;">Building / dwelling</label>
+    <select id="sh-building" style="padding:10px; font-size:16px; border:1px solid #ccc; border-radius:8px;">${buildingOpts}</select>
     <div class="modal-buttons">
       <button onclick="closeModal()">Cancel</button>
       <button class="danger" id="sh-delete-btn">Delete shape</button>
@@ -1864,6 +1869,7 @@ function openShapeEditor(sh) {
     sh.label = $('sh-label').value || sh.label;
     sh.type = $('sh-type').value;
     sh.floor = $('sh-floor').value;
+    sh.building = $('sh-building').value;
     closeModal();
     render();
     renderDrawer();
@@ -1903,6 +1909,7 @@ function closeShape() {
     id: state.nextShapeId++,
     label, type: typeKey,
     floor: state.activeFloor,
+    building: DEFAULT_BUILDING,
     points: pts,
     segments: [],
   };
@@ -2000,7 +2007,7 @@ function renderDrawer() {
     ? shapes.map(sh => {
         const area = Math.round(polygonArea(sh.points));
         return `<div class="item" data-id="${sh.id}">
-          <span>${escapeHtml(sh.label)}</span>
+          <span>${escapeHtml(sh.label)}<br><span style="font-size:11px;color:#888;">${escapeHtml(sh.building||DEFAULT_BUILDING)}</span></span>
           <span style="color:#666;">${area} sf</span>
         </div>`;
       }).join('')

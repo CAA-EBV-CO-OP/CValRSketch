@@ -90,16 +90,17 @@ function headingDeg(seg) {
 }
 
 function parseSegment(text, priorHeadingDeg = null) {
-  // Combined-components syntax: "5'd & 2'l" → one diagonal segment with summed dx/dy.
-  // Each side is parsed as its own cardinal length+direction; angles aren't allowed here.
-  if (text.includes('&')) {
-    const parts = text.split('&').map(p => p.trim()).filter(Boolean);
-    if (parts.length < 2) throw new Error(`"${text}": '&' must combine two or more length-direction pairs`);
+  // Combined-components syntax: "5'd , 2'l" → one diagonal segment with summed dx/dy.
+  // Comma is the separator (legacy '&' still accepted). Each side is parsed as its own
+  // cardinal length+direction; angles aren't allowed here.
+  if (text.includes(',') || text.includes('&')) {
+    const parts = text.split(/[,&]/).map(p => p.trim()).filter(Boolean);
+    if (parts.length < 2) throw new Error(`"${text}": ',' must combine two or more length-direction pairs`);
     let dx = 0, dy = 0;
     for (const part of parts) {
       const sub = parseSegment(part);
-      if (sub.autoExtend) throw new Error(`"${text}": '&' requires an explicit length on every part`);
-      if (sub.angle) throw new Error(`"${text}": '&' parts can't have angles — use a single diagonal segment instead`);
+      if (sub.autoExtend) throw new Error(`"${text}": ',' requires an explicit length on every part`);
+      if (sub.angle) throw new Error(`"${text}": ',' parts can't have angles — use a single diagonal segment instead`);
       dx += sub.dx;
       dy += sub.dy;
     }

@@ -1,7 +1,7 @@
 # Version
 
-**Current version:** `0.12.0`
-**Released:** 2026-06-25
+**Current version:** `0.13.0`
+**Released:** 2026-09-09
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 While the project is below 1.0, the public "API" (segment syntax, JSON save format) may still change between minor versions; breaking changes will be called out in [CHANGELOG.md](./CHANGELOG.md).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.13.0  | 2026-09-09 | minor  | Desktop **session autosave / crash recovery** (localStorage mirror, silent restore on reload or after an accidental Ctrl+R); **click-to-drop start point** with **Shift+Arrow** stepping onto aligned active-floor vertices plus faint guide lines; **comma** replaces `&` as the diagonal-components separator (`5'd, 2'l`; `&` still accepted); mobile gains the **Building / dwelling** dropdown (splits inherit it) and its version stamp is synced to the release (was 0.11.47). Work dated 2026-07-09, released 2026-09-09. |
 | 0.12.0  | 2026-06-25 | minor  | Desktop sketch + export overhaul: **click-to-snap** closing; **free-text notes** (Text mode — multi-line, optional heading, placeable over areas, per-floor); **basement declaration** with % finished + **Above/Below-Grade** summary on sheet and totals; **🖨 Export / Print-preview** modal (page size, title/legend, per-floor "dimensions + notes" surfacing); **draggable area labels**; floor-bar **label-size slider**; other-floor **ghosts** redrawn as a faded dashed-outline overlay; export crop tightened to rendered text. JSON gains `labels`/`basements`/`labelOffset` (backward-compatible). |
 | 0.11.47 | 2026-05-28 | minor  | Added a **Building / dwelling** tag to each area (`Dwelling 1/2/3`, `Outbuildings`, `Other` — baked into `core.js`). Both UIs' shape editors gain a Building dropdown; desktop Totals now group **Building → Floor → Type** with per-building subtotals. New areas default to `Dwelling 1`; copies/splits inherit the parent's building; legacy shapes fall back to `Dwelling 1`. Lightweight (Option 3) — no per-building floor tabs. |
 | 0.11.46 | 2026-05-28 | minor  | Mobile: measurement fields (wall length, all offset/move inputs, start offset, fence move) now open an **on-screen number pad** instead of the iOS QWERTY keyboard. Length fields show digits + ft/in/+/·; offset fields also expose L/U/D/R. Fields are `readonly` + class `measure`/`dir`; a shared bottom-sheet pad fills them and their existing Apply button parses as before. The full keyboard now appears only for genuinely alphabetic fields (area label, subject). |
