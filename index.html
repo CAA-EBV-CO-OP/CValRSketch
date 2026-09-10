@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.19.3"></script>
-<script src="dictation.js?v=0.19.3"></script>
+<script src="core.js?v=0.20.0"></script>
+<script src="dictation.js?v=0.20.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -103,12 +103,17 @@
   .visible-vertex.split-hover { fill: #ffa500; stroke: #fff; }
   .visible-vertex.pickable { fill: #d4edda; stroke: #2e8b57; stroke-width: 2; }
   .ghost { opacity: var(--ghost-opacity, 0.45); pointer-events: none; }
+  /* Building gallery (Building: All with several buildings in the file) */
+  .gallery-frame { fill: #fff; stroke: #c0c8d0; stroke-width: 1.5; cursor: pointer; }
+  .gallery-panel:hover .gallery-frame { stroke: #2b6cb0; stroke-width: 2.5; }
+  .gallery-caption { font: bold 13px Arial, sans-serif; fill: #2b3a4a; pointer-events: none; }
+  #floor-bar #building-select { font-size: 12px; padding: 3px 6px; border: 1px solid #c0c8d0; border-radius: 4px; background: #fff; }
 </style>
 </head>
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.19.3</span>
+  <span class="version-chip" id="app-version">v0.20.0</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -138,6 +143,10 @@
   <button class="small-btn" onclick="addFloor()">+ Floor</button>
   <button class="small-btn" onclick="renameFloor()">Rename</button>
   <button class="small-btn" onclick="removeFloor()">Delete Floor</button>
+  <span style="margin-left:14px;">Building:</span>
+  <select id="building-select" onchange="setViewBuilding(this.value)" title="Show one building on the canvas, fitted to the window. All shows every building; with several in the file, All is a gallery — click a building to edit it."></select>
+  <button class="small-btn" onclick="addBuilding()" title="Add a named building to this file (Shop, Barn, Guest cabin…) and switch to it">+ Building</button>
+  <button class="small-btn" onclick="renameBuilding()" title="Rename the building shown on the canvas (its shapes and basement setting follow)">Rename</button>
   <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Size of the dimension, area, and note labels on the drawing">
     Label size:
     <input type="range" id="sketch-font-bar" min="0.6" max="2" step="0.1" style="width:120px;">
@@ -180,6 +189,8 @@ let state = {
   shapes: [],           // completed shapes (each: {id, points, segments, label, type, floor})
   floors: ['basement','main','upper','other'],
   activeFloor: 'main',
+  buildings: [...BUILDINGS],  // named buildings in this file (the five defaults plus any added); shapes reference them by name
+  viewBuilding: 'all',  // canvas filter: 'all' or one building name; 'all' with several buildings shows the gallery
   selection: null,      // {kind:'wall'|'vertex'|'shape', shapeId, idx?}
   splitSelection: null, // {shapeId, idx} for first vertex in split
   mode: 'walk',         // 'walk' | 'edit' | 'split'
@@ -214,6 +225,7 @@ function snapshotState() {
     segments: state.segments,
     shapes: state.shapes,
     floors: state.floors,
+    buildings: state.buildings,
     activeFloor: state.activeFloor,
     nextShapeId: state.nextShapeId,
     startPoint: state.startPoint,
@@ -232,6 +244,7 @@ function restoreState(snap) {
   state.segments = d.segments;
   state.shapes = d.shapes;
   state.floors = d.floors;
+  state.buildings = normalizeBuildings(d.buildings || state.buildings);
   state.activeFloor = d.activeFloor;
   state.nextShapeId = d.nextShapeId;
   state.startPoint = d.startPoint;
@@ -498,7 +511,7 @@ try {
 
 // Page-local wrapper around findAlignedCandidates that pulls start + shapes from `state`.
 function findAlignedCandidatesHere(priorSegments, dir) {
-  return findAlignedCandidates(priorSegments, dir, getStart(), state.shapes);
+  return findAlignedCandidates(priorSegments, dir, getStart(), visibleShapes());
 }
 
 // Cast a ray from `origin` in direction `dir` and return the closest forward hit on a wall of `shape`,
@@ -608,12 +621,74 @@ function removeFloor() {
 // =============================================================================
 const svg = document.getElementById('canvas');
 
-function shapesOnFloor(floor) { return state.shapes.filter(s => s.floor === floor); }
-function shapesOnOtherFloors() { return state.shapes.filter(s => s.floor !== state.activeFloor); }
+// ----- Buildings: the file's named list, and the canvas view filter -----------
+// Every shape carries a `building` name. The canvas can show all of them or one;
+// shapesOnFloor / shapesOnOtherFloors / fitView / snapping all go through
+// visibleShapes(), so picking a building scopes editing to it and fits it to the
+// window. Floor rename/delete and the totals deliberately still see every shape.
+function normalizeBuildings(list) {
+  const out = [];
+  (Array.isArray(list) && list.length ? list : BUILDINGS).forEach(b => {
+    const n = String(b || '').trim();
+    if (n && !out.includes(n)) out.push(n);
+  });
+  state.shapes.forEach(sh => { const b = sh.building || DEFAULT_BUILDING; if (!out.includes(b)) out.push(b); });
+  return out;
+}
+function buildingList() { state.buildings = normalizeBuildings(state.buildings); return state.buildings; }
+function viewBuildingOrAll() {
+  const v = state.viewBuilding || 'all';
+  return (v === 'all' || buildingList().includes(v)) ? v : 'all';
+}
+function visibleShapes() {
+  const v = viewBuildingOrAll();
+  return v === 'all' ? state.shapes : state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === v);
+}
+function galleryActive() { return viewBuildingOrAll() === 'all' && buildingsPresent().length > 1; }
+function newShapeBuilding() { const v = viewBuildingOrAll(); return v === 'all' ? DEFAULT_BUILDING : v; }
+function setViewBuilding(name) {
+  state.viewBuilding = name || 'all';
+  state.selection = null; state.splitSelection = null; state.fenceSelection = null; state.startPoint = null;
+  render();
+}
+function addBuilding() {
+  const name = (prompt('Name of the new building (e.g. Shop, Barn, Guest cabin):') || '').trim();
+  if (!name) return;
+  if (buildingList().includes(name)) { setViewBuilding(name); return; }
+  pushUndo();
+  state.buildings.push(name);
+  setViewBuilding(name);
+}
+function renameBuilding() {
+  const cur = viewBuildingOrAll();
+  if (cur === 'all') { alert('Pick a building in the Building dropdown first, then Rename.'); return; }
+  const name = (prompt('Rename "' + cur + '" to:', cur) || '').trim();
+  if (!name || name === cur) return;
+  if (buildingList().includes(name)) { alert('A building named "' + name + '" already exists.'); return; }
+  pushUndo();
+  state.buildings = state.buildings.map(b => b === cur ? name : b);
+  state.shapes.forEach(sh => { if ((sh.building || DEFAULT_BUILDING) === cur) sh.building = name; });
+  if (state.basements[cur]) { state.basements[name] = state.basements[cur]; delete state.basements[cur]; }
+  state.viewBuilding = name;
+  render();
+}
+
+function syncBuildingSelect() {
+  const bsel = document.getElementById('building-select');
+  if (!bsel) return;
+  const curB = viewBuildingOrAll();
+  const present = buildingsPresent();
+  bsel.innerHTML = '<option value="all">All' + (present.length > 1 ? ' (gallery)' : '') + '</option>' +
+    buildingList().map(b => `<option value="${escapeHtml(b)}"${b === curB ? ' selected' : ''}>${escapeHtml(b)}${present.includes(b) ? '' : ' (empty)'}</option>`).join('');
+  bsel.value = curB;
+}
+
+function shapesOnFloor(floor) { return visibleShapes().filter(s => s.floor === floor); }
+function shapesOnOtherFloors() { return visibleShapes().filter(s => s.floor !== state.activeFloor); }
 
 function fitView() {
   const all = [];
-  state.shapes.forEach(s => all.push(...s.points));
+  visibleShapes().forEach(s => all.push(...s.points));
   if (state.segments.length) all.push(...pathPointsHere(state.segments));
   // Include text-label anchors so notes placed below/around the drawing stay on
   // screen (the 80px pad below covers each label's height).
@@ -649,13 +724,17 @@ function render() {
   ftEl.innerHTML = state.floors.map(f =>
     `<button class="${f===state.activeFloor?'active':''}" onclick="state.activeFloor='${f}'; state.selection=null; state.splitSelection=null; render();">${f}</button>`
   ).join('');
+  syncBuildingSelect();
   document.getElementById('floor-help').textContent =
+    galleryActive() ? 'Gallery: every building in the file, each fitted to its panel. Click one to edit it on its own.' :
     state.mode==='text' ? 'Click a blank spot to add a text label. Click a label to select it; drag to move it; double-click to edit.' :
     state.mode==='split' ? 'Click two vertices in a shape to split it.' :
     state.mode==='edit' ? 'Click a wall or vertex to edit, or the body of a shape to move/copy/retype it. Esc deselects. Drag a dimension or area label to move it; double-click a dimension label to snap it back.' :
     (state.segments.length === 0
       ? 'Type segments to build a shape — or click any vertex (green) to start from there. Click a blank spot to drop the start, then Shift+Arrow to snap it onto aligned vertices.'
       : 'Type segments to extend the path, or click any vertex to draw a straight line to it. Close Shape when you return to start.');
+
+  if (galleryActive()) { renderGallery(); renderSidebar(); return; }
 
   // SVG render
   const w = svg.clientWidth, h = svg.clientHeight;
@@ -1052,12 +1131,16 @@ function renderSidebar() {
   const active = document.activeElement;
   const refocusId = (active && active.id && aside.contains(active)) ? active.id : null;
   let html = '';
-  if (state.mode === 'walk') html += sidebarWalk();
-  if (state.mode === 'edit') html += sidebarEdit();
-  if (state.mode === 'split') html += sidebarSplit();
-  if (state.mode === 'fence') html += sidebarFence();
-  if (state.mode === 'text') html += sidebarText();
-  html += sidebarOffsets();
+  if (galleryActive()) {
+    html += sidebarGallery();
+  } else {
+    if (state.mode === 'walk') html += sidebarWalk();
+    if (state.mode === 'edit') html += sidebarEdit();
+    if (state.mode === 'split') html += sidebarSplit();
+    if (state.mode === 'fence') html += sidebarFence();
+    if (state.mode === 'text') html += sidebarText();
+    html += sidebarOffsets();
+  }
   html += sidebarShapes() + sidebarBasement() + sidebarTotals();
   aside.innerHTML = html;
   attachSidebarHandlers();
@@ -1136,7 +1219,7 @@ function screenToWorld(clientX, clientY) {
 }
 
 function fenceMouseDown(e) {
-  if (state.mode !== 'fence') return;
+  if (state.mode !== 'fence' || galleryActive()) return;
   if (e.button !== 0) return;
   const p = screenToWorld(e.clientX, e.clientY);
   state.fenceDraw = { start: p, end: p };
@@ -1747,7 +1830,8 @@ function sidebarEdit() {
           ${state.floors.map(f=>`<option value="${f}"${f===sh.floor?' selected':''}>${f}</option>`).join('')}
         </select></div>
         <div class="field"><label>Building</label><select id="sh-building">
-          ${BUILDINGS.map(b=>`<option value="${b}"${b===(sh.building||DEFAULT_BUILDING)?' selected':''}>${b}</option>`).join('')}
+          ${buildingList().map(b=>`<option value="${escapeHtml(b)}"${b===(sh.building||DEFAULT_BUILDING)?' selected':''}>${escapeHtml(b)}</option>`).join('')}
+          <option value="__new__">➕ New building…</option>
         </select></div>
         <div class="field"><label>Fill</label>
           <input type="color" id="sh-color" class="swatch" value="${shapeStyle(sh).color}" title="Fill colour for this shape">
@@ -2184,7 +2268,13 @@ function applyShapeEdit() {
   sh.label = document.getElementById('sh-label').value;
   sh.type = document.getElementById('sh-type').value;
   sh.floor = document.getElementById('sh-floor').value;
-  sh.building = document.getElementById('sh-building').value;
+  let b = document.getElementById('sh-building').value;
+  if (b === '__new__') {
+    b = (prompt('Name of the new building (e.g. Shop, Barn, Guest cabin):') || '').trim();
+    if (!b) { render(); return; }
+    if (!buildingList().includes(b)) state.buildings.push(b);
+  }
+  sh.building = b;
   const useDefault = document.getElementById('sh-style-default');
   if (useDefault && useDefault.checked) delete sh.style;
   else if (useDefault) sh.style = { color: document.getElementById('sh-color').value, pattern: document.getElementById('sh-pattern').value };
@@ -2661,7 +2751,7 @@ function closeShape() {
       id: state.nextShapeId++,
       points: pointsToUse,
       segments: hasJumps ? [] : [...state.segments],
-      label, type: finalType, floor: state.activeFloor, building: DEFAULT_BUILDING,
+      label, type: finalType, floor: state.activeFloor, building: newShapeBuilding(),
     };
   }
   if (hasJumps) rebuildSegments(shape);
@@ -2689,6 +2779,10 @@ document.querySelectorAll('#mode-tabs button').forEach(b => {
 });
 
 svg.addEventListener('click', (e) => {
+  // Gallery: a click on a building panel selects that building for editing.
+  const gp = e.target.closest ? e.target.closest('[data-gallery-building]') : null;
+  if (gp) { setViewBuilding(gp.getAttribute('data-gallery-building')); return; }
+  if (galleryActive()) return;
   if (e.target !== svg) return;
   if (state.mode === 'text') {
     // Blank-canvas click in Text mode: place a new label here. If one is
@@ -2878,7 +2972,8 @@ function saveSettings() {
 // EXPORT
 // =============================================================================
 function exportFilename(ext) {
-  return (state.subject || 'sketch').replace(/[^\w\-]/g, '_') + '.' + ext;
+  const viewB = viewBuildingOrAll();
+  return ((state.subject || 'sketch') + (viewB === 'all' ? '' : ' - ' + viewB)).replace(/[^\w\-]/g, '_') + '.' + ext;
 }
 // Print-preview modal: shows the printable sheet, lets you pick page size + what's
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
@@ -2906,6 +3001,13 @@ function openExportPreview() {
           <option value="vertical">All floors — stacked vertically</option>
         </select>
       </label>
+      <label id="prev-buildings-row" style="${buildingsPresent().length > 1 ? '' : 'display:none;'}">Building:
+        <select id="prev-buildings" style="margin-left:6px;" title="Export one building at full page size, or every building as its own file">
+          <option value="view">As shown on canvas</option>
+          ${buildingsPresent().map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('')}
+          <option value="each">Each building — one file per building</option>
+        </select>
+      </label>
       <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="prev-title" ${s.exportIncludeTitle?'checked':''}> Title</label>
       <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="prev-legend" ${s.exportIncludeLegend?'checked':''}> Legend</label>
     </div>
@@ -2928,6 +3030,16 @@ function openExportPreview() {
   sel.value = s.exportPageSize || 'auto';
   const laySel = div.querySelector('#prev-layout');
   laySel.value = s.exportLayout || 'active';
+  const bSel = div.querySelector('#prev-buildings');
+  const present = buildingsPresent();
+  // Which building(s) the export covers. 'view' = whatever the canvas shows now.
+  const exportTargets = () => {
+    const v = bSel ? bSel.value : 'view';
+    if (v === 'each') return present;
+    if (v === 'view') return [viewBuildingOrAll()];
+    return [v];
+  };
+  const buildFor = b => (b === 'all' ? svgForExport() : withBuildingRendered(b, svgForExport));
   const draw = () => {
     s.exportPageSize = sel.value;
     s.exportLayout = laySel.value;
@@ -2942,7 +3054,15 @@ function openExportPreview() {
     const area = div.querySelector('#prev-area');
     area.innerHTML = '';
     let svgEl;
-    try { svgEl = svgForExport(); } catch (e) { area.textContent = 'Preview error: ' + e.message; return; }
+    const targets = exportTargets();
+    try { svgEl = buildFor(targets[0]); } catch (e) { area.textContent = 'Preview error: ' + e.message; return; }
+    finally { render(); }
+    if (targets.length > 1) {
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:11px; color:#555; margin-bottom:6px;';
+      note.textContent = 'Preview shows ' + targets[0] + '. Save writes ' + targets.length + ' files, one per building.';
+      area.appendChild(note);
+    }
     const w = parseFloat(svgEl.getAttribute('width')), h = parseFloat(svgEl.getAttribute('height'));
     const scale = Math.min(680 / w, (window.innerHeight * 0.55) / h, 1);
     svgEl.setAttribute('width', Math.round(w * scale));
@@ -2955,32 +3075,47 @@ function openExportPreview() {
   div.querySelector('#prev-title').addEventListener('change', draw);
   div.querySelector('#prev-legend').addEventListener('change', draw);
   div.querySelectorAll('[data-dimfloor]').forEach(cb => cb.addEventListener('change', draw));
-  div.querySelector('#prev-save-svg').addEventListener('click', () => { exportSVG(); closeModal(); });
-  div.querySelector('#prev-save-png').addEventListener('click', () => { exportPNG(); closeModal(); });
+  if (bSel) bSel.addEventListener('change', draw);
+  const saveAll = async (fmt) => {
+    const targets = exportTargets();
+    closeModal();
+    for (const b of targets) {
+      const clone = buildFor(b);
+      const name = b === 'all' ? exportFilename(fmt) : withBuildingRendered(b, () => exportFilename(fmt));
+      if (fmt === 'svg') await exportSVG(clone, name); else await exportPNG(clone, name);
+    }
+    render();
+  };
+  div.querySelector('#prev-save-svg').addEventListener('click', () => { saveAll('svg'); });
+  div.querySelector('#prev-save-png').addEventListener('click', () => { saveAll('png'); });
   draw();
 }
 
-async function exportSVG() {
-  const clone = svgForExport();
+async function exportSVG(clone, filename) {
+  clone = clone || svgForExport();
+  filename = filename || exportFilename('svg');
   const xml = new XMLSerializer().serializeToString(clone);
-  await saveBlob(new Blob(['<?xml version="1.0"?>\n', xml], { type: 'image/svg+xml' }), exportFilename('svg'), 'image/svg+xml');
+  await saveBlob(new Blob(['<?xml version="1.0"?>\n', xml], { type: 'image/svg+xml' }), filename, 'image/svg+xml');
 }
-function exportPNG() {
-  const clone = svgForExport();
+function exportPNG(clone, filename) {
+  clone = clone || svgForExport();
+  filename = filename || exportFilename('png');
   const w = parseFloat(clone.getAttribute('width')), h = parseFloat(clone.getAttribute('height'));
   const xml = new XMLSerializer().serializeToString(clone);
   const url = URL.createObjectURL(new Blob([xml], { type:'image/svg+xml;charset=utf-8' }));
-  const img = new Image();
-  img.onload = () => {
-    const c = document.createElement('canvas');
-    c.width = w*2; c.height = h*2;
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,c.width,c.height);
-    ctx.drawImage(img,0,0,c.width,c.height);
-    c.toBlob(async b => { await saveBlob(b, exportFilename('png'), 'image/png'); });
-    URL.revokeObjectURL(url);
-  };
-  img.src = url;
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = w*2; c.height = h*2;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,c.width,c.height);
+      ctx.drawImage(img,0,0,c.width,c.height);
+      c.toBlob(async b => { await saveBlob(b, filename, 'image/png'); URL.revokeObjectURL(url); resolve(); });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+    img.src = url;
+  });
 }
 
 // Snapshot the live canvas for export: the tight bbox of what's actually drawn
@@ -2988,7 +3123,7 @@ function exportPNG() {
 // Captures whatever floor is on the canvas right now.
 function captureLivePanel() {
   const allWorldPts = [];
-  const sceneShapes = state.settings.showFloorGhosts ? state.shapes : shapesOnFloor(state.activeFloor);
+  const sceneShapes = state.settings.showFloorGhosts ? visibleShapes() : shapesOnFloor(state.activeFloor);
   sceneShapes.forEach(sh => allWorldPts.push(...sh.points));
   if (state.segments.length) allWorldPts.push(...pathPointsHere(state.segments));
   state.annotations.forEach(a => { allWorldPts.push(a.a); allWorldPts.push(a.b); });
@@ -3057,6 +3192,96 @@ function withFloorRendered(floor, fn) {
   }
 }
 
+// Temporarily scope the canvas to one building (no in-progress walk, no selection),
+// run fn() against it, then put the view filter back. Callers re-render afterwards
+// (renderGallery does so implicitly by overwriting the canvas; exports call render()).
+function withBuildingRendered(building, fn) {
+  const saved = { view: state.viewBuilding, segments: state.segments, preview: state.preview, startPoint: state.startPoint, selection: state.selection };
+  state.viewBuilding = building;
+  state.segments = []; state.preview = null; state.startPoint = null; state.selection = null;
+  try { render(); return fn(); }
+  finally {
+    state.viewBuilding = saved.view; state.segments = saved.segments; state.preview = saved.preview;
+    state.startPoint = saved.startPoint; state.selection = saved.selection;
+  }
+}
+
+// Building gallery: each building rendered alone (active floor, ghosts per settings),
+// captured like an export panel, and tiled so every one is as large as its cell allows.
+// Clicking a panel selects that building for editing (see the svg click handler).
+function renderGallery() {
+  const present = buildingsPresent();
+  const w = svg.clientWidth || 800, h = svg.clientHeight || 600;
+  const floorFor = b => {
+    const has = f => state.shapes.some(sh => (sh.building || DEFAULT_BUILDING) === b && sh.floor === f);
+    // Fallback order: the building's main level first ('main', or 'other' for an
+    // outbuilding drawn there), then whatever floor has content.
+    const order = [state.activeFloor, 'main', 'other', ...state.floors];
+    return order.find(has) || state.activeFloor;
+  };
+  const panels = present.map(b => {
+    const f = floorFor(b);
+    const cap = f === state.activeFloor
+      ? withBuildingRendered(b, captureLivePanel)
+      : withBuildingRendered(b, () => withFloorRendered(f, captureLivePanel));
+    return { building: b, floor: f, ...cap };
+  });
+  viewTransform = null;   // no screen↔world mapping while the gallery is up
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const n = panels.length;
+  const cols = n <= 2 ? n : (n <= 4 ? 2 : 3);
+  const rows = Math.ceil(n / cols);
+  const gap = 24, capH = 26, pad = 20;
+  const cellW = (w - pad * 2 - gap * (cols - 1)) / cols;
+  const cellH = (h - pad * 2 - gap * (rows - 1)) / rows;
+  const ns = 'http://www.w3.org/2000/svg';
+  svg.innerHTML = '<defs></defs>';
+  const defs = svg.querySelector('defs');
+  panels.forEach((p, i) => {
+    (p.patterns || []).forEach(pat => { if (!defs.querySelector('#' + pat.id)) defs.appendChild(pat); });
+    const cx = pad + (i % cols) * (cellW + gap), cy = pad + Math.floor(i / cols) * (cellH + gap);
+    const availH = cellH - capH;
+    const sc = Math.min(cellW / p.tight.w, availH / p.tight.h);
+    const fw = p.tight.w * sc, fh = p.tight.h * sc;
+    const px = cx + (cellW - fw) / 2, py = cy + (availH - fh) / 2;
+    const g = document.createElementNS(ns, 'g');
+    g.setAttribute('class', 'gallery-panel ui-overlay');
+    g.setAttribute('data-gallery-building', p.building);
+    const frame = document.createElementNS(ns, 'rect');
+    frame.setAttribute('x', cx); frame.setAttribute('y', cy); frame.setAttribute('width', cellW); frame.setAttribute('height', cellH);
+    frame.setAttribute('rx', 8); frame.setAttribute('class', 'gallery-frame');
+    g.appendChild(frame);
+    const nested = document.createElementNS(ns, 'svg');
+    nested.setAttribute('x', px); nested.setAttribute('y', py); nested.setAttribute('width', fw); nested.setAttribute('height', fh);
+    nested.setAttribute('viewBox', `${p.tight.x} ${p.tight.y} ${p.tight.w} ${p.tight.h}`);
+    nested.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    nested.style.pointerEvents = 'none';
+    while (p.content.firstChild) nested.appendChild(p.content.firstChild);
+    g.appendChild(nested);
+    const area = state.shapes
+      .filter(sh => (sh.building || DEFAULT_BUILDING) === p.building && sh.floor === p.floor)
+      .reduce((a, sh) => a + polygonArea(sh.points), 0);
+    const cap = document.createElementNS(ns, 'text');
+    cap.setAttribute('x', cx + cellW / 2); cap.setAttribute('y', cy + cellH - 8);
+    cap.setAttribute('text-anchor', 'middle'); cap.setAttribute('class', 'gallery-caption');
+    cap.textContent = p.building + ' — ' + floorCaption(p.floor) + (area > 0 ? ' ' + Math.round(area) + ' sf' : '') +
+      (p.floor !== state.activeFloor ? ' (nothing on ' + state.activeFloor + ')' : '');
+    g.appendChild(cap);
+    svg.appendChild(g);
+  });
+  // The inner renders ran with one building selected; put the bar back to "All".
+  syncBuildingSelect();
+  document.getElementById('floor-help').textContent = 'Gallery: every building in the file, each fitted to its panel. Click one to edit it on its own.';
+}
+
+function sidebarGallery() {
+  const present = buildingsPresent();
+  return `<div class="section"><h2>Buildings</h2>
+    <div class="help">Every building in this file is shown as a gallery. Click one on the canvas, or pick it here, to edit it on its own — the canvas fits that building to the window and new shapes are tagged to it. Use the Building dropdown in the floor bar to come back to All.</div>
+    <div class="row-buttons">${present.map(b => `<button data-building="${escapeHtml(b)}" onclick="setViewBuilding(this.dataset.building)">${escapeHtml(b)}</button>`).join('')}</div>
+  </div>`;
+}
+
 const FLOOR_CAPTIONS = { basement: 'Basement', main: 'Main floor', upper: 'Upper floor', other: 'Other' };
 function floorCaption(f) { return FLOOR_CAPTIONS[f] || (f.charAt(0).toUpperCase() + f.slice(1)); }
 
@@ -3071,13 +3296,14 @@ function svgForExport() {
 
   // ---- 1. Decide what's on the export ----
   const includeTitle = state.settings.exportIncludeTitle && (state.subject || '').trim().length > 0;
-  const usedTypes = [...new Set(state.shapes.map(s => s.type))].filter(k => k in TYPES);
+  const usedTypes = [...new Set(visibleShapes().map(s => s.type))].filter(k => k in TYPES);
   const includeLegend = state.settings.exportIncludeLegend && usedTypes.length > 0;
 
   // Above/below-grade summary line shown on the sheet (appraisal totals)
   const gradeSummary = (() => {
     let agla = 0, bArea = 0, bFin = 0, hasB = false;
-    buildingsPresent().forEach(b => {
+    const exportBuildings = viewBuildingOrAll() === 'all' ? buildingsPresent() : [viewBuildingOrAll()];
+    exportBuildings.forEach(b => {
       agla += aboveGradeLiving(b);
       const bm = state.basements[b];
       if (bm) { hasB = true; const a = basementArea(b); bArea += a; bFin += a * bm.pctFinished / 100; }
@@ -3167,7 +3393,8 @@ function svgForExport() {
 
   // Title block in page coords (slimmed)
   if (includeTitle) {
-    const subj = (state.subject || '').trim();
+    const viewB = viewBuildingOrAll();
+    const subj = ((state.subject || '').trim() + (viewB === 'all' ? '' : ' — ' + viewB)).trim();
     const sub = (state.subtitle || '').trim();
     out.appendChild(mk('text', {
       x: pageW / 2, y: 26, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
@@ -3235,7 +3462,7 @@ function svgForExport() {
       out.appendChild(mk('text', {
         x: rowX + 30, y: rowY + 11, 'font-family':'Arial, sans-serif', 'font-size': 11, fill:'#222'
       }, t.name));
-      const total = state.shapes.filter(s => s.type === key).reduce((a, s) => a + polygonArea(s.points), 0);
+      const total = visibleShapes().filter(s => s.type === key).reduce((a, s) => a + polygonArea(s.points), 0);
       out.appendChild(mk('text', {
         x: rowX + colW - 20, y: rowY + 11, 'text-anchor':'end',
         'font-family':'Arial, sans-serif', 'font-size': 11, 'font-weight':'bold', fill:'#444'
@@ -3415,6 +3642,8 @@ function newProject() {
   state.subject = '';
   state.subtitle = '';
   state.floors = ['basement', 'main', 'upper', 'other'];
+  state.buildings = [...BUILDINGS];
+  state.viewBuilding = 'all';
   state.activeFloor = 'main';
   state.nextShapeId = 1;
   state.selection = null;
@@ -3436,6 +3665,8 @@ function applyLoadedProject(text) {
   state.selection = null; state.splitSelection = null;
   state.labels = d.labels || []; state.nextLabelId = d.nextLabelId || 1;
   state.basements = d.basements || {};
+  state.buildings = normalizeBuildings(d.buildings);      // older files: the five defaults plus whatever the shapes use
+  state.viewBuilding = d.viewBuilding || 'all';
   state.selectedLabel = null; state.labelDrag = null; state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null;
   const subjInp = document.getElementById('subject-input');
   if (subjInp) subjInp.value = state.subject || '';

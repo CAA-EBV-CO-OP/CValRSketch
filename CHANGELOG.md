@@ -14,6 +14,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.20.0] — 2026-09-10
+
+### Added
+- **Named buildings.** A file now carries its own building list (`buildings` in the JSON): the five defaults plus any you add. **+ Building** on the floor bar adds one (Shop, Barn, Guest cabin…) and switches to it; **Rename** renames the building on the canvas and carries its shapes and basement setting along. The shape panel's Building menu lists the file's buildings and offers *New building…*. Older files load with the defaults plus whatever their shapes use.
+- **Building view filter.** A **Building** dropdown on the floor bar scopes the canvas to one building: it is fitted to the window on its own, floor tabs, ghosts, snapping, fence and the Areas panel follow the same scope, and new shapes are tagged to it. Persisted in the file as `viewBuilding`.
+- **Building gallery.** With several buildings in the file, *All* shows each building in its own panel, fitted as large as its cell allows (the active floor, or the building's main level when it has nothing on the active floor). Click a panel to edit that building.
+- **Per-building export.** The Export / Print preview gains a **Building** choice: as shown on the canvas, one named building at full page size, or *Each building — one file per building*. The title and file name carry the building name. Legend and grade totals cover only the exported building.
+
+### Changed
+- `visibleShapes()` sits under `shapesOnFloor` / `shapesOnOtherFloors` / `fitView` / walk snapping; floor rename/delete and the Totals panel still see every shape.
+
+---
+
 ## [0.19.3] — 2026-09-10
 
 ### Fixed

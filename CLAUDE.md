@@ -124,9 +124,11 @@ Elements with class `ui-overlay` are stripped from exports (fence rings, fence r
 
 Each `render()` call sets `svg.innerHTML` and redraws everything. Do not attach persistent event listeners to canvas children — they are destroyed on the next render. Use `state` for persistence, not DOM references.
 
-### 4.8 Floor Isolation
+### 4.8 Floor and Building Isolation
 
-`shapesOnFloor(floorName)` filters shapes by `sh.floor`. `state.activeFloor` is the current editing context. Fence operations and edits should only affect active-floor shapes.
+`shapesOnFloor(floorName)` filters shapes by `sh.floor` **within `visibleShapes()`**, which applies the building view filter (`state.viewBuilding`: `'all'` or one name from `state.buildings`). `state.activeFloor` is the current editing context. Fence operations and edits should only affect active-floor shapes of the viewed building. Floor rename/delete, the Totals panel, `buildingsPresent()` and the basement helpers deliberately read `state.shapes` directly (every building).
+
+`galleryActive()` is true when the view is `'all'` and more than one building has shapes; `render()` then hands off to `renderGallery()`, which renders each building alone through `withBuildingRendered()` and tiles the captured panels. Anything that converts screen to world coordinates must bail out while the gallery is up (`viewTransform` is `null`). `state.buildings` is undo-able (in `snapshotState`) and saved with the file; `normalizeBuildings()` reconciles it with the names shapes actually use.
 
 ---
 
