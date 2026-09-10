@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.24.0] — 2026-09-10
+
+### Added
+- **Arrow keys for direction.** With a length typed in the New Segment box (`16'4`, `12`, `3'6"`), pressing ← ↑ → ↓ adds the wall in that direction — no `u`/`d`/`l`/`r` needed. With the box empty the arrows still pen-jump to the next aligned vertex.
+- **Compass pad.** An on-screen ↑ ← → ↓ pad under the New Segment box does the same by click, for mouse or touch work. (`compassDir()`, `isLengthOnly()`.)
+
+---
+
 ## [0.23.2] — 2026-09-10
 
 ### Fixed

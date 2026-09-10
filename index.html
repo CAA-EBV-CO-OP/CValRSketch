@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.23.2"></script>
-<script src="dictation.js?v=0.23.2"></script>
+<script src="core.js?v=0.24.0"></script>
+<script src="dictation.js?v=0.24.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -80,6 +80,13 @@
   .row-buttons button { flex: 1; background: #6c7a8a; color: #fff; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px; min-width: 70px; }
   .row-buttons button:hover { background: #7d8c9d; }
   .row-buttons button.primary { background: #2e8b57; }
+  /* Compass pad: click a direction instead of typing u/d/l/r */
+  .compass { display: grid; grid-template-columns: repeat(3, 34px); grid-template-rows: repeat(3, 30px); gap: 3px; margin-top: 8px; justify-content: start; align-items: stretch; }
+  .compass button { background: #eef2f6; color: #2b3a4a; border: 1px solid #c0c8d0; border-radius: 4px; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
+  .compass button:hover { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+  .compass .compass__hint { grid-column: 1 / 4; font-size: 10px; color: #777; align-self: center; }
+  .compass-row { display: flex; gap: 12px; align-items: flex-start; }
+  .compass-row .help { flex: 1; margin-top: 8px; }
   .row-buttons button.primary:hover { background: #379a64; }
   .row-buttons button.danger { background: #c44; }
   .help { font-size: 11px; color: #666; line-height: 1.5; }
@@ -147,7 +154,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.23.2</span>
+  <span class="version-chip" id="app-version">v0.24.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">shared to <b>osasi.org</b></a>
@@ -1761,6 +1768,14 @@ function sidebarWalk() {
         <button id="btnMic" type="button" title="Dictate measurements">Dictate</button>
         <button id="btnTrain" type="button" title="Teach a correction for the last mishearing">Train</button>
       </div>
+      <div class="compass-row">
+        <div class="compass" aria-label="Direction pad">
+          <span></span><button type="button" onclick="compassDir('u')" title="Up — adds the typed length going up (empty box: pen-jump up)">&#8593;</button><span></span>
+          <button type="button" onclick="compassDir('l')" title="Left — adds the typed length going left (empty box: pen-jump left)">&#8592;</button><span></span><button type="button" onclick="compassDir('r')" title="Right — adds the typed length going right (empty box: pen-jump right)">&#8594;</button>
+          <span></span><button type="button" onclick="compassDir('d')" title="Down — adds the typed length going down (empty box: pen-jump down)">&#8595;</button><span></span>
+        </div>
+        <div class="help">Type a length, then click a direction or press <code>&#8592; &#8593; &#8594; &#8595;</code> — the wall is added that way. With the box empty the same keys pen-jump to the next aligned vertex.</div>
+      </div>
       <div id="micStatus" style="font-size:11px;color:#666;margin-top:4px;min-height:14px;"></div>
       <pre id="micLog" style="font-size:10px;color:#777;background:#f4f7fa;border:1px solid #e0e6ec;border-radius:4px;margin-top:4px;padding:4px 6px;max-height:120px;overflow:auto;white-space:pre-wrap;line-height:1.35;"></pre>
       <div class="row-buttons">
@@ -2119,6 +2134,11 @@ function attachSidebarHandlers() {
       // Empty input + arrow key → preview/cycle next aligned vertex as a pen-jump (no wall)
       e.preventDefault();
       handleAutoExtendKey(ARROW_DIR[e.key], /*asJump=*/true);
+    }
+    else if (e.key in ARROW_DIR && isLengthOnly(cmd.value)) {
+      // A length typed + arrow key → add that wall in the arrow's direction
+      e.preventDefault();
+      compassDir(ARROW_DIR[e.key]);
     }
   });
   const off = document.getElementById('start-offset');
@@ -2507,6 +2527,22 @@ function handleSplitClick(shapeId, vIdx) {
 // =============================================================================
 // WALK MODE COMMANDS
 // =============================================================================
+// A "length only" entry: digits, feet/inch marks, dot, dash, slash — no direction yet.
+function isLengthOnly(v) { return /^[\d'"\s.\-\/]+$/.test(v.trim()) && /\d/.test(v); }
+// Compass pad / arrow keys: with a length typed, add the wall that way; with the
+// box empty, behave like the pen-jump arrows.
+function compassDir(dir) {
+  if (state.mode !== 'walk') return;
+  const input = document.getElementById('cmd');
+  if (!input) return;
+  const v = input.value.trim();
+  if (v === '') { handleAutoExtendKey(dir, /*asJump=*/true); input.focus(); return; }
+  if (!isLengthOnly(v)) { input.focus(); return; }   // already has a direction or angle — leave it to Enter
+  input.value = v + ' ' + dir;
+  addCmd();
+  input.focus();
+}
+
 function addCmd() {
   const input = document.getElementById('cmd');
   if (!input) return;
