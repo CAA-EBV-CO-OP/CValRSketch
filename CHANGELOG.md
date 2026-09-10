@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.25.0] — 2026-09-10
+
+### Added
+- **Angle picker beside the compass pad** — 0°, 22.5°, 45°, 67.5°. With an angle picked, an arrow key or pad click adds the wall as `<length> <dir> <angle>`, so it follows the existing angle convention: a turn from the previous wall for right/left, or degrees clockwise from the cardinal base for up/down and the first wall. The picker stays set until changed.
+
+---
+
 ## [0.24.0] — 2026-09-10
 
 ### Added

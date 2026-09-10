@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.24.0`
+**Current version:** `0.25.0`
 **Released:** 2026-09-10
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.25.0  | 2026-09-10 | minor  | **Angle picker beside the compass** (0 / 22.5 / 45 / 67.5°): the chosen angle is appended after the direction for arrow-key and pad entries, exactly as typing `16 r 45`. |
 | 0.24.0  | 2026-09-10 | minor  | **Arrow keys and a compass pad for direction.** Type a length, then press ← ↑ → ↓ or click the on-screen pad under the New Segment box and the wall is added in that direction. With the box empty the same keys and pad pen-jump to the next aligned vertex, as before. |
 | 0.23.2  | 2026-09-10 | patch  | Sidebar input rows no longer overflow the right edge: the text box may shrink (`min-width: 0`), buttons keep their size and wrap to a second line only if the panel is too narrow; the sidebar never scrolls sideways. |
 | 0.23.1  | 2026-09-10 | patch  | **Walk mode: just start typing.** The segment box takes the caret when Walk is chosen, after Load / New, and on startup; a printable key pressed with nothing focused goes straight into it. No more click into the box first. |
