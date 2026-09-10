@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.27.0"></script>
-<script src="dictation.js?v=0.27.0"></script>
+<script src="core.js?v=0.27.1"></script>
+<script src="dictation.js?v=0.27.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -171,7 +171,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.27.0</span>
+  <span class="version-chip" id="app-version">v0.27.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -3451,7 +3451,7 @@ function openExportPreview() {
       </label>
       <label id="prev-buildings-row" style="${buildingsPresent().length > 1 ? '' : 'display:none;'}">Building:
         <select id="prev-buildings" style="margin-left:6px;" title="Export one building at full page size, or every building as its own file">
-          <option value="view">As shown on canvas</option>
+          <option value="view">${galleryActive() ? 'All buildings — one sheet (as on canvas)' : 'As shown on canvas'}</option>
           ${buildingsPresent().map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('')}
           <option value="each">Each building — one file per building</option>
         </select>
@@ -3803,26 +3803,43 @@ function svgForExport() {
   // tile the panels on one sheet, so the floors read as separate plans, not a stack.
   const layout = state.settings.exportLayout || 'active';
   const floorsWithContent = state.floors.filter(f => shapesOnFloor(f).length || labelsOnFloor(f).length);
-  const multi = layout !== 'active' && floorsWithContent.length > 1;
+  // Gallery on the canvas (All, several buildings): the sheet is one panel per
+  // building in a grid — every building on one page, all at the same scale.
+  const galleryExport = galleryActive();
+  const multi = galleryExport || (layout !== 'active' && floorsWithContent.length > 1);
   let panels;
-  if (!multi) {
+  if (galleryExport) {
+    const floorFor = b => {
+      const has = f => state.shapes.some(sh => (sh.building || DEFAULT_BUILDING) === b && sh.floor === f);
+      return [state.activeFloor, 'main', 'other', ...state.floors].find(has) || state.activeFloor;
+    };
+    panels = buildingsPresent().map(b => {
+      const f = floorFor(b);
+      const cap = f === state.activeFloor ? withBuildingRendered(b, captureLivePanel)
+                                          : withBuildingRendered(b, () => withFloorRendered(f, captureLivePanel));
+      return { building: b, floor: f, ...cap };
+    });
+  } else if (!multi) {
     panels = [{ floor: state.activeFloor, ...captureLivePanel() }];
   } else {
     // Report order: above-grade floors as listed, basement last.
     const order = floorsWithContent.filter(f => f !== 'basement').concat(floorsWithContent.filter(f => f === 'basement'));
     panels = order.map(f => ({ floor: f, ...withFloorRendered(f, captureLivePanel) }));
   }
-  const horiz = !multi || layout === 'horizontal';
+  const grid = galleryExport;
+  const horiz = !grid && (!multi || layout === 'horizontal');
   const n = panels.length;
   const captionH = multi ? 22 : 0;   // page px, under each panel
   const gap = 28;                    // page px, between panels
   const sumW = panels.reduce((a, p) => a + p.tight.w, 0), sumH = panels.reduce((a, p) => a + p.tight.h, 0);
   const maxW = Math.max(...panels.map(p => p.tight.w)), maxH = Math.max(...panels.map(p => p.tight.h));
+  const cols = grid ? (n <= 2 ? n : (n <= 4 ? 2 : 3)) : 1;
+  const rows = grid ? Math.ceil(n / cols) : 1;
   // Drawing extent (screen px, scales with fitScale) vs fixed page chrome (gaps, captions)
-  const contentW = horiz ? sumW : maxW;
-  const contentH = horiz ? maxH : sumH;
-  const fixedW = horiz ? gap * (n - 1) : 0;
-  const fixedH = horiz ? captionH : captionH * n + gap * (n - 1);
+  const contentW = grid ? cols * maxW : (horiz ? sumW : maxW);
+  const contentH = grid ? rows * maxH : (horiz ? maxH : sumH);
+  const fixedW = grid ? gap * (cols - 1) : (horiz ? gap * (n - 1) : 0);
+  const fixedH = grid ? captionH * rows + gap * (rows - 1) : (horiz ? captionH : captionH * n + gap * (n - 1));
 
   // ---- 3. Page size & available canvas area ----
   const page = EXPORT_PAGE_SIZES[state.settings.exportPageSize] || null;
@@ -3896,10 +3913,16 @@ function svgForExport() {
 
   // ---- 5. Place the panel(s): one nested SVG per panel, cropped to its tight bbox ----
   let cx = blockX, cy = blockY;
-  panels.forEach(p => {
+  panels.forEach((p, i) => {
     const fw = p.tight.w * fitScale, fh = p.tight.h * fitScale;
-    let px, py;
-    if (horiz) { px = cx; py = blockY + (contentH * fitScale - fh) / 2; cx += fw + gap; }
+    let px, py, capY;
+    if (grid) {
+      const cellW = maxW * fitScale, cellH = maxH * fitScale;
+      const cellX = blockX + (i % cols) * (cellW + gap), cellY = blockY + Math.floor(i / cols) * (cellH + captionH + gap);
+      px = cellX + (cellW - fw) / 2; py = cellY + (cellH - fh) / 2;
+      capY = cellY + cellH + 15;
+    }
+    else if (horiz) { px = cx; py = blockY + (contentH * fitScale - fh) / 2; cx += fw + gap; }
     else       { px = blockX + (blockW - fw) / 2; py = cy; cy += fh + captionH + gap; }
     const nested = mk('svg', {
       x: px, y: py, width: fw, height: fh,
@@ -3909,12 +3932,14 @@ function svgForExport() {
     while (p.content.firstChild) nested.appendChild(p.content.firstChild);
     out.appendChild(nested);
     if (multi) {
-      const area = shapesOnFloor(p.floor).reduce((a, sh) => a + polygonArea(sh.points), 0);
-      const capY = (horiz ? blockY + contentH * fitScale : py + fh) + 15;
+      const area = p.building
+        ? state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === p.building && sh.floor === p.floor).reduce((a, sh) => a + polygonArea(sh.points), 0)
+        : shapesOnFloor(p.floor).reduce((a, sh) => a + polygonArea(sh.points), 0);
+      if (!grid) capY = (horiz ? blockY + contentH * fitScale : py + fh) + 15;
       out.appendChild(mk('text', {
         x: px + fw / 2, y: capY, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
         'font-size': 12, 'font-weight':'bold', fill:'#222'
-      }, `${floorCaption(p.floor)} — ${Math.round(area)} sq ft`));
+      }, p.building ? `${p.building} — ${floorCaption(p.floor)} — ${Math.round(area)} sq ft` : `${floorCaption(p.floor)} — ${Math.round(area)} sq ft`));
     }
   });
 
