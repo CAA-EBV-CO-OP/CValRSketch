@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.29.0"></script>
-<script src="dictation.js?v=0.29.0"></script>
+<script src="core.js?v=0.30.0"></script>
+<script src="dictation.js?v=0.30.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -193,7 +193,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.29.0</span>
+  <span class="version-chip" id="app-version">v0.30.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -1547,6 +1547,41 @@ function applyGroupMove() {
   render();
 }
 
+// What the fence captured in full: shapes with every vertex inside, the unfinished
+// walk when all its points are inside, offsets with both ends inside.
+function fencedWhole() {
+  const sel = state.fenceSelection;
+  if (!sel) return null;
+  const perShape = new Map();
+  sel.shapeVerts.forEach(({ shapeId }) => perShape.set(shapeId, (perShape.get(shapeId) || 0) + 1));
+  const shapes = [...perShape.entries()]
+    .filter(([id, n]) => { const sh = state.shapes.find(x => x.id === id); return sh && n >= sh.points.length - 1; })
+    .map(([id]) => id);
+  const walk = state.segments.length > 0 && sel.inProgVerts.length >= state.segments.length + 1;
+  const perAnn = new Map();
+  sel.annEnds.forEach(({ idx }) => perAnn.set(idx, (perAnn.get(idx) || 0) + 1));
+  const anns = [...perAnn.entries()].filter(([, n]) => n >= 2).map(([idx]) => idx);
+  return { shapes, walk, anns };
+}
+function deleteFenced() {
+  const whole = fencedWhole();
+  if (!whole) return;
+  const names = whole.shapes.map(id => { const sh = state.shapes.find(x => x.id === id); return sh.label + ' (' + Math.round(polygonArea(sh.points)) + ' sf)'; });
+  if (whole.walk) names.push('the unfinished walk (' + state.segments.length + ' segment' + (state.segments.length === 1 ? '' : 's') + ')');
+  if (whole.anns.length) names.push(whole.anns.length + ' offset measurement' + (whole.anns.length === 1 ? '' : 's'));
+  if (!names.length) { alert('Nothing is captured whole. Enlarge the fence so every vertex of what you want gone is inside it.'); return; }
+  if (state.settings.confirmDelete && !confirm('Delete:\n  ' + names.join('\n  ') + '\n\nUndo (Ctrl+Z) restores them.')) return;
+  pushUndo();
+  const gone = new Set(whole.shapes);
+  state.shapes = state.shapes.filter(sh => !gone.has(sh.id));
+  if (whole.walk) { state.segments = []; state.startPoint = null; state.preview = null; state.enclose = null; state.rewalk = null; }
+  const goneAnn = new Set(whole.anns);
+  state.annotations = state.annotations.filter((_, i) => !goneAnn.has(i));
+  state.fenceSelection = null;
+  state.selection = null;
+  render();
+}
+
 function sidebarFence() {
   const sel = state.fenceSelection;
   const counts = sel
@@ -1555,15 +1590,18 @@ function sidebarFence() {
   const intro = state.fenceDraw
     ? 'Release to capture vertices inside the rectangle.'
     : (sel
-        ? `Selected: <b>${counts}</b>. Walls with both endpoints captured will translate; walls crossing the fence stretch. Type an offset and press <b>Move</b>.`
-        : 'Click and drag on the canvas to draw a rectangular fence. Vertices fully inside the rectangle will be captured.');
+        ? `Selected: <b>${counts}</b>. Walls with both endpoints captured will translate; walls crossing the fence stretch. Type an offset and press <b>Move</b>. <b>Delete fenced</b> (or the Delete key) removes whatever the fence captured <i>whole</i>: shapes with every vertex inside, an unfinished walk with all its points inside, offsets with both ends inside.`
+        : 'Click and drag on the canvas to draw a rectangular fence. Vertices fully inside the rectangle will be captured — then move them by a typed offset, or delete what was captured whole.');
+  const whole = sel ? fencedWhole() : null;
+  const delLabel = whole ? [whole.shapes.length ? `${whole.shapes.length} shape${whole.shapes.length === 1 ? '' : 's'}` : '', whole.walk ? 'the unfinished walk' : '', whole.anns.length ? `${whole.anns.length} offset${whole.anns.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ') : '';
   const moveBlock = sel ? `
     <div class="input-row" style="margin-top:8px;">
       <input id="group-move" placeholder="e.g. 3'6 r  or  6&quot; d">
       <button data-act="applyGroupMove" class="primary">Move</button>
     </div>
     <div class="row-buttons" style="margin-top:6px;">
-      <button data-act="clearFenceSelection" class="danger">Clear selection</button>
+      <button data-act="deleteFenced" class="danger" ${delLabel ? '' : 'disabled'} title="${delLabel ? 'Delete ' + delLabel : 'Nothing is captured whole — enlarge the fence to cover every vertex of what you want gone'}">Delete fenced${delLabel ? ' (' + delLabel + ')' : ''}</button>
+      <button data-act="clearFenceSelection">Clear selection</button>
     </div>
   ` : '';
   return `
@@ -2357,6 +2395,7 @@ function sidebarAction(e) {
     case 'addCmd': addCmd(); break;
     case 'undo': undoHistory(); break;
     case 'closeShape': closeShape(); break;
+    case 'deleteFenced': deleteFenced(); break;
     case 'encloseAccept': closeShape(); break;
     case 'encloseNext': encloseNext(); break;
     case 'encloseDismiss': encloseDismiss(); break;
@@ -3692,6 +3731,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.30.0', '2026-09-11', 'Fence can delete: draw a fence around anything — a stray unfinished walk, whole shapes, offsets — and Delete fenced (or the Delete key) removes what it captured whole, one undo step.'],
   ['0.29.0', '2026-09-11', 'Enclosed areas: when the pen lands on an existing wall, the region it fences off with the existing walls lights up yellow — Enter closes along those walls (N cycles options) instead of a straight line back to the start. New-area picker: label plus a grid of type buttons, no more typing the type.'],
   ['0.28.0', '2026-09-10', 'Compass rose: click a direction (8 at 45° or 16 at 22.5°) with a length typed and the wall goes that way; the list beside it shows the typed command for each direction and highlights with the wedge. Directions are absolute (up is always up).'],
   ['0.24–0.27', '2026-09-10', 'Walk box focuses on click; arrow keys add cardinal walls; Manage buildings (rename, merge, delete); mark buildings for deletion from the gallery or full-screen; gallery export prints every building on one sheet.'],
@@ -4743,6 +4783,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'Escape' && state.offsetPick) { cancelOffsetPick(); }
   else if (e.key === 'Escape' && state.shapeMovePick) { cancelShapeMovePick(); }
   else if (e.key === 'Escape' && state.mode === 'edit' && state.selection) { state.selection = null; render(); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && state.mode === 'fence' && state.fenceSelection) { e.preventDefault(); deleteFenced(); }
   else if (e.key === 'Escape' && state.mode === 'fence' && (state.fenceSelection || state.fenceDraw)) { state.fenceDraw = null; state.fenceSelection = null; render(); }
   else if (state.mode === 'text' && state.selectedLabel !== null && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); deleteLabel(state.selectedLabel); }
   else if (e.key === 'Escape' && state.mode === 'text' && state.selectedLabel !== null) { state.selectedLabel = null; render(); }
