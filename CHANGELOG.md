@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.26.0] — 2026-09-10
+
+### Added
+- **Manage buildings.** *Manage…* on the floor bar (and *Manage buildings…* in the gallery sidebar) opens a table of every building with its shape count and area. Per row: **Rename**, **Merge into…** (moves the shapes across and drops the duplicate name; the target's basement setting wins), **Delete** (removes the building's shapes, basement setting and name — confirmed, one undo step). *Remove unused names* drops names that have no shapes; *+ Add building* is there too. Renaming onto an existing name now offers a merge instead of refusing. Deleting the building on the canvas returns the view to All.
+
+---
+
 ## [0.25.1] — 2026-09-10
 
 ### Changed
