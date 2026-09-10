@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.30.2] — 2026-09-11
+
+### Changed
+- **New-area dialog simplified.** Two text boxes read as two places for free text. Now: **1. Type** (the buttons — fill, legend entry, which totals it counts in), then **2. Label** (your own wording, e.g. *Enclosed porch / sunroom*). The “Or type it” box, which only matched a type name and silently ignored anything else, is gone.
+- **Label follows the type.** The label starts as the chosen type's name (“Open covered porch”) and changes when you click another type, until you type your own wording; a blank label falls back to the type name. Most areas are one click and Enter.
+
+---
+
 ## [0.30.1] — 2026-09-11
 
 ### Fixed

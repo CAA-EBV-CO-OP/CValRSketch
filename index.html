@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.30.1"></script>
-<script src="dictation.js?v=0.30.1"></script>
+<script src="core.js?v=0.30.2"></script>
+<script src="dictation.js?v=0.30.2"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -193,7 +193,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.30.1</span>
+  <span class="version-chip" id="app-version">v0.30.2</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -3179,16 +3179,6 @@ function typeSwatch(k) {
   const f = TYPES[k].fill;
   return f.startsWith('#') ? f : 'repeating-linear-gradient(45deg,#c8c8c8 0 2px,#fff 2px 5px)';
 }
-// Resolve free text to a type key: exact key, then a name that starts with or contains it.
-function resolveTypeText(t) {
-  t = (t || '').trim().toLowerCase();
-  if (!t) return null;
-  if (t in TYPES) return t;
-  const ents = Object.entries(TYPES);
-  const hit = ents.find(([k, v]) => k.startsWith(t) || v.name.toLowerCase().startsWith(t))
-           || ents.find(([k, v]) => v.name.toLowerCase().includes(t));
-  return hit ? hit[0] : null;
-}
 function openNewAreaModal(defLabel, onOk) {
   const m = createModal();
   const div = document.createElement('div');
@@ -3198,34 +3188,32 @@ function openNewAreaModal(defLabel, onOk) {
   let sel = suggestedType();
   div.innerHTML = `
     <h3>New area</h3>
-    <label style="font-size:12px;display:block;">Label<br>
-      <input id="na-label" value="${escapeHtml(defLabel)}" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:13px;border:1px solid #c0c8d0;border-radius:4px;margin-top:3px;">
-    </label>
-    <div style="font-size:12px;margin-top:10px;">Type</div>
+    <div style="font-size:12px;"><b>1. Type</b> — sets the fill, the legend entry and which totals it counts in. Pick one of these:</div>
     <div class="type-grid">${Object.entries(TYPES).map(([k, v]) =>
       `<button type="button" class="type-btn${k === sel ? ' sel' : ''}" data-type="${k}"><span class="sw" style="background:${typeSwatch(k)}"></span><span>${escapeHtml(v.name)}<small>${k}</small></span></button>`).join('')}
     </div>
-    <label style="font-size:12px;display:block;">Or type it<br>
-      <input id="na-type" value="${sel}" placeholder="living, garage, deck, shop …" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:13px;border:1px solid #c0c8d0;border-radius:4px;margin-top:3px;">
+    <label style="font-size:12px;display:block;margin-top:4px;"><b>2. Label</b> — printed on the drawing; follows the type unless you type your own (e.g. <i>Main Floor</i>, <i>Enclosed porch / sunroom</i>)<br>
+      <input id="na-label" value="${escapeHtml(TYPES[sel].name)}" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:13px;border:1px solid #c0c8d0;border-radius:4px;margin-top:3px;">
     </label>
-    <div class="help" style="margin-top:6px;">Click a type or type its name (a few letters will do). Enter = OK, Esc = cancel and keep the walk. Types are fixed because each one has its own fill and legend entry; for anything else pick the closest and put the detail in the label.</div>
+    <div class="help" style="margin-top:6px;">Enter = OK, Esc = cancel and keep the walk. Both can be changed later in Edit mode.</div>
     <div class="modal-buttons">
       <button type="button" onclick="closeModal()">Cancel</button>
       <button type="button" class="primary" id="na-ok">OK</button>
     </div>`;
   m.appendChild(div);
-  const typeIn = div.querySelector('#na-type'), labelIn = div.querySelector('#na-label');
+  const labelIn = div.querySelector('#na-label');
+  let labelAuto = true;   // label still follows the type (the user has not typed their own)
+  labelIn.addEventListener('input', () => { labelAuto = false; });
   const mark = () => div.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('sel', b.dataset.type === sel));
   div.querySelectorAll('.type-btn').forEach(b => b.addEventListener('click', () => {
-    sel = b.dataset.type; typeIn.value = sel; mark();
+    sel = b.dataset.type; mark();
+    if (labelAuto) labelIn.value = TYPES[sel].name;
     // Hand the caret back to the label so typing after a type click goes there, not to the walk box.
-    labelIn.focus(); if (labelIn.value === defLabel) labelIn.select();
+    labelIn.focus(); if (labelAuto) labelIn.select();
   }));
-  typeIn.addEventListener('input', () => { const k = resolveTypeText(typeIn.value); if (k) { sel = k; mark(); } });
   const ok = () => {
-    const typed = resolveTypeText(typeIn.value);
-    const type = typed || sel || 'misc';
-    const label = labelIn.value.trim() || defLabel;
+    const type = sel || 'misc';
+    const label = labelIn.value.trim() || TYPES[type].name;
     closeModal();
     onOk(label, type);
   };
