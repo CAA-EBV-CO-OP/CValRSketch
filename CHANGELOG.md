@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.30.0] — 2026-09-11
+
+### Added
+- **Fence can delete.** The Fence tab already captured vertices for a group move; it now has *Delete fenced* (and the Delete / Backspace key) which removes whatever the fence captured *whole*: shapes with every vertex inside, an unfinished walk with all its points inside, offset measurements with both ends inside. Partly captured things are left alone, so a fence that clips a corner of the house cannot take the house. The button names what it will remove, the confirmation lists it, and it is one undo step. Handy for a stray unfinished walk sitting far from the drawing — fence it and delete.
+
+---
+
 ## [0.29.0] — 2026-09-11
 
 ### Added
