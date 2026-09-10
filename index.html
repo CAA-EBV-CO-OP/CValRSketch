@@ -134,6 +134,8 @@
   <label class="btn" id="load-label">Load
     <input type="file" id="load-json" accept=".json" style="display:none">
   </label>
+  <button onclick="document.getElementById('add-json').click()" title="Append another sketch file's buildings to this one (you choose the building names; the drawing is placed beside what is here)">➕ Add file…</button>
+  <input type="file" id="add-json" accept=".json" style="display:none">
   <span id="autosave-chip" class="autosave-chip"></span>
 </header>
 
@@ -3622,6 +3624,103 @@ async function saveJSONAs() {
     renderAutosaveChip();
   }
 }
+
+// ----- Add file: append another sketch's buildings to this project ----------
+// Lets the one-file-per-building habit be combined into a single file. Each
+// incoming building is mapped to a name here (pre-filled: keep the name if it is
+// unused, else the sketch's subject suffix, else "<name> 2"); shapes, labels and
+// offset annotations are appended, shifted to sit beside the current drawing;
+// basement settings follow the new names. One undo step.
+function openAddFileModal(d, fname) {
+  if (!d || !Array.isArray(d.shapes) || !d.shapes.length) { alert('That file has no shapes to add.'); return; }
+  const incoming = [...new Set(d.shapes.map(sh => sh.building || DEFAULT_BUILDING))];
+  const subj = String(d.subject || '');
+  const suffix = subj.includes(' - ') ? subj.slice(subj.lastIndexOf(' - ') + 3).trim() : '';
+  const present = buildingsPresent();
+  const taken = new Set(present);
+  const suggest = b => {
+    const generic = b === 'Outbuildings' || b === 'Other';
+    let n = (generic && suffix && !present.includes(suffix)) ? suffix
+      : (!present.includes(b) ? b : (suffix && !present.includes(suffix) ? suffix : b + ' 2'));
+    let k = 2;
+    while (taken.has(n)) n = b + ' ' + (++k);
+    taken.add(n);
+    return n;
+  };
+  const m = createModal();
+  const div = document.createElement('div');
+  div.className = 'modal';
+  div.style.maxWidth = '520px';
+  div.innerHTML = `
+    <h3>Add file: ${escapeHtml(fname)}</h3>
+    <div class="help" style="margin-bottom:8px;">${d.shapes.length} shape${d.shapes.length === 1 ? '' : 's'}${subj ? ' from “' + escapeHtml(subj) + '”' : ''}. Name each incoming building as it should appear in this file.</div>
+    ${incoming.map((b, i) => `<div class="field"><label>${escapeHtml(b)} →</label><input id="addmap-${i}" value="${escapeHtml(suggest(b))}" style="flex:1;"></div>`).join('')}
+    <label class="inline" style="display:flex; align-items:center; gap:6px; margin-top:8px;"><input type="checkbox" id="add-beside" checked> Place beside the current drawing (shift so nothing overlaps)</label>
+    <div class="modal-buttons">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="primary" id="add-file-go">Add</button>
+    </div>`;
+  m.appendChild(div);
+  div.querySelector('#add-file-go').addEventListener('click', () => {
+    const mapping = {};
+    for (let i = 0; i < incoming.length; i++) {
+      const v = (div.querySelector('#addmap-' + i).value || '').trim();
+      if (!v) { alert('Give every incoming building a name.'); return; }
+      mapping[incoming[i]] = v;
+    }
+    const beside = div.querySelector('#add-beside').checked;
+    closeModal();
+    addFileToProject(d, mapping, beside);
+  });
+  const first = div.querySelector('#addmap-0');
+  if (first) { first.focus(); first.select(); }
+}
+
+function addFileToProject(d, mapping, beside) {
+  pushUndo();
+  let dx = 0, dy = 0;
+  const cur = state.shapes.flatMap(sh => sh.points);
+  if (beside && cur.length) {
+    const inPts = d.shapes.flatMap(sh => sh.points || []);
+    if (inPts.length) {
+      const curMaxX = Math.max(...cur.map(p => p.x)), curMinY = Math.min(...cur.map(p => p.y));
+      const inMinX = Math.min(...inPts.map(p => p.x)), inMinY = Math.min(...inPts.map(p => p.y));
+      dx = curMaxX + 20 - inMinX;
+      dy = curMinY - inMinY;
+    }
+  }
+  const shift = p => ({ x: p.x + dx, y: p.y + dy });
+  (d.floors || []).forEach(f => { if (!state.floors.includes(f)) state.floors.push(f); });
+  Object.values(mapping).forEach(n => { if (!buildingList().includes(n)) state.buildings.push(n); });
+  d.shapes.forEach(sh => {
+    const copy = JSON.parse(JSON.stringify(sh));
+    copy.id = state.nextShapeId++;
+    copy.building = mapping[sh.building || DEFAULT_BUILDING] || (sh.building || DEFAULT_BUILDING);
+    copy.floor = copy.floor || 'main';
+    copy.points = (copy.points || []).map(shift);
+    if (!state.floors.includes(copy.floor)) state.floors.push(copy.floor);
+    state.shapes.push(copy);
+  });
+  (d.labels || []).forEach(l => state.labels.push({ ...l, id: state.nextLabelId++, x: l.x + dx, y: l.y + dy }));
+  (d.annotations || []).forEach(a => { if (a && a.a && a.b) state.annotations.push({ ...a, a: shift(a.a), b: shift(a.b) }); });
+  Object.entries(d.basements || {}).forEach(([b, v]) => {
+    const n = mapping[b] || b;
+    if (!state.basements[n] && v) state.basements[n] = { ...v };
+  });
+  state.viewBuilding = 'all';
+  state.selection = null; state.splitSelection = null; state.fenceSelection = null; state.startPoint = null;
+  render();
+}
+document.getElementById('add-json').addEventListener('change', (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try { openAddFileModal(JSON.parse(r.result), f.name); }
+    catch (err) { alert('Add file failed: ' + err.message); }
+  };
+  r.readAsText(f);
+  e.target.value = '';
+});
 
 function newProject() {
   const hasWork = state.shapes.length || state.segments.length || state.annotations.length || (state.subject || '').trim();
