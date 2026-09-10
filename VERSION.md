@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.26.0`
+**Current version:** `0.27.0`
 **Released:** 2026-09-10
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.27.0  | 2026-09-10 | minor  | **Mark and delete visually.** Each gallery panel has a tick box: mark buildings for deletion while looking at them, open one to check it and tick *Mark for deletion* on the floor bar, then *Delete marked (n)* removes them all in one undo step. Marks are session-only. |
 | 0.26.0  | 2026-09-10 | minor  | **Manage buildings** (floor bar *Manage…*, and in the gallery sidebar): every building with its shape count and area; Rename, **Merge into…** (shapes move across, duplicate name dropped), **Delete** (shapes + basement setting + name), and *Remove unused names*. Rename onto an existing name now offers a merge. Each action is one undo step. |
 | 0.25.1  | 2026-09-10 | patch  | Wording: the header chip and the optional export credit read *provided by osasi.org* (was *shared to osasi.org*, which could read as data being sent there). |
 | 0.25.0  | 2026-09-10 | minor  | **Angle picker beside the compass** (0 / 22.5 / 45 / 67.5°): the chosen angle is appended after the direction for arrow-key and pad entries, exactly as typing `16 r 45`. |
