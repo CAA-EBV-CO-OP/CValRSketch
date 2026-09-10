@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.19.2"></script>
-<script src="dictation.js?v=0.19.2"></script>
+<script src="core.js?v=0.19.3"></script>
+<script src="dictation.js?v=0.19.3"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -74,6 +74,9 @@
   .field { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; }
   .field label { flex: 0 0 80px; color: #444; }
   .field input, .field select { flex: 1; padding: 5px 7px; border: 1px solid #bbb; border-radius: 4px; font-size: 12px; }
+  .field input.swatch { flex: 0 0 44px; width: 44px; height: 28px; padding: 2px; cursor: pointer; }
+  .field label.inline { flex: 1 1 auto; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .field label.inline input { flex: 0 0 auto; width: auto; padding: 0; margin: 0; }
   .closed-badge { color: #2e8b57; font-weight: bold; font-size: 11px; }
   .open-badge { color: #c80; font-size: 11px; }
   /* Modal */
@@ -105,7 +108,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.19.2</span>
+  <span class="version-chip" id="app-version">v0.19.3</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -1747,11 +1750,13 @@ function sidebarEdit() {
           ${BUILDINGS.map(b=>`<option value="${b}"${b===(sh.building||DEFAULT_BUILDING)?' selected':''}>${b}</option>`).join('')}
         </select></div>
         <div class="field"><label>Fill</label>
-          <input type="color" id="sh-color" value="${shapeStyle(sh).color}" title="Fill colour for this shape" style="width:40px; height:26px; padding:0; border:1px solid #bbb;">
+          <input type="color" id="sh-color" class="swatch" value="${shapeStyle(sh).color}" title="Fill colour for this shape">
           <select id="sh-pattern">${patternOptions(shapeStyle(sh).pattern)}</select>
-          <label style="flex:0 0 auto; display:flex; align-items:center; gap:4px;"><input type="checkbox" id="sh-style-default" ${sh.style ? '' : 'checked'}> type default</label>
         </div>
-        <div class="help">Uncheck "type default" to give just this shape its own colour/pattern. The palette for every type lives in ⚙ Settings.</div>
+        <div class="field"><label></label>
+          <label class="inline"><input type="checkbox" id="sh-style-default" ${sh.style ? '' : 'checked'}> Use the type's palette entry (⚙ Settings)</label>
+        </div>
+        <div class="help">Pick a colour or pattern above to give just this shape its own fill; the box unticks itself. Tick it again to follow the palette.</div>
         <div class="row-buttons">
           <button data-act="applyShape" class="primary">Apply</button>
           <button data-act="deleteShape" class="danger">Delete shape</button>

@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.19.3] — 2026-09-10
+
+### Fixed
+- **Shape panel Fill row.** The colour picker was collapsed to a thin sliver (the row's flex rule gave the pattern menu all the width) and the "type default" checkbox ran past the panel edge. The swatch is now a fixed-size button next to the pattern menu, and the checkbox has its own row, labelled *Use the type's palette entry*.
+
+---
+
 ## [0.19.2] — 2026-09-10
 
 ### Changed
