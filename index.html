@@ -1,4 +1,16 @@
 <!DOCTYPE html>
+<!--
+  CValRSketch — browser-based floor plan sketching for residential appraisal.
+  Copyright (C) 2026 CAA-EBV-CO-OP and the CValRSketch contributors.
+  Part of OSASI, the Open Source Appraisal Software Initiative (https://osasi.org).
+  SPDX-License-Identifier: AGPL-3.0-or-later
+
+  This program is free software: you can redistribute it and/or modify it under
+  the terms of the GNU Affero General Public License as published by the Free
+  Software Foundation, either version 3 of the License, or (at your option) any
+  later version. It is distributed WITHOUT ANY WARRANTY; see the License for
+  details. Source and licence: https://github.com/CAA-EBV-CO-OP/CValRSketch
+-->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -19,6 +31,11 @@
   header { background: #2b3a4a; color: #fff; padding: 8px 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   header h1 { font-size: 15px; margin: 0; }
   header .version-chip { font-size: 11px; color: #9fb0c2; font-family: ui-monospace, monospace; }
+  header .osasi-chip { font-size: 11px; color: #cfe0f0; text-decoration: none; border: 1px solid #5a7388; border-radius: 10px; padding: 2px 8px; white-space: nowrap; }
+  header .osasi-chip:hover { background: #4a6377; color: #fff; }
+  header .osasi-chip b { color: #ffd166; font-weight: 700; }
+  .about-modal p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; }
+  .about-modal a { color: #2b6cb0; }
   header button, header label.btn { background: #4a6377; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
   header button:hover, header label.btn:hover { background: #5a7388; }
   header button:disabled { background: #3a4554; color: #6a7484; cursor: not-allowed; }
@@ -114,6 +131,7 @@
 <header>
   <h1>Sketch Walker</h1>
   <span class="version-chip" id="app-version">v0.20.0</span>
+  <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">Part of <b>OSASI</b> · osasi.org</a>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -126,6 +144,7 @@
   <button id="btn-redo" onclick="redoHistory()" title="Redo (Ctrl+Y)">↷ Redo</button>
   <div class="sep"></div>
   <button onclick="openSettings()">⚙ Settings</button>
+  <button onclick="openAbout()" title="About CValRSketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openExportPreview()" title="Preview the printable sheet, pick a page size, and export">🖨 Export / Preview</button>
   <button onclick="newProject()" title="Clear current sketch and start a new project (Ctrl+Z to recover)">🗋 New</button>
   <button onclick="saveJSON()" title="Save to the current file (Ctrl+S) — opens Save As if there is no file yet">Save</button>
@@ -2979,6 +2998,24 @@ function exportFilename(ext) {
 }
 // Print-preview modal: shows the printable sheet, lets you pick page size + what's
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
+function openAbout() {
+  const m = createModal();
+  const div = document.createElement('div');
+  div.className = 'modal about-modal';
+  div.style.maxWidth = '560px';
+  const ver = (document.getElementById('app-version') || {}).textContent || '';
+  div.innerHTML = `
+    <h3>CValRSketch ${escapeHtml(ver)}</h3>
+    <p><strong>Browser-based floor plan sketching for residential appraisal.</strong> Walk the perimeter by typing wall segments; the app draws the plan, totals the areas above and below grade, and exports a labelled sketch.</p>
+    <p>Part of <a href="https://osasi.org" target="_blank" rel="noopener"><strong>OSASI</strong> — the Open Source Appraisal Software Initiative</a>, a co-operative of real estate appraisers building shared, open tools. Developed for the CAA-EBV-CO-OP community.</p>
+    <p>Copyright &copy; 2026 CAA-EBV-CO-OP and the CValRSketch contributors.</p>
+    <p>This program is free software under the <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">GNU Affero General Public License v3.0</a> (or, at your option, any later version). You may use, study, modify and share it. If you redistribute it, or offer a modified version to others over a network, you must make the complete source available under the same licence and keep these notices intact. It is provided <strong>without any warranty</strong>; see the licence for details.</p>
+    <p>Source code and licence text: <a href="https://github.com/CAA-EBV-CO-OP/CValRSketch" target="_blank" rel="noopener">github.com/CAA-EBV-CO-OP/CValRSketch</a> · <a href="LICENSE" target="_blank" rel="noopener">LICENSE</a> (local copy)</p>
+    <p style="color:#666; font-size:12px;">Your sketches never leave this machine: the app runs entirely in the browser and saves to files you choose.</p>
+    <div class="modal-buttons"><button class="primary" onclick="closeModal()">Close</button></div>`;
+  m.appendChild(div);
+}
+
 function openExportPreview() {
   const m = createModal();
   const s = state.settings;

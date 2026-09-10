@@ -1,3 +1,9 @@
+// CValRSketch core — pure geometry / parsing / edit operations shared by the desktop and mobile UIs.
+// Copyright (C) 2026 CAA-EBV-CO-OP and the CValRSketch contributors.
+// Part of OSASI, the Open Source Appraisal Software Initiative (https://osasi.org).
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Free software under the GNU AGPL v3 (or later); distributed WITHOUT ANY WARRANTY.
+// Source and licence: https://github.com/CAA-EBV-CO-OP/CValRSketch
 // =============================================================================
 // CValRSketch core — pure logic shared by desktop and mobile UIs.
 // No DOM access, no global state. Each function takes everything it needs
