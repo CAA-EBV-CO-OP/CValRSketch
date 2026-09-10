@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.19.0] — 2026-09-09
+
+### Added
+- **Re-walk this wall.** In Edit mode, select a wall and press **Re-walk this wall**: the wall is removed and the shape reopens as a walk in progress whose pen sits at the wall's start vertex, with every other wall already in the segment list. Type the replacement legs — one, or a whole new section — and press **Close Shape**; the shape comes back with its label, type, floor, building and fill intact. **Cancel** restores the original. Removing × on the last legs in the list drops the neighbouring walls too, for rebuilding a longer stretch.
+  Until now the only way to remove a wall was **Merge**, which joins the two neighbours with a straight line — right for a notch, but it draws a diagonal slash across the shape when what you wanted was to rebuild that side.
+
+---
+
 ## [0.18.1] — 2026-09-09
 
 ### Fixed

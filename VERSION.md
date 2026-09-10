@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.18.1`
+**Current version:** `0.19.0`
 **Released:** 2026-09-09
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.19.0  | 2026-09-09 | minor  | **Re-walk this wall** (Edit mode, wall panel): removes the wall and reopens the shape as a walk in progress ending at the wall's start, keeping label/type/floor/building/fill; type the replacement legs (any number), then Close Shape. Cancel puts the original back. Complements *Merge*, which joins the neighbours with one straight wall (and produced the diagonal slash when used to rebuild a section). `segmentBetween()` added to core.js. |
 | 0.18.1  | 2026-09-09 | patch  | Edit mode: a **blank-canvas click no longer clears the selection**, so the shape/wall/vertex panel stays put while you look around; **Esc** deselects. **Undo/Redo keep the selection** when the shape still exists. |
 | 0.18.0  | 2026-09-09 | minor  | **Fill palette**: Settings gains a colour + pattern chooser per area type (solid, wood planks, diagonal hatch, cross-hatch, dots; ↺ per row restores the default), and the Edit-mode shape panel gains a per-shape override. Decks default to a light wood-plank pattern. Patterns are generated per colour into `<defs>`; legend swatches and every export panel carry them. Settings key `typeStyles`; per-shape `style`. |
 | 0.17.0  | 2026-09-09 | minor  | **Move shape** (Edit mode, shape panel): slide a whole shape by a typed offset (`3' r`, `2'6 d 1' l`), or **move by picking points** — click an anchor vertex on the shape, then the destination (any vertex on any floor, ghosts included, or a blank spot); the shape translates so the anchor lands there. Esc cancels; undo-able. Replaces the copy-then-delete workaround for lining a floor up over another. |

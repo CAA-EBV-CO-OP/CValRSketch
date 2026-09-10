@@ -250,23 +250,28 @@ function findOpposingWall(shape, wallIdx) {
   return best;
 }
 
+// One walk segment describing the straight line from a to b (nearest cardinal
+// direction plus signed angle), in the same shape the parser produces.
+function segmentBetween(a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  const theta = Math.atan2(dy, dx) * 180 / Math.PI;
+  const bases = [['r', 0], ['d', 90], ['l', 180], ['u', -90]];
+  let best = bases[0], bestDiff = Infinity;
+  for (const [d, ba] of bases) {
+    let diff = ((theta - ba + 540) % 360) - 180;
+    if (Math.abs(diff) < Math.abs(bestDiff)) { bestDiff = diff; best = [d, ba]; }
+  }
+  return {
+    length, dir: best[0], angle: bestDiff, dx, dy,
+    raw: `${formatLength(length)} ${best[0]}${Math.abs(bestDiff) > 0.5 ? ' ' + bestDiff.toFixed(1) : ''}`
+  };
+}
+
 function rebuildSegments(shape) {
   shape.segments = [];
   for (let i = 0; i < shape.points.length - 1; i++) {
-    const a = shape.points[i], b = shape.points[i+1];
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const length = Math.hypot(dx, dy);
-    const theta = Math.atan2(dy, dx) * 180 / Math.PI;
-    const bases = [['r', 0], ['d', 90], ['l', 180], ['u', -90]];
-    let best = bases[0], bestDiff = Infinity;
-    for (const [d, ba] of bases) {
-      let diff = ((theta - ba + 540) % 360) - 180;
-      if (Math.abs(diff) < Math.abs(bestDiff)) { bestDiff = diff; best = [d, ba]; }
-    }
-    shape.segments.push({
-      length, dir: best[0], angle: bestDiff, dx, dy,
-      raw: `${formatLength(length)} ${best[0]}${Math.abs(bestDiff) > 0.5 ? ' ' + bestDiff.toFixed(1) : ''}`
-    });
+    shape.segments.push(segmentBetween(shape.points[i], shape.points[i+1]));
   }
 }
 

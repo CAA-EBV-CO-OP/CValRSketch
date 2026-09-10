@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.18.1"></script>
-<script src="dictation.js?v=0.18.1"></script>
+<script src="core.js?v=0.19.0"></script>
+<script src="dictation.js?v=0.19.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -105,7 +105,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.18.1</span>
+  <span class="version-chip" id="app-version">v0.19.0</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -195,6 +195,7 @@ let state = {
   shapeLabelDrag: null, // transient: while dragging a shape's area/centroid label
   dimLabelDrag: null,   // transient: while dragging a wall's dimension label
   shapeMovePick: null,  // transient: { shapeId, anchor } while moving a shape by picking anchor -> destination
+  rewalk: null,         // { original } while a shape is reopened as a walk (Re-walk this wall); closeShape re-applies its attributes
   offsetPick: null,     // null | { first: {x,y}|null } — active picking state for offset tool
   fenceDraw: null,      // null | { start:{x,y}, end:{x,y} } in WORLD coords while dragging
   fenceSelection: null, // null | { shapeVerts:[{shapeId,idx}], inProgVerts:[idx], annEnds:[{idx,end}] }
@@ -236,6 +237,7 @@ function restoreState(snap) {
   state.labels = d.labels || [];
   state.nextLabelId = d.nextLabelId || 1;
   state.selection = keepOk ? keep : null;
+  state.rewalk = null;
   state.selectedLabel = null;
   state.labelDrag = null;
   state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null;
@@ -290,7 +292,7 @@ const fileAutosave = { handle: null, name: '', status: 'off', lastAt: null, last
 function serializeProject() {
   const data = { ...state };
   ['undoStack', 'redoStack', 'selection', 'splitSelection', 'preview', 'splitPreview',
-   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'dimLabelDrag', 'shapeMovePick', 'offsetPick', 'fenceDraw', 'fenceSelection']
+   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'dimLabelDrag', 'shapeMovePick', 'rewalk', 'offsetPick', 'fenceDraw', 'fenceSelection']
     .forEach(k => delete data[k]);
   return JSON.stringify(data, null, 2);
 }
@@ -1652,6 +1654,7 @@ function sidebarWalk() {
       </div>
     </div>
     <div class="section">
+      ${state.rewalk ? `<div style="background:#fff4e6;border:2px solid #ff8800;border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:12px;"><b style="color:#cc5500;">Re-walking “${escapeHtml(state.rewalk.original.label)}”</b> — the pen is at the removed wall's start. Type the replacement legs, then Close Shape. × on the last legs removes further walls; Cancel puts the original back.</div>` : ''}
       <h2>Current Shape ${closedTag}</h2>
       <div id="seg-list">${segListHtml}</div>
     </div>
@@ -1687,8 +1690,10 @@ function sidebarEdit() {
         <h2 style="margin-top:14px;">Other</h2>
         <div class="row-buttons">
           <button data-act="insertVertex">Insert vertex (midpoint)</button>
+          <button data-act="rewalkWall" title="Remove this wall and reopen the shape as a walk ending at its start — type the replacement legs, then Close Shape">Re-walk this wall</button>
           <button data-act="deleteWall" class="danger">Merge (delete this wall)</button>
         </div>
+        <div class="help" style="margin-top:6px;"><b>Re-walk</b> drops the wall and reopens the shape as a walk in progress ending at this wall's start, keeping its label, type and floor; type the replacement legs (as many as you like) and press Close Shape. <b>Merge</b> joins the two neighbours with one straight wall.</div>
       </div>`;
   }
 
@@ -1991,6 +1996,7 @@ function sidebarAction(e) {
     case 'moveWall': moveSelectedWall(); break;
     case 'insertVertex': insertVertexAction(); break;
     case 'deleteWall': deleteWallAction(); break;
+    case 'rewalkWall': rewalkSelectedWall(); break;
     case 'moveVertex': moveSelectedVertex(); break;
     case 'deleteVertex': deleteSelectedVertex(); break;
     case 'applyShape': applyShapeEdit(); break;
@@ -2466,8 +2472,49 @@ function cancelWalkPreview() {
   render();
 }
 
+// ----- Re-walk a wall -------------------------------------------------------
+// Removes the selected wall and turns the shape back into an in-progress walk:
+// start = the wall's end vertex, segments = every other wall in ring order, so the
+// pen sits at the wall's start vertex. The user types the replacement legs and
+// presses Close Shape, which re-applies the original label/type/floor/building/style.
+function rewalkSelectedWall() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'wall') return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  if (!sh) return;
+  if (state.segments.length && !confirm('A walk is already in progress. Discard it and re-walk this wall?')) return;
+  pushUndo();
+  const n = sh.points.length - 1;   // closed ring: last point repeats the first
+  const i = sel.idx;                // wall i runs points[i] -> points[i+1]
+  const order = [];
+  for (let k = 1; k <= n; k++) order.push(sh.points[(i + k) % n]);   // end vertex ... around ... start vertex
+  const segs = [];
+  for (let k = 0; k < order.length - 1; k++) segs.push(segmentBetween(order[k], order[k+1]));
+  state.rewalk = { original: JSON.parse(JSON.stringify(sh)) };
+  state.shapes = state.shapes.filter(s => s.id !== sh.id);
+  state.startPoint = { x: order[0].x, y: order[0].y };
+  state.segments = segs;
+  state.preview = null;
+  state.selection = null;
+  state.activeFloor = sh.floor;
+  state.mode = 'walk';
+  render();
+  const inp = document.getElementById('seg-input'); if (inp) inp.focus();
+}
+
 function cancelShape() {
   if (state.segments.length === 0 && !state.preview) return;
+  if (state.rewalk) {
+    if (!confirm('Cancel the re-walk and put the original shape back?')) return;
+    pushUndo();
+    state.shapes.push(state.rewalk.original);
+    state.rewalk = null;
+    state.segments = [];
+    state.preview = null;
+    state.startPoint = null;
+    render();
+    return;
+  }
   if (state.segments.length && !confirm('Discard current segments?')) return;
   pushUndo();
   state.segments = [];
@@ -2567,22 +2614,33 @@ function closeShape() {
       pointsToUse = pts.map((p,i) => i === pts.length-1 ? { ...start } : p);
     }
   }
-  const label = prompt('Label for this area:', `Area ${state.nextShapeId}`);
-  if (label === null) return;
-  const typeRaw = prompt(`Type? (${Object.keys(TYPES).join(', ')})`, 'living');
-  if (typeRaw === null) return; // Cancel/Escape only — keep the walk intact
-  const typeKey = typeRaw.trim().toLowerCase();
-  // Forgiving match: a typo or wrong case must not discard the walk. Fall back to
-  // 'misc' and let the user fix the type in Edit mode rather than losing their work.
-  const finalType = (typeKey in TYPES) ? typeKey : 'misc';
-  if (!(typeKey in TYPES)) alert(`Unrecognized type "${typeRaw.trim()}" — using "Misc / other". You can change it anytime in Edit mode.`);
-  pushUndo();
-  const shape = {
-    id: state.nextShapeId++,
-    points: pointsToUse,
-    segments: hasJumps ? [] : [...state.segments],
-    label, type: finalType, floor: state.activeFloor, building: DEFAULT_BUILDING,
-  };
+  let shape;
+  if (state.rewalk) {
+    // Re-walk: the shape keeps everything but its geometry. Per-wall label nudges
+    // are indexed by wall and no longer line up, so they're dropped.
+    pushUndo();
+    const o = state.rewalk.original;
+    shape = { ...o, points: pointsToUse, segments: hasJumps ? [] : [...state.segments] };
+    delete shape.dimOffsets;
+    state.rewalk = null;
+  } else {
+    const label = prompt('Label for this area:', `Area ${state.nextShapeId}`);
+    if (label === null) return;
+    const typeRaw = prompt(`Type? (${Object.keys(TYPES).join(', ')})`, 'living');
+    if (typeRaw === null) return; // Cancel/Escape only — keep the walk intact
+    const typeKey = typeRaw.trim().toLowerCase();
+    // Forgiving match: a typo or wrong case must not discard the walk. Fall back to
+    // 'misc' and let the user fix the type in Edit mode rather than losing their work.
+    const finalType = (typeKey in TYPES) ? typeKey : 'misc';
+    if (!(typeKey in TYPES)) alert(`Unrecognized type "${typeRaw.trim()}" — using "Misc / other". You can change it anytime in Edit mode.`);
+    pushUndo();
+    shape = {
+      id: state.nextShapeId++,
+      points: pointsToUse,
+      segments: hasJumps ? [] : [...state.segments],
+      label, type: finalType, floor: state.activeFloor, building: DEFAULT_BUILDING,
+    };
+  }
   if (hasJumps) rebuildSegments(shape);
   state.shapes.push(shape);
   state.segments = [];
