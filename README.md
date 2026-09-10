@@ -1,6 +1,6 @@
 # CValRSketch
 
-**A browser-based floor plan sketching tool for residential property appraisal.**
+**Floor plan sketching for residential appraisal that runs entirely in the browser.** Use it offline from a local download or host it yourself; your sketches never leave your machine.
 Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
 
 **Version:** 0.21.0 (2026-09-10)

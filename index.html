@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  CValRSketch — browser-based floor plan sketching for residential appraisal.
+  CValRSketch — floor plan sketching for residential appraisal that runs entirely in the browser.
   Copyright (C) 2026 CAA-EBV-CO-OP and the CValRSketch contributors.
   Part of OSASI, the Open Source Appraisal Software Initiative (https://osasi.org).
   SPDX-License-Identifier: AGPL-3.0-or-later
@@ -3074,13 +3074,12 @@ function openAbout() {
   const ver = (document.getElementById('app-version') || {}).textContent || '';
   div.innerHTML = `
     <h3>CValR-Sketch ${escapeHtml(ver)}</h3>
-    <p><strong>Browser-based floor plan sketching for residential appraisal.</strong> Walk the perimeter by typing wall segments; the app draws the plan, totals the areas above and below grade, and exports a labelled sketch.</p>
+    <p><strong>Floor plan sketching for residential appraisal that runs entirely in the browser.</strong> Use it offline from a local download or host it yourself; your sketches never leave your machine. Walk the perimeter by typing wall segments; the app draws the plan, totals the areas above and below grade, and exports a labelled sketch.</p>
     <p>Part of <a href="https://osasi.org" target="_blank" rel="noopener"><strong>OSASI</strong> — the Open Source Appraisal Software Initiative</a>, a co-operative of real estate appraisers building shared, open tools. Developed for the CAA-EBV-CO-OP community.</p>
     <p>Copyright &copy; 2026 CAA-EBV-CO-OP and the CValRSketch contributors.</p>
     <p>This program is free software under the <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">GNU Affero General Public License v3.0</a> (or, at your option, any later version). You may use, study, modify and share it. If you redistribute it, or offer a modified version to others over a network, you must make the complete source available under the same licence and keep these notices intact. It is provided <strong>without any warranty</strong>; see the licence for details.</p>
     <p><strong>Built on CValRSketch, an OSASI project</strong> — <a href="https://osasi.org" target="_blank" rel="noopener">osasi.org</a>. This attribution is an additional term of the licence (AGPL §7(b), see <a href="NOTICE" target="_blank" rel="noopener">NOTICE</a>) and must be preserved in every copy and derivative; modified versions may not be represented as the original or as endorsed by OSASI (§7(c)).</p>
     <p>Source code and licence text: <a href="https://github.com/CAA-EBV-CO-OP/CValRSketch" target="_blank" rel="noopener">github.com/CAA-EBV-CO-OP/CValRSketch</a> · <a href="LICENSE" target="_blank" rel="noopener">LICENSE</a> (local copy)</p>
-    <p style="color:#666; font-size:12px;">Your sketches never leave this machine: the app runs entirely in the browser and saves to files you choose.</p>
     <div class="modal-buttons"><button class="primary" onclick="closeModal()">Close</button></div>`;
   m.appendChild(div);
 }
