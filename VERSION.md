@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.20.0`
+**Current version:** `0.20.1`
 **Released:** 2026-09-10
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.20.1  | 2026-09-10 | patch  | `LICENSE` is now the bare official AGPL-3.0 text so GitHub and licence scanners detect it; the copyright notice and the Section 7(b)/(c) additional terms moved to `NOTICE`, which the file headers and About dialog reference. No functional change. |
 | 0.20.0  | 2026-09-10 | minor  | **Named buildings, building view filter, gallery, per-building export.** Files carry a `buildings` list (+ Building / Rename on the floor bar; *New building…* in the shape panel). The floor-bar **Building** dropdown scopes the canvas to one building, fitted to the window; *All* with several buildings shows a click-to-edit gallery. Export / Preview can print one building at full page size or every building as its own file. **Add files…** appends one or more sketch files' buildings (named on the way in, placed beside the current drawing). `viewBuilding` persisted; older files load unchanged. |
 | 0.19.3  | 2026-09-10 | patch  | Shape panel Fill row: the colour swatch was squeezed to a sliver by the row's flex rules and the "type default" checkbox overflowed the panel. Swatch now a fixed 44 px button; the checkbox sits on its own row with a clearer label. |
 | 0.19.2  | 2026-09-10 | patch  | Decking pattern redrawn: narrow boards running the full width with a staggered joint every 96 px (the old 12 px stagger read as brick pavers). Second orientation added: *Decking (boards N–S)* (`planksv`). |
