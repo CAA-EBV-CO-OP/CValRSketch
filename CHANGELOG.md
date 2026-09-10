@@ -14,6 +14,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.16.0] — 2026-09-09
+
+### Added
+- **Draggable dimension labels (Edit mode).** Every wall's dimension label has a drag handle in Edit mode; drag it wherever it reads best (clear of a notch, another label, or the area label). **Double-click** a label to snap it back to its automatic spot. Nudges are undo-able, saved with the sketch as `dimOffsets` per wall (world feet), follow their wall when vertices are inserted or deleted, and appear in exports exactly where you put them.
+
+### Fixed
+- **Dimension labels beside vertical walls no longer straddle the wall line.** The label was centred on a point 12 px off the wall, so half of a horizontally-set label overlapped the wall and, on short jogs, the neighbouring wall too (e.g. a 2'0" label on a 2 ft jog). Labels beside near-vertical walls are now anchored by their near edge, 6 px off the wall, on the outward side.
+
+---
+
 ## [0.15.0] — 2026-09-09
 
 ### Added

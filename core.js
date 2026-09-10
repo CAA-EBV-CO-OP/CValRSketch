@@ -333,6 +333,13 @@ function insertVertexOnWall(shape, wallIdx, t = 0.5) {
   const a = shape.points[wallIdx], b = shape.points[wallIdx+1];
   const newP = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
   shape.points.splice(wallIdx + 1, 0, newP);
+  // Keep manual dimension-label nudges with their walls: the split wall's own nudge
+  // is dropped (its two halves get fresh auto placement), later walls shift by one.
+  if (shape.dimOffsets) {
+    const o = {};
+    for (const k in shape.dimOffsets) { const i = +k; if (i < wallIdx) o[i] = shape.dimOffsets[k]; else if (i > wallIdx) o[i + 1] = shape.dimOffsets[k]; }
+    shape.dimOffsets = Object.keys(o).length ? o : undefined;
+  }
   rebuildSegments(shape);
 }
 
@@ -348,6 +355,19 @@ function deleteVertex(shape, vIdx) {
     shape.points.push({ ...shape.points[0] });
   } else {
     shape.points.splice(vIdx, 1);
+  }
+  // Manual dimension-label nudges: the two walls that merge lose theirs, the rest
+  // keep theirs under the shifted index.
+  if (shape.dimOffsets) {
+    const o = {};
+    if (vIdx === 0 || vIdx === n - 1) {
+      // walls 0 and n-2 merge into the new last wall (index n-3); walls 1..n-3 shift down
+      for (const k in shape.dimOffsets) { const i = +k; if (i >= 1 && i <= n - 3) o[i - 1] = shape.dimOffsets[k]; }
+    } else {
+      // walls vIdx-1 and vIdx merge into wall vIdx-1; walls after vIdx shift down
+      for (const k in shape.dimOffsets) { const i = +k; if (i < vIdx - 1) o[i] = shape.dimOffsets[k]; else if (i > vIdx) o[i - 1] = shape.dimOffsets[k]; }
+    }
+    shape.dimOffsets = Object.keys(o).length ? o : undefined;
   }
   rebuildSegments(shape);
   return true;

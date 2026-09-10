@@ -11,8 +11,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValRSketch</title>
-<script src="core.js?v=0.15.0"></script>
-<script src="dictation.js?v=0.15.0"></script>
+<script src="core.js?v=0.16.0"></script>
+<script src="dictation.js?v=0.16.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -105,7 +105,7 @@
 <body>
 <header>
   <h1>Sketch Walker</h1>
-  <span class="version-chip" id="app-version">v0.15.0</span>
+  <span class="version-chip" id="app-version">v0.16.0</span>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
     <button data-mode="edit">Edit</button>
@@ -193,6 +193,7 @@ let state = {
   selectedLabel: null,  // id of the currently selected free-text label (Text mode)
   labelDrag: null,      // transient: { id, grabX, grabY, moved } while dragging a label
   shapeLabelDrag: null, // transient: while dragging a shape's area/centroid label
+  dimLabelDrag: null,   // transient: while dragging a wall's dimension label
   offsetPick: null,     // null | { first: {x,y}|null } — active picking state for offset tool
   fenceDraw: null,      // null | { start:{x,y}, end:{x,y} } in WORLD coords while dragging
   fenceSelection: null, // null | { shapeVerts:[{shapeId,idx}], inProgVerts:[idx], annEnds:[{idx,end}] }
@@ -232,7 +233,7 @@ function restoreState(snap) {
   state.selection = null;
   state.selectedLabel = null;
   state.labelDrag = null;
-  state.shapeLabelDrag = null;
+  state.shapeLabelDrag = null; state.dimLabelDrag = null;
   state.fenceSelection = null;
   state.fenceDraw = null;
   state.splitSelection = null;
@@ -284,7 +285,7 @@ const fileAutosave = { handle: null, name: '', status: 'off', lastAt: null, last
 function serializeProject() {
   const data = { ...state };
   ['undoStack', 'redoStack', 'selection', 'splitSelection', 'preview', 'splitPreview',
-   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'offsetPick', 'fenceDraw', 'fenceSelection']
+   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'dimLabelDrag', 'offsetPick', 'fenceDraw', 'fenceSelection']
     .forEach(k => delete data[k]);
   return JSON.stringify(data, null, 2);
 }
@@ -641,7 +642,7 @@ function render() {
   document.getElementById('floor-help').textContent =
     state.mode==='text' ? 'Click a blank spot to add a text label. Click a label to select it; drag to move it; double-click to edit.' :
     state.mode==='split' ? 'Click two vertices in a shape to split it.' :
-    state.mode==='edit' ? 'Click a wall or vertex to edit.' :
+    state.mode==='edit' ? 'Click a wall or vertex to edit. Drag a dimension or area label to move it; double-click a dimension label to snap it back.' :
     (state.segments.length === 0
       ? 'Type segments to build a shape — or click any vertex (green) to start from there. Click a blank spot to drop the start, then Shift+Arrow to snap it onto aligned vertices.'
       : 'Type segments to extend the path, or click any vertex to draw a straight line to it. Close Shape when you return to start.');
@@ -796,9 +797,30 @@ function renderShape(sh, W, isGhost) {
         const nx=-dy/len, ny=dx/len;
         const c = W(polygonCentroid(sh.points));
         const sign = ((mx - c.x)*nx + (my - c.y)*ny) > 0 ? 1 : -1;
-        const tx = mx + nx*12*sign, ty = my + ny*12*sign;
+        const ox = nx*sign, oy = ny*sign;   // outward unit normal
+        // Text is always set horizontally. Beside a (near-)vertical wall, anchor its
+        // near edge just off the wall instead of centring it on the offset point —
+        // centred text straddles the wall line and runs into the neighbouring wall.
+        const beside = Math.abs(ox) > Math.abs(oy);
+        const gap = beside ? 6 : 12;
+        const anchor = beside ? (ox > 0 ? 'start' : 'end') : 'middle';
+        const autoX = mx + ox*gap, autoY = my + oy*gap;
+        // Manual nudge (world feet) set by dragging the label in Edit mode.
+        const man = sh.dimOffsets && sh.dimOffsets[i];
+        const tx = autoX + (man ? man.dx * viewTransform.scale : 0);
+        const ty = autoY + (man ? man.dy * viewTransform.scale : 0);
+        const label = formatLength(sh.segments[i].length);
         // No ghost fade on dimensions: a surfaced floor's dims should read crisply.
-        addEl('text', { x: tx, y: ty, 'text-anchor':'middle', 'dominant-baseline':'middle', 'font-size':skFont(11), 'font-weight':'bold', fill:'#0066cc' }, formatLength(sh.segments[i].length));
+        addEl('text', { x: tx, y: ty, 'text-anchor':anchor, 'dominant-baseline':'middle', 'font-size':skFont(11), 'font-weight':'bold', fill:'#0066cc' }, label);
+        if (!isGhost && state.mode === 'edit') {
+          // Drag handle over the label (ui-overlay → never exported). Double-click resets.
+          const tw = label.length * skFont(11) * 0.62, th = skFont(11) + 6;
+          const hx = anchor === 'start' ? tx : anchor === 'end' ? tx - tw : tx - tw/2;
+          const hit = addEl('rect', { x: hx - 3, y: ty - th/2, width: tw + 6, height: th, fill: 'rgba(0,0,0,0)', class: 'ui-overlay dim-handle' });
+          hit.style.cursor = 'move';
+          hit.addEventListener('mousedown', (ev) => startDimLabelDrag(ev, sh.id, i, { x: autoX, y: autoY }));
+          hit.addEventListener('dblclick', (ev) => { ev.stopPropagation(); resetDimLabel(sh.id, i); });
+        }
       }
     }
   }
@@ -1382,7 +1404,7 @@ function startShapeLabelDrag(ev, shapeId) {
 function shapeLabelDragMove(e) {
   if (!state.shapeLabelDrag) return;
   const sh = state.shapes.find(s => s.id === state.shapeLabelDrag.shapeId);
-  if (!sh) { state.shapeLabelDrag = null; return; }
+  if (!sh) { state.shapeLabelDrag = null; state.dimLabelDrag = null; return; }
   if (!state.shapeLabelDrag.moved) { pushUndo(); state.shapeLabelDrag.moved = true; }
   const base = polygonCentroid(sh.points);
   const w = screenToWorld(e.clientX, e.clientY);
@@ -1391,7 +1413,44 @@ function shapeLabelDragMove(e) {
 }
 function shapeLabelDragUp() {
   if (!state.shapeLabelDrag) return;
-  state.shapeLabelDrag = null;
+  state.shapeLabelDrag = null; state.dimLabelDrag = null;
+}
+
+// Dimension labels: per-wall manual nudge, dragged in Edit mode. Stored on the shape
+// as dimOffsets[wallIdx] = {dx, dy} in world feet relative to the auto position.
+// Copy-on-write, so a copied shape never shares the object with its source.
+function startDimLabelDrag(ev, shapeId, idx, autoScreen) {
+  if (ev.button !== 0) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+  const sh = state.shapes.find(s => s.id === shapeId);
+  if (!sh) return;
+  const v = viewTransform;
+  const auto = { x: (autoScreen.x - v.tx) / v.scale, y: (autoScreen.y - v.ty) / v.scale };
+  const off = (sh.dimOffsets && sh.dimOffsets[idx]) || { dx: 0, dy: 0 };
+  const w = screenToWorld(ev.clientX, ev.clientY);
+  state.dimLabelDrag = { shapeId, idx, auto, grabX: w.x - (auto.x + off.dx), grabY: w.y - (auto.y + off.dy), moved: false };
+}
+function dimLabelDragMove(e) {
+  const d = state.dimLabelDrag;
+  if (!d) return;
+  const sh = state.shapes.find(s => s.id === d.shapeId);
+  if (!sh) { state.dimLabelDrag = null; return; }
+  if (!d.moved) { pushUndo(); d.moved = true; }
+  const w = screenToWorld(e.clientX, e.clientY);
+  const dx = (w.x - d.grabX) - d.auto.x, dy = (w.y - d.grabY) - d.auto.y;
+  if (!isFinite(dx) || !isFinite(dy)) return;   // bad pointer sample (e.g. zero-size layout) — never persist NaN
+  sh.dimOffsets = { ...(sh.dimOffsets || {}), [d.idx]: { dx, dy } };
+  render();
+}
+function dimLabelDragUp() { if (state.dimLabelDrag) state.dimLabelDrag = null; }
+function resetDimLabel(shapeId, idx) {
+  const sh = state.shapes.find(s => s.id === shapeId);
+  if (!sh || !sh.dimOffsets || !sh.dimOffsets[idx]) return;
+  pushUndo();
+  const o = { ...sh.dimOffsets }; delete o[idx];
+  sh.dimOffsets = Object.keys(o).length ? o : undefined;
+  render();
 }
 
 function startOffsetPick() {
@@ -2376,7 +2435,7 @@ document.querySelectorAll('#mode-tabs button').forEach(b => {
     state.selection = null;
     state.selectedLabel = null;
     state.labelDrag = null;
-    state.shapeLabelDrag = null;
+    state.shapeLabelDrag = null; state.dimLabelDrag = null;
     state.splitSelection = null;
     state.preview = null;
     state.splitPreview = null;
@@ -2410,6 +2469,8 @@ window.addEventListener('mousemove', labelDragMove);
 window.addEventListener('mouseup', labelDragUp);
 window.addEventListener('mousemove', shapeLabelDragMove);
 window.addEventListener('mouseup', shapeLabelDragUp);
+window.addEventListener('mousemove', dimLabelDragMove);
+window.addEventListener('mouseup', dimLabelDragUp);
 
 (function initSubjectInput() {
   const inp = document.getElementById('subject-input');
@@ -3064,7 +3125,7 @@ function newProject() {
   state.nextLabelId = 1;
   state.selectedLabel = null;
   state.labelDrag = null;
-  state.shapeLabelDrag = null;
+  state.shapeLabelDrag = null; state.dimLabelDrag = null;
   state.subject = '';
   state.subtitle = '';
   state.floors = ['basement', 'main', 'upper', 'other'];
@@ -3089,7 +3150,7 @@ function applyLoadedProject(text) {
   state.selection = null; state.splitSelection = null;
   state.labels = d.labels || []; state.nextLabelId = d.nextLabelId || 1;
   state.basements = d.basements || {};
-  state.selectedLabel = null; state.labelDrag = null; state.shapeLabelDrag = null;
+  state.selectedLabel = null; state.labelDrag = null; state.shapeLabelDrag = null; state.dimLabelDrag = null;
   const subjInp = document.getElementById('subject-input');
   if (subjInp) subjInp.value = state.subject || '';
   saveToRecents();  // also add loaded sketch to recents so it's reloadable
