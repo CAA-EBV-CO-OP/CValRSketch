@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.27.1] — 2026-09-10
+
+### Fixed
+- **Export / Preview from the gallery produced a blank page.** The gallery draws into the canvas as UI overlays, which the export strips. With the gallery on the canvas the export now builds a *buildings sheet*: one panel per building (the active floor, or the building's main level), laid out in a grid at one common scale, each captioned with building, floor and area — every building on one page. The preview's Building menu calls this *All buildings — one sheet (as on canvas)*. Single-building and per-building exports are unchanged.
+
+---
+
 ## [0.27.0] — 2026-09-10
 
 ### Added
