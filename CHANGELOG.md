@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.23.1] — 2026-09-10
+
+### Fixed
+- **Walk mode needed a click into the segment box before typing.** The box now takes the caret when the Walk tab is chosen, after Load and New, and on startup; and a printable key pressed while nothing has focus is routed into it (`focusWalkInput()` + the global keydown handler). Modifier shortcuts, PageUp/PageDown and the gallery are unaffected.
+
+---
+
 ## [0.23.0] — 2026-09-10
 
 ### Added
