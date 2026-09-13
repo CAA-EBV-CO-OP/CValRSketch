@@ -1,7 +1,7 @@
 # Version
 
-**Current version:** `0.30.2`
-**Released:** 2026-09-10
+**Current version:** `0.31.0`
+**Released:** 2026-09-11
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
 While the project is below 1.0, the public "API" (segment syntax, JSON save format) may still change between minor versions; breaking changes will be called out in [CHANGELOG.md](./CHANGELOG.md).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.31.0  | 2026-09-11 | minor  | **Curved walls**: in Edit mode a selected wall gets a Curve section — type a rise (how far the midpoint moves off the straight line), pick outward or inward, Make arc. The wall bows into a circular arc through its two vertices; the area includes the curve; Straighten puts it back. Mobile has the same row in its wall editor. |
 | 0.30.2  | 2026-09-11 | patch  | **New-area dialog simplified**: type buttons first, then one Label box. The confusing “Or type it” box (a keyboard shortcut for picking a type that read like a free-text type) is gone. The label follows the chosen type until you type your own. |
 | 0.30.1  | 2026-09-11 | patch  | **New-area label sticks after clicking a type** (typing was being pulled into the walk box behind the dialog). **Phantom leg after Close Shape fixed** (a leftover snap preview was committed from the origin by the next Enter). **Enter takes the enclosed-area offer even while a snap preview is showing** (it used to commit the preview step instead, then a retraced leg left a stray line). Candidates that double back along a walked leg are no longer offered. Both sidebar boxes say which Enter does what. |
 | 0.30.0  | 2026-09-11 | minor  | **Fence can delete.** *Delete fenced* (or the Delete key) removes whatever the fence captured whole: shapes with every vertex inside, an unfinished walk with all its points inside, offset measurements with both ends inside. Confirmed, one undo step. The button names what it will remove. |

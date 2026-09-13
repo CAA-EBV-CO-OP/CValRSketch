@@ -3,7 +3,7 @@
 **Floor plan sketching for residential appraisal that runs entirely in the browser.** Use it offline from a local download or host it yourself; your sketches never leave your machine.
 Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
 
-**Version:** 0.30.2 (2026-09-11)
+**Version:** 0.31.0 (2026-09-11)
 **License:** [AGPL-3.0](./LICENSE)
 **Repo:** https://github.com/CAA-EBV-CO-OP/CValRSketch
 **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
@@ -79,7 +79,7 @@ The file is fully self-contained: HTML + inline CSS + vanilla JavaScript. No ext
 - **Gap diagnosis** — open shapes display a directional breakdown (e.g. `gap 5'5" (2'0" left + 5'0" down)`)
 
 ### Editing
-- **Edit mode** — select any wall or vertex to modify length, move, insert, or delete
+- **Edit mode** — select any wall or vertex to modify length, move, insert, delete, or curve a wall into an arc by its rise
 - **Length-edit modes** — stretch end, symmetric, maintain rectangle
 - **Split mode** — divide a shape with a projected wall
 - **Fence (group stretch)** — drag a selection rectangle; enclosed vertices translate, crossing walls stretch
