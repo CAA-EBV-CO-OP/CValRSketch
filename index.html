@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.31.0"></script>
-<script src="dictation.js?v=0.31.0"></script>
+<script src="core.js?v=0.32.0"></script>
+<script src="dictation.js?v=0.32.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -103,6 +103,8 @@
   .rose-hub { fill: #fff; stroke: #c0c8d0; }
   .enclose-box { background: #fffbd6; border: 2px solid #e6b800; }
   .enclose-box h2 { color: #8a6d00; }
+  .close-box { background: #e9f7ef; border: 2px solid #2e8b57; }
+  .close-box h2 { color: #1f6b43; }
   .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 6px 0 8px; }
   .type-btn { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border: 1px solid #c9d3dc; border-radius: 5px; background: #fff; cursor: pointer; font-size: 12px; text-align: left; line-height: 1.2; }
   .type-btn:hover { background: #f4f7fa; }
@@ -193,7 +195,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.31.0</span>
+  <span class="version-chip" id="app-version">v0.32.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -525,19 +527,27 @@ async function idbGet(key) {
   } catch (e) { return undefined; }
 }
 
+// Counts edits, undo and redo included. Stack depths can't stand in for this:
+// they plateau at HISTORY_LIMIT, and an undo followed by a retype lands back on
+// the number it started from. Used to key the "shape is closed" offer so that
+// waving it off sticks for the walk in hand but not past the next change.
+let editTick = 0;
 function pushUndo() {
+  editTick++;
   state.undoStack.push(snapshotState());
   if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
   state.redoStack = [];
 }
 function undoHistory() {
   if (state.undoStack.length === 0) return;
+  editTick++;
   state.redoStack.push(snapshotState());
   restoreState(state.undoStack.pop());
   render();
 }
 function redoHistory() {
   if (state.redoStack.length === 0) return;
+  editTick++;
   state.undoStack.push(snapshotState());
   restoreState(state.redoStack.pop());
   render();
@@ -1001,6 +1011,7 @@ function render() {
   // Current in-progress segments
   if (state.segments.length) renderInProgress(W);
   if (state.segments.length && state.mode === 'walk') renderEnclose(W);
+  if (state.segments.length && state.mode === 'walk') renderCloseOffer(W);
   else if (state.mode === 'walk') {
     const start = getStart();
     const startScreen = W(start);
@@ -2019,6 +2030,19 @@ function sidebarWalk() {
       <div class="pen-indicator">${penInfo}</div>
     </div>
     ${(() => {
+      const co = currentCloseOffer();
+      if (!co) return '';
+      return `
+    <div class="section close-box">
+      <h2>Shape is closed — ${Math.round(co.area)} sq ft</h2>
+      <div class="help">The pen is back at the start${co.gap > 0.01 ? ` (within ${formatLength(co.gap)})` : ''}. Press <b>Enter</b> with the box empty, or click below, to close it and name the area. <b>Esc</b> or <b>Tab</b> keeps walking and puts this away — <b>Close Shape</b> still works whenever you want it.</div>
+      <div class="row-buttons">
+        <button data-act="closeShape" class="primary">&#10003; Close shape (Enter)</button>
+        <button data-act="closeOfferDismiss">Keep walking (Esc)</button>
+      </div>
+    </div>`;
+    })()}
+    ${(() => {
       const enc = currentEnclose();
       if (!enc) return '';
       const c = enc.cands[enc.idx], n = enc.cands.length;
@@ -2391,7 +2415,8 @@ function attachSidebarHandlers() {
   const ARROW_DIR = { ArrowRight: 'r', ArrowLeft: 'l', ArrowUp: 'u', ArrowDown: 'd' };
   if (cmd) cmd.addEventListener('keydown', e => {
     if (e.key === 'Enter') addCmd();
-    else if (e.key === 'Escape') { if (currentEnclose()) encloseDismiss(); else cancelWalkPreview(); cmd.value = ''; }
+    else if (e.key === 'Escape') { if (currentEnclose()) encloseDismiss(); else if (currentCloseOffer()) closeOfferDismiss(); else cancelWalkPreview(); cmd.value = ''; }
+    else if (e.key === 'Tab' && cmd.value === '' && currentCloseOffer()) { e.preventDefault(); closeOfferDismiss(); }
     else if ((e.key === 'n' || e.key === 'N') && cmd.value === '' && currentEnclose()) { e.preventDefault(); encloseNext(); }
     else if (e.key in ARROW_DIR && cmd.value === '') {
       // Empty input + arrow key → preview/cycle next aligned vertex as a pen-jump (no wall)
@@ -2428,6 +2453,7 @@ function sidebarAction(e) {
     case 'encloseAccept': closeShape(); break;
     case 'encloseNext': encloseNext(); break;
     case 'encloseDismiss': encloseDismiss(); break;
+    case 'closeOfferDismiss': closeOfferDismiss(); break;
     case 'cancelShape': cancelShape(); break;
     case 'removeSeg': pushUndo(); state.segments.splice(parseInt(i),1); render(); break;
     case 'applyLen': applyLengthEdit(); break;
@@ -2931,6 +2957,7 @@ function addCmd() {
   // a preview the user is actively cycling still commits.
   if (!raw) {
     if (currentEnclose()) { closeShape(); return; }
+    if (currentCloseOffer()) { closeShape(); return; }
     if (state.preview) commitWalkPreview();
     return;
   }
@@ -3224,6 +3251,7 @@ function finishNewShape(shape, rebuild) {
   state.startPoint = null;
   state.preview = null;    // a snap preview left over from stepping would otherwise draw a phantom leg from the origin
   state.enclose = null;
+  state.closeOffer = null;
   render();
 }
 
@@ -3408,6 +3436,35 @@ function encCandidates() {
   encCache = { sig, cands };
   return cands;
 }
+// ----- "Walk is closed" offer -----
+// When the pen comes back to the start the walk is already a polygon, but nothing
+// happens until Close Shape is clicked. This offers it in place: Enter takes it,
+// Esc or Tab waves it off. Keyed to wall count + pen position like the enclosure
+// offer, so waving it off sticks until the walk actually changes — walk on and
+// come back to the start and it is offered again.
+function currentCloseOffer() {
+  if (state.mode !== 'walk' || state.segments.length < 3) return null;
+  const walk = pathPointsHere(state.segments);
+  const start = walk[0], pen = walk[walk.length - 1];
+  const gap = Math.hypot(pen.x - start.x, pen.y - start.y);
+  if (gap > state.settings.autoCloseFeet) return null;
+  const key = [state.segments.length, editTick, encPointKey(pen)].join('|');
+  if (!state.closeOffer || state.closeOffer.key !== key) state.closeOffer = { key, off: false };
+  if (state.closeOffer.off) return null;
+  return { gap, polygon: walk, area: polygonArea(walk) };
+}
+function closeOfferDismiss() {
+  if (currentCloseOffer()) { state.closeOffer.off = true; render(); focusWalkInput(); }
+}
+// Never exported: the sidebar offer needs a matching mark on the drawing.
+function renderCloseOffer(W) {
+  const co = currentCloseOffer();
+  if (!co) return;
+  const pts = co.polygon.map(W);
+  const d = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p.x + ' ' + p.y).join(' ') + ' Z';
+  addEl('path', { d, fill: '#2e8b57', 'fill-opacity': 0.14, stroke: '#2e8b57', 'stroke-width': 2, 'stroke-dasharray': '7,4', class: 'ui-overlay' });
+}
+
 // The live offer, or null: candidates at the current pen, minus a dismissed one.
 function currentEnclose() {
   const cands = encCandidates();
@@ -3799,6 +3856,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.32.0', '2026-09-13', 'Closing a shape no longer needs the button: walk the last wall back to where you started and the sketch offers to close it right there — Enter takes it, Esc or Tab waves it off and you carry on walking. The region that would be created is washed green while the offer stands. On the phone the offer is a bar above the keypad with both choices as buttons.'],
   ['0.31.0', '2026-09-10', 'Curved walls: select a wall in Edit mode, type a rise and Make arc — the wall bows into a circular arc whose midpoint sits that far off the straight line, outward for bays and turrets or inward for a curved notch. Areas include the curve; Straighten puts the wall back.'],
   ['0.30.0', '2026-09-10', 'Fence can delete: draw a fence around anything — a stray unfinished walk, whole shapes, offsets — and Delete fenced (or the Delete key) removes what it captured whole, one undo step.'],
   ['0.29.0', '2026-09-10', 'Enclosed areas: when the pen lands on an existing wall, the region it fences off with the existing walls lights up yellow — Enter closes along those walls (N cycles options) instead of a straight line back to the start. New-area picker: label plus a grid of type buttons, no more typing the type.'],

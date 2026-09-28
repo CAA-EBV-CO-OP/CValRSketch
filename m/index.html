@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
 <link rel="apple-touch-icon" href="../icon-192.png">
 <title>CValRSketch — Mobile</title>
-<script src="../core.js?v=0.31.0"></script>
-<script src="../dictation.js?v=0.31.0"></script>
+<script src="../core.js?v=0.32.0"></script>
+<script src="../dictation.js?v=0.32.0"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -63,6 +63,16 @@
   }
   .status.gap { color: #c44; font-weight: bold; }
   .status.closed { color: #2e8b57; }
+  /* "Walk is closed" offer — tap either way, no hunting for the ✓ in the header */
+  .close-offer {
+    flex: 0 0 auto; display: flex; gap: 8px; align-items: center;
+    background: #e9f7ef; border-top: 2px solid #2e8b57;
+    padding: 8px 12px;
+  }
+  .close-offer[hidden] { display: none; }
+  .close-offer .co-text { flex: 1; min-width: 0; font-size: 12px; font-weight: bold; color: #1f6b43; }
+  .close-offer button { padding: 10px 12px; font-size: 14px; font-weight: bold; border-radius: 8px; border: 1px solid #2e8b57; background: #fff; color: #1f6b43; }
+  .close-offer button.primary { background: #2e8b57; color: #fff; }
   /* Bottom controls */
   .controls {
     flex: 0 0 auto;
@@ -297,6 +307,12 @@
 
 <div class="status" id="status">Pen at start. Pick a direction and a distance.</div>
 
+<div class="close-offer" id="close-offer" hidden>
+  <div class="co-text" id="close-offer-text">Shape is closed</div>
+  <button class="primary" id="close-offer-yes">&#10003; Close shape</button>
+  <button id="close-offer-no">Keep walking</button>
+</div>
+
 <div class="start-panel" id="start-panel">
   <div class="hint" id="start-panel-info">Start point</div>
   <div class="dirs">
@@ -434,7 +450,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.31.0'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.32.0'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -519,7 +535,11 @@ function restoreState(snap) {
   state.annotations = d.annotations || [];
   state.selection = null;
 }
+// Counts edits, undo and redo included — see the desktop note; used to key the
+// "shape is closed" offer.
+let editTick = 0;
 function pushUndo() {
+  editTick++;
   state.undoStack.push(snapshotState());
   if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
   state.redoStack.length = 0;
@@ -533,6 +553,7 @@ function undoHistory() {
   if (now - lastHistoryAt < 80) return;
   lastHistoryAt = now;
   if (!state.undoStack.length) { toast('Nothing to undo'); return; }
+  editTick++;
   state.redoStack.push(snapshotState());
   restoreState(state.undoStack.pop());
   render();
@@ -542,6 +563,7 @@ function redoHistory() {
   if (now - lastHistoryAt < 80) return;
   lastHistoryAt = now;
   if (!state.redoStack.length) { toast('Nothing to redo'); return; }
+  editTick++;
   state.undoStack.push(snapshotState());
   restoreState(state.redoStack.pop());
   render();
@@ -655,6 +677,7 @@ function render() {
     }
   }
   renderStatus();
+  renderCloseOffer();
   renderStartPanel();
 }
 
@@ -1488,6 +1511,29 @@ function renderInProgress(W) {
       fill: 'none', stroke: '#e57c00', 'stroke-width': 1.5, 'stroke-dasharray': '4,4'
     });
   }
+}
+
+// ----- "Walk is closed" offer (mirrors the desktop sidebar box) -----
+// Keyed to wall count + pen position, so dismissing sticks until the walk
+// changes; walk on and come back to the start and it is offered again.
+function currentCloseOffer() {
+  if (state.segments.length < 3) return null;
+  const wpts = pathPoints(state.segments, getStart());
+  const start = wpts[0], pen = wpts[wpts.length - 1];
+  const gap = Math.hypot(pen.x - start.x, pen.y - start.y);
+  if (gap > state.settings.autoCloseFeet) return null;
+  const key = [state.segments.length, editTick, pen.x.toFixed(2) + ',' + pen.y.toFixed(2)].join('|');
+  if (!state.closeOffer || state.closeOffer.key !== key) state.closeOffer = { key, off: false };
+  if (state.closeOffer.off) return null;
+  return { gap, area: polygonArea(wpts) };
+}
+
+function renderCloseOffer() {
+  const bar = $('close-offer');
+  if (!bar) return;
+  const co = currentCloseOffer();
+  bar.hidden = !co;
+  if (co) $('close-offer-text').textContent = `Shape is closed — ${Math.round(co.area)} sq ft`;
 }
 
 function renderStatus() {
@@ -2619,6 +2665,8 @@ $('drawer-bg').onclick = closeDrawer;
 $('btn-undo').onclick = undoHistory;
 $('btn-redo').onclick = redoHistory;
 $('btn-close-shape').onclick = closeShape;
+$('close-offer-yes').onclick = closeShape;
+$('close-offer-no').onclick = () => { if (currentCloseOffer()) { state.closeOffer.off = true; renderCloseOffer(); } };
 // Fence mode wiring
 $('btn-fence-toggle').onclick = toggleFenceMode;
 $('btn-fence-mode').onclick = () => { enterFenceMode(); closeDrawer(); };
