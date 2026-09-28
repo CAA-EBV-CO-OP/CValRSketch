@@ -244,6 +244,116 @@ function wallUnit(shape, i) {
   return { x: v.x / len, y: v.y / len };
 }
 
+// ----- Curved walls (circular arcs) -----
+// A wall may bow into a circular arc. `shape.arcs = { [wallIdx]: rise }` where
+// rise is the sagitta in feet: how far the wall's midpoint sits off the straight
+// chord between its two vertices. Positive bows outward (away from the shape's
+// interior), negative inward. The vertices stay the chord endpoints, so every
+// vertex and wall edit keeps working unchanged; the curve is re-derived from
+// the chord and rise each time it is drawn or measured.
+
+// Positive when the ring runs clockwise on screen (Y grows downward).
+function polygonSignedArea(pts) {
+  let sum = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i+1];
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return sum / 2;
+}
+
+// Geometry of wall i's arc, or null when the wall is straight.
+function wallArc(shape, i) {
+  const rise = shape.arcs && shape.arcs[i];
+  if (!rise) return null;
+  const a = shape.points[i], b = shape.points[i+1];
+  if (!a || !b) return null;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const c = Math.hypot(dx, dy);
+  if (c < 1e-9) return null;
+  const s = Math.abs(rise);
+  // Outward is left of travel on a clockwise ring, right of travel otherwise.
+  const cw = polygonSignedArea(shape.points) >= 0;
+  const side = (rise > 0) === cw ? 1 : -1;        // +1 → left normal (dy, -dx)
+  const nx = dy / c * side, ny = -dx / c * side;   // unit normal the arc bows toward
+  const r = (c * c + 4 * s * s) / (8 * s);
+  const half = Math.acos(Math.max(-1, Math.min(1, (r - s) / r)));   // half the central angle
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+  return {
+    rise, s, c, r, nx, ny,
+    apex: { x: mx + nx * s, y: my + ny * s },
+    center: { x: mx + nx * (s - r), y: my + ny * (s - r) },
+    sweep: side === 1 ? 1 : 0,      // SVG sweep flag: 1 = clockwise on screen
+    large: s > r ? 1 : 0,           // past a semicircle
+    arcLength: 2 * r * half,
+    segmentArea: r * r * half - (r - s) * Math.sqrt(Math.max(0, s * (2 * r - s))),
+  };
+}
+
+// Set (or clear, with 0) the rise of wall i.
+function setWallArc(shape, i, rise) {
+  if (!shape.arcs) shape.arcs = {};
+  if (rise && Math.abs(rise) > 1e-6) shape.arcs[i] = rise; else delete shape.arcs[i];
+  if (!Object.keys(shape.arcs).length) delete shape.arcs;
+}
+
+// Re-key a { [wallIdx]: value } map after walls are inserted or removed.
+// `fn(oldIdx)` returns the new index, or null to drop the entry.
+function remapByWall(map, fn) {
+  if (!map) return undefined;
+  const o = {};
+  for (const k in map) { const j = fn(+k); if (j != null) o[j] = map[k]; }
+  return Object.keys(o).length ? o : undefined;
+}
+
+// Enclosed area: the polygon through the vertices, plus each outward arc's
+// circular segment, minus each inward one.
+function shapeArea(shape) {
+  let area = polygonArea(shape.points);
+  if (shape.arcs) for (const k in shape.arcs) {
+    const arc = wallArc(shape, +k);
+    if (arc) area += arc.rise > 0 ? arc.segmentArea : -arc.segmentArea;
+  }
+  return Math.max(0, area);
+}
+
+// Points that bound the shape when drawn: its vertices plus, for curved walls,
+// the arc's apex and (past a semicircle) its widest points.
+function shapeExtentPoints(shape) {
+  const pts = shape.points.slice();
+  if (shape.arcs) for (const k in shape.arcs) {
+    const arc = wallArc(shape, +k);
+    if (!arc) continue;
+    pts.push(arc.apex);
+    if (arc.large) {
+      const ux = -arc.ny, uy = arc.nx;   // along the chord
+      pts.push({ x: arc.center.x + ux * arc.r, y: arc.center.y + uy * arc.r });
+      pts.push({ x: arc.center.x - ux * arc.r, y: arc.center.y - uy * arc.r });
+    }
+  }
+  return pts;
+}
+
+// SVG path data for wall i, in whatever space `W` maps points into (screen
+// for the canvas, identity for world-coordinate exports). W must be a uniform
+// scale plus translation; the arc radius is scaled by the same factor as the chord.
+function wallPathD(shape, i, W = p => p, moveTo = true) {
+  const a = W(shape.points[i]), b = W(shape.points[i+1]);
+  const d = moveTo ? `M${a.x} ${a.y} ` : '';
+  const arc = wallArc(shape, i);
+  if (!arc) return d + `L${b.x} ${b.y}`;
+  const r = arc.r * Math.hypot(b.x - a.x, b.y - a.y) / arc.c;
+  return d + `A${r} ${r} 0 ${arc.large} ${arc.sweep} ${b.x} ${b.y}`;
+}
+
+// Closed SVG path for the whole outline, curved walls included.
+function shapePathD(shape, W = p => p) {
+  const p0 = W(shape.points[0]);
+  let d = `M${p0.x} ${p0.y}`;
+  for (let i = 0; i < shape.points.length - 1; i++) d += ' ' + wallPathD(shape, i, W, false);
+  return d + ' Z';
+}
+
 function findOpposingWall(shape, wallIdx) {
   const unit = wallUnit(shape, wallIdx);
   const n = shape.points.length - 1;
@@ -353,6 +463,7 @@ function insertVertexOnWall(shape, wallIdx, t = 0.5) {
     for (const k in shape.dimOffsets) { const i = +k; if (i < wallIdx) o[i] = shape.dimOffsets[k]; else if (i > wallIdx) o[i + 1] = shape.dimOffsets[k]; }
     shape.dimOffsets = Object.keys(o).length ? o : undefined;
   }
+  shape.arcs = remapByWall(shape.arcs, i => i < wallIdx ? i : i > wallIdx ? i + 1 : null);
   rebuildSegments(shape);
 }
 
@@ -382,6 +493,9 @@ function deleteVertex(shape, vIdx) {
     }
     shape.dimOffsets = Object.keys(o).length ? o : undefined;
   }
+  shape.arcs = remapByWall(shape.arcs, (vIdx === 0 || vIdx === n - 1)
+    ? (i => (i >= 1 && i <= n - 3) ? i - 1 : null)
+    : (i => i < vIdx - 1 ? i : i > vIdx ? i - 1 : null));
   rebuildSegments(shape);
   return true;
 }

@@ -14,6 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.31.0] — 2026-09-10
+
+### Added
+- **Curved walls (arcs).** In Edit mode, a selected wall's sidebar has a **Curve (arc)** section: type a **rise** — the distance the wall's midpoint moves off the straight line — choose **Outward** or **Inward** (or type a leading minus), and **Make arc**. The wall becomes a circular arc through its two vertices; **Straighten** removes it. The mobile wall editor has the same row.
+- Areas everywhere (centroid labels, Totals, gallery and export summaries, basement helpers) include the circular segment each arc adds or removes.
+- Curved walls export as true arcs (SVG/PNG), are selectable along the curve, keep their dimension label (chord length) at the crown, and are kept in view/crop bounds.
+
+### Changed
+- Save format: shapes may carry `arcs` — `{ [wallIndex]: rise }` in feet, positive outward. Older files load unchanged; files with arcs open as straight walls in older versions.
+- Split, split-project, insert-vertex and delete-vertex keep each arc with its wall (the wall that is cut or merged loses its arc); copy keeps arcs; re-walk drops them along with the label nudges.
+
 ## [0.30.2] — 2026-09-10
 
 ### Changed

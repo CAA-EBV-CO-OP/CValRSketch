@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.30.2"></script>
-<script src="dictation.js?v=0.30.2"></script>
+<script src="core.js?v=0.31.0"></script>
+<script src="dictation.js?v=0.31.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -193,7 +193,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.30.2</span>
+  <span class="version-chip" id="app-version">v0.31.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -672,6 +672,12 @@ function splitPolygon(shape, idx1, idx2) {
   ];
   const a = { ...shape, points: ptsA, id: state.nextShapeId++, label: shape.label };
   const b = { ...shape, points: ptsB, id: state.nextShapeId++, label: shape.label + ' (split)' };
+  // Walls before idx1 and from idx2 on go to A (with the cut wall at idx1 between
+  // them); walls idx1..idx2-1 go to B. Per-wall arcs and label nudges follow.
+  const toA = j => j < idx1 ? j : j >= idx2 ? j - idx2 + idx1 + 1 : null;
+  const toB = j => (j >= idx1 && j < idx2) ? j - idx1 : null;
+  a.arcs = remapByWall(shape.arcs, toA); b.arcs = remapByWall(shape.arcs, toB);
+  a.dimOffsets = remapByWall(shape.dimOffsets, toA); b.dimOffsets = remapByWall(shape.dimOffsets, toB);
   rebuildSegments(a); rebuildSegments(b);
   return { a, b };
 }
@@ -754,7 +760,7 @@ function addBuilding() {
 }
 function buildingStats(b) {
   const shs = state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === b);
-  return { count: shs.length, area: shs.reduce((a, sh) => a + polygonArea(sh.points), 0) };
+  return { count: shs.length, area: shs.reduce((a, sh) => a + shapeArea(sh), 0) };
 }
 function renameBuilding(cur) {
   cur = cur || viewBuildingOrAll();
@@ -910,7 +916,7 @@ function shapesOnOtherFloors() { return visibleShapes().filter(s => s.floor !== 
 
 function fitView() {
   const all = [];
-  visibleShapes().forEach(s => all.push(...s.points));
+  visibleShapes().forEach(s => all.push(...shapeExtentPoints(s)));
   if (state.segments.length) all.push(...pathPointsHere(state.segments));
   // Include text-label anchors so notes placed below/around the drawing stay on
   // screen (the 80px pad below covers each label's height).
@@ -1127,7 +1133,7 @@ function patternOptions(selected) {
 function renderShape(sh, W, isGhost) {
   const t = TYPES[sh.type] || TYPES.living;
   const screenPts = sh.points.map(W);
-  const d = screenPts.map((p,i)=> (i===0?'M':'L') + p.x + ' ' + p.y).join(' ') + ' Z';
+  const d = shapePathD(sh, W);
   const cls = isGhost ? 'ghost' : '';
 
   // Fill (active floor only). Ghosts of other floors are drawn as a no-fill dashed
@@ -1162,10 +1168,15 @@ function renderShape(sh, W, isGhost) {
     if (!isGhost) {
       const isSel = state.selection && state.selection.kind === 'wall' && state.selection.shapeId === sh.id && state.selection.idx === i;
       const wallClass = 'visible-wall' + (isSel ? ' selected' : '');
-      const visibleWall = addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: 'black', 'stroke-width': 2, class: wallClass });
+      const arcD = wallArc(sh, i) ? wallPathD(sh, i, W) : null;   // curved walls draw as arcs
+      const visibleWall = arcD
+        ? addEl('path', { d: arcD, fill: 'none', stroke: 'black', 'stroke-width': 2, class: wallClass })
+        : addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: 'black', 'stroke-width': 2, class: wallClass });
       if (t.dashed) visibleWall.setAttribute('stroke-dasharray', '8,5');
       if (state.mode === 'edit') {
-        const hit = addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'hit-wall' });
+        const hit = arcD
+          ? addEl('path', { d: arcD, class: 'hit-wall' })
+          : addEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'hit-wall' });
         hit.addEventListener('click', (ev) => {
           ev.stopPropagation();
           state.selection = { kind:'wall', shapeId: sh.id, idx: i };
@@ -1174,7 +1185,9 @@ function renderShape(sh, W, isGhost) {
       }
     }
     if (showDims) {
-      const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+      const arc = wallArc(sh, i);
+      const crown = arc ? W(arc.apex) : null;   // a curved wall's label sits at its crown
+      const mx = crown ? crown.x : (a.x+b.x)/2, my = crown ? crown.y : (a.y+b.y)/2;
       const dx=b.x-a.x, dy=b.y-a.y;
       const len = Math.hypot(dx,dy);
       if (len >= 30) {
@@ -1246,7 +1259,7 @@ function renderShape(sh, W, isGhost) {
     const base = polygonCentroid(sh.points);
     const off = sh.labelOffset || { dx: 0, dy: 0 };
     const c = W({ x: base.x + off.dx, y: base.y + off.dy });
-    const area = polygonArea(sh.points);
+    const area = shapeArea(sh);
     const halo = { stroke: 'white', 'stroke-width': 3.5, 'paint-order': 'stroke fill' };
     // Other-floor (ghost) labels render a touch smaller and in a muted blue-grey so
     // they stay distinguishable from the active floor's label even at high opacity.
@@ -1566,7 +1579,7 @@ function fencedWhole() {
 function deleteFenced() {
   const whole = fencedWhole();
   if (!whole) return;
-  const names = whole.shapes.map(id => { const sh = state.shapes.find(x => x.id === id); return sh.label + ' (' + Math.round(polygonArea(sh.points)) + ' sf)'; });
+  const names = whole.shapes.map(id => { const sh = state.shapes.find(x => x.id === id); return sh.label + ' (' + Math.round(shapeArea(sh)) + ' sf)'; });
   if (whole.walk) names.push('the unfinished walk (' + state.segments.length + ' segment' + (state.segments.length === 1 ? '' : 's') + ')');
   if (whole.anns.length) names.push(whole.anns.length + ' offset measurement' + (whole.anns.length === 1 ? '' : 's'));
   if (!names.length) { alert('Nothing is captured whole. Enlarge the fence so every vertex of what you want gone is inside it.'); return; }
@@ -2066,9 +2079,10 @@ function sidebarEdit() {
 
   if (sel.kind === 'wall') {
     const len = wallLength(sh, sel.idx);
+    const arc = wallArc(sh, sel.idx);
     return `
       <div class="section">
-        <h2>Wall ${sel.idx+1} of "${escapeHtml(sh.label)}"</h2>
+        <h2>Wall ${sel.idx+1} of "${escapeHtml(sh.label)}"${arc ? ' (curved)' : ''}</h2>
         <div class="field"><label>Length</label><input id="edit-len" value="${formatLength(len)}"></div>
         <div class="field"><label>Mode</label><select id="edit-mode">
           <option value="stretch-end"${state.settings.defaultLengthEditMode==='stretch-end'?' selected':''}>Move end vertex (adjacent walls change)</option>
@@ -2083,6 +2097,19 @@ function sidebarEdit() {
         <div class="row-buttons">
           <button data-act="moveWall" class="primary">Move wall</button>
         </div>
+        <h2 style="margin-top:14px;">Curve (arc)</h2>
+        <div class="field"><label>Rise</label><input id="arc-rise" value="${arc ? formatLength(arc.s) : ''}" placeholder="e.g. 2'6 — how far the midpoint moves"></div>
+        <div class="field"><label>Bow</label><select id="arc-dir">
+          <option value="out"${!arc || arc.rise > 0 ? ' selected' : ''}>Outward (away from the area)</option>
+          <option value="in"${arc && arc.rise < 0 ? ' selected' : ''}>Inward (into the area)</option>
+        </select></div>
+        <div class="row-buttons">
+          <button data-act="applyArc" class="primary">${arc ? 'Update arc' : 'Make arc'}</button>
+          ${arc ? '<button data-act="clearArc">Straighten</button>' : ''}
+        </div>
+        <div class="help" style="margin-top:6px;">${arc
+          ? `Chord ${formatLength(arc.c)} · arc length ${formatLength(arc.arcLength)} · radius ${formatLength(arc.r)} · ${arc.rise > 0 ? 'adds' : 'takes'} ${Math.round(arc.segmentArea)} sq ft. The dimension label keeps the straight (chord) length.`
+          : 'Bows this wall into a circular arc through its two vertices, with the midpoint pushed out by the rise (a minus sign also means inward). The vertices stay put, so length and move edits keep working; the area includes the curve.'}</div>
         <h2 style="margin-top:14px;">Other</h2>
         <div class="row-buttons">
           <button data-act="insertVertex">Insert vertex (midpoint)</button>
@@ -2215,7 +2242,7 @@ function sidebarShapes() {
   if (onFloor.length === 0) return `<div class="section"><h2>Areas on "${state.activeFloor}"</h2><div class="help">None yet.</div></div>`;
   const html = onFloor.map(sh => {
     const isSel = state.selection && state.selection.shapeId === sh.id;
-    const area = polygonArea(sh.points);
+    const area = shapeArea(sh);
     return `
       <div class="shape-item${isSel?' selected':''}">
         <div class="hdr"><span>${escapeHtml(sh.label)}</span><span>${Math.round(area)} sf</span></div>
@@ -2241,13 +2268,13 @@ function buildingsPresent() {
 function mainFloorFootprint(building) {
   return state.shapes
     .filter(sh => (sh.building || DEFAULT_BUILDING) === building && sh.floor === 'main' && sh.type === 'living')
-    .reduce((a, sh) => a + polygonArea(sh.points), 0);
+    .reduce((a, sh) => a + shapeArea(sh), 0);
 }
 function aboveGradeLiving(building) {
   return state.shapes
     .filter(sh => (sh.building || DEFAULT_BUILDING) === building
       && ABOVE_GRADE_FLOORS.includes(sh.floor) && AGLA_TYPES.includes(sh.type))
-    .reduce((a, sh) => a + polygonArea(sh.points), 0);
+    .reduce((a, sh) => a + shapeArea(sh), 0);
 }
 function basementArea(building) {
   const b = state.basements[building];
@@ -2317,7 +2344,7 @@ function sidebarTotals() {
     const b = sh.building || DEFAULT_BUILDING;
     if (!byBuilding[b]) byBuilding[b] = {};
     if (!byBuilding[b][sh.floor]) byBuilding[b][sh.floor] = {};
-    byBuilding[b][sh.floor][sh.type] = (byBuilding[b][sh.floor][sh.type] || 0) + polygonArea(sh.points);
+    byBuilding[b][sh.floor][sh.type] = (byBuilding[b][sh.floor][sh.type] || 0) + shapeArea(sh);
   });
   Object.entries(byBuilding).forEach(([building, floors]) => {
     html += `<div style="margin-top:8px;font-weight:bold;font-size:12px;color:#2b3a4a;border-bottom:1px solid #ddd;">${escapeHtml(building)}</div>`;
@@ -2379,6 +2406,8 @@ function attachSidebarHandlers() {
   });
   const off = document.getElementById('start-offset');
   if (off) off.addEventListener('keydown', e => { if (e.key === 'Enter') offsetStart(); });
+  const rise = document.getElementById('arc-rise');
+  if (rise) rise.addEventListener('keydown', e => { if (e.key === 'Enter') applyWallArc(); });
   const sdir = document.getElementById('split-dir');
   if (sdir) sdir.addEventListener('keydown', e => {
     if (e.key === 'Enter') splitProject();
@@ -2402,6 +2431,8 @@ function sidebarAction(e) {
     case 'cancelShape': cancelShape(); break;
     case 'removeSeg': pushUndo(); state.segments.splice(parseInt(i),1); render(); break;
     case 'applyLen': applyLengthEdit(); break;
+    case 'applyArc': applyWallArc(); break;
+    case 'clearArc': clearWallArc(); break;
     case 'moveWall': moveSelectedWall(); break;
     case 'insertVertex': insertVertexAction(); break;
     case 'deleteWall': deleteWallAction(); break;
@@ -2495,6 +2526,32 @@ function confirmLengthEdit(shapeId, wallIdx, newLen) {
   pushUndo();
   setWallLength(sh, wallIdx, newLen, mode);
   closeModal();
+  render();
+}
+
+// Bow the selected wall into an arc: the rise is how far its midpoint moves off
+// the chord. Direction comes from the Bow select, or a leading minus sign.
+function applyWallArc() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'wall') return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  if (!sh) return;
+  const raw = document.getElementById('arc-rise').value.trim();
+  const inward = raw.startsWith('-') || document.getElementById('arc-dir').value === 'in';
+  const rise = parseLength(raw.replace(/^[-+]\s*/, ''));
+  if (!(rise > 0)) { alert("Enter the rise — how far the wall's midpoint should move, e.g. 2'6"); return; }
+  pushUndo();
+  setWallArc(sh, sel.idx, inward ? -rise : rise);
+  render();
+}
+
+function clearWallArc() {
+  const sel = state.selection;
+  if (!sel || sel.kind !== 'wall') return;
+  const sh = state.shapes.find(s => s.id === sel.shapeId);
+  if (!sh || !wallArc(sh, sel.idx)) return;
+  pushUndo();
+  setWallArc(sh, sel.idx, 0);
   render();
 }
 
@@ -2657,6 +2714,7 @@ function copySelectedShape() {
     building: sh.building || DEFAULT_BUILDING,
     points: sh.points.map(p => ({ x: p.x + seg.dx, y: p.y + seg.dy })),
     segments: sh.segments.map(s => ({ ...s })),
+    ...(sh.arcs ? { arcs: { ...sh.arcs } } : {}),
   };
   state.shapes.push(newShape);
   state.selection = { kind: 'shape', shapeId: newId };
@@ -2710,7 +2768,9 @@ function confirmSplitProject() {
   pushUndo();
   // Insert a new vertex on the hit wall (between points[wallIdx] and points[wallIdx+1]).
   const wallIdx = sp.hit.wallIdx;
+  const arcsBefore = sh.arcs;
   sh.points.splice(wallIdx + 1, 0, { x: sp.hit.point.x, y: sp.hit.point.y });
+  sh.arcs = remapByWall(sh.arcs, i => i < wallIdx ? i : i > wallIdx ? i + 1 : null);
   rebuildSegments(sh);
   // Origin index may have shifted if it was after the inserted vertex.
   let originIdx = sp.originIdx;
@@ -2720,6 +2780,7 @@ function confirmSplitProject() {
   if (!result) {
     // Revert insert + undo
     sh.points.splice(wallIdx + 1, 1);
+    sh.arcs = arcsBefore;
     rebuildSegments(sh);
     state.undoStack.pop();
     state.splitPreview = null;
@@ -3139,6 +3200,7 @@ function closeShape() {
     const o = state.rewalk.original;
     const shape = { ...o, points: pointsToUse, segments: rebuild ? [] : [...state.segments] };
     delete shape.dimOffsets;
+    delete shape.arcs;
     state.rewalk = null;
     finishNewShape(shape, rebuild);
     return;
@@ -3419,7 +3481,7 @@ function openFloorMenu(clientX, clientY) {
   menu.id = 'floor-menu';
   menu.className = 'floor-menu';
   const b = viewBuildingOrAll();
-  const areaOn = f => visibleShapes().filter(sh => sh.floor === f).reduce((a, sh) => a + polygonArea(sh.points), 0);
+  const areaOn = f => visibleShapes().filter(sh => sh.floor === f).reduce((a, sh) => a + shapeArea(sh), 0);
   menu.innerHTML = '<h4>Floor' + (b === 'all' ? '' : ' — ' + escapeHtml(b)) + '</h4>' +
     state.floors.map(f => {
       const a = areaOn(f);
@@ -3737,6 +3799,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.31.0', '2026-09-10', 'Curved walls: select a wall in Edit mode, type a rise and Make arc — the wall bows into a circular arc whose midpoint sits that far off the straight line, outward for bays and turrets or inward for a curved notch. Areas include the curve; Straighten puts the wall back.'],
   ['0.30.0', '2026-09-10', 'Fence can delete: draw a fence around anything — a stray unfinished walk, whole shapes, offsets — and Delete fenced (or the Delete key) removes what it captured whole, one undo step.'],
   ['0.29.0', '2026-09-10', 'Enclosed areas: when the pen lands on an existing wall, the region it fences off with the existing walls lights up yellow — Enter closes along those walls (N cycles options) instead of a straight line back to the start. New-area picker: label plus a grid of type buttons, no more typing the type.'],
   ['0.28.0', '2026-09-10', 'Compass rose: click a direction (8 at 45° or 16 at 22.5°) with a length typed and the wall goes that way; the list beside it shows the typed command for each direction and highlights with the wedge. Directions are absolute (up is always up).'],
@@ -3957,7 +4020,7 @@ function exportPNG(clone, filename) {
 function captureLivePanel() {
   const allWorldPts = [];
   const sceneShapes = state.settings.showFloorGhosts ? visibleShapes() : shapesOnFloor(state.activeFloor);
-  sceneShapes.forEach(sh => allWorldPts.push(...sh.points));
+  sceneShapes.forEach(sh => allWorldPts.push(...shapeExtentPoints(sh)));
   if (state.segments.length) allWorldPts.push(...pathPointsHere(state.segments));
   state.annotations.forEach(a => { allWorldPts.push(a.a); allWorldPts.push(a.b); });
   labelsOnFloor(state.activeFloor).forEach(l => allWorldPts.push({ x: l.x, y: l.y }));
@@ -4093,7 +4156,7 @@ function renderGallery() {
     g.appendChild(nested);
     const area = state.shapes
       .filter(sh => (sh.building || DEFAULT_BUILDING) === p.building && sh.floor === p.floor)
-      .reduce((a, sh) => a + polygonArea(sh.points), 0);
+      .reduce((a, sh) => a + shapeArea(sh), 0);
     const cap = document.createElementNS(ns, 'text');
     cap.setAttribute('x', cx + cellW / 2); cap.setAttribute('y', cy + cellH - 8);
     cap.setAttribute('text-anchor', 'middle'); cap.setAttribute('class', 'gallery-caption');
@@ -4318,8 +4381,8 @@ function svgForExport() {
     out.appendChild(nested);
     if (multi) {
       const area = p.building
-        ? state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === p.building && sh.floor === p.floor).reduce((a, sh) => a + polygonArea(sh.points), 0)
-        : shapesOnFloor(p.floor).reduce((a, sh) => a + polygonArea(sh.points), 0);
+        ? state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === p.building && sh.floor === p.floor).reduce((a, sh) => a + shapeArea(sh), 0)
+        : shapesOnFloor(p.floor).reduce((a, sh) => a + shapeArea(sh), 0);
       if (!grid) capY = (horiz ? blockY + contentH * fitScale : py + fh) + 15;
       out.appendChild(mk('text', {
         x: px + fw / 2, y: capY, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
@@ -4360,7 +4423,7 @@ function svgForExport() {
       out.appendChild(mk('text', {
         x: rowX + 30, y: rowY + 11, 'font-family':'Arial, sans-serif', 'font-size': 11, fill:'#222'
       }, t.name));
-      const total = visibleShapes().filter(s => s.type === key).reduce((a, s) => a + polygonArea(s.points), 0);
+      const total = visibleShapes().filter(s => s.type === key).reduce((a, s) => a + shapeArea(s), 0);
       out.appendChild(mk('text', {
         x: rowX + colW - 20, y: rowY + 11, 'text-anchor':'end',
         'font-family':'Arial, sans-serif', 'font-size': 11, 'font-weight':'bold', fill:'#444'
