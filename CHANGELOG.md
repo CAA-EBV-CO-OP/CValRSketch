@@ -14,6 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.32.0] — 2026-09-13
+
+### Added
+- **A closed walk offers to close itself.** Walking the last wall back to the start used to leave the sketch sitting there until **Close Shape** was clicked. Now an offer appears in place, the same way the enclosed-area offer does: **Enter** on an empty segment box accepts it and opens the new-area picker, **Esc** or **Tab** declines and leaves the walk untouched, and both choices are also buttons. On mobile it is a bar above the keypad, so there is no reaching for the ✓ in the header.
+- The region the closed walk would become is washed green on the drawing while the offer stands. It is tagged `ui-overlay`, so it never reaches an export.
+
+### Changed
+- Declining sticks for the walk in hand and no longer: change the walk — including undo then retyping the same wall — and close it again, and the offer comes back.
+- The offer takes precedence over a snap preview when Enter is pressed on an empty box, matching how the enclosed-area offer already behaved, so snap-stepping onto the start point closes the shape rather than stepping again.
+
+---
+
 ## [0.31.0] — 2026-09-10
 
 ### Added
