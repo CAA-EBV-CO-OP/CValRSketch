@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.32.0"></script>
-<script src="dictation.js?v=0.32.0"></script>
+<script src="core.js?v=0.33.0"></script>
+<script src="dictation.js?v=0.33.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -195,7 +195,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.32.0</span>
+  <span class="version-chip" id="app-version">v0.33.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -205,6 +205,7 @@
     <button data-mode="split">Split</button>
     <button data-mode="fence">Fence</button>
     <button data-mode="text">Text</button>
+    <button data-mode="underlay" title="Trace over a scanned or photographed plan">Image</button>
   </div>
   <div class="sep"></div>
   <button id="btn-undo" onclick="undoHistory()" title="Undo (Ctrl+Z)">↶ Undo</button>
@@ -307,6 +308,9 @@ let state = {
   offsetPick: null,     // null | { first: {x,y}|null } — active picking state for offset tool
   fenceDraw: null,      // null | { start:{x,y}, end:{x,y} } in WORLD coords while dragging
   fenceSelection: null, // null | { shapeVerts:[{shapeId,idx}], inProgVerts:[idx], annEnds:[{idx,end}] }
+  underlay: null,       // { src, w, h, x, y, ftPerPx, opacity, floor, locked, name } — scan to trace over
+  underlayDrag: null,   // transient: { grabX, grabY } while dragging the underlay
+  underlayCal: null,    // transient: { first } while picking the two calibration points
   subject: '',          // project/property name shown as title on exports
   subtitle: '',         // optional secondary line under the title
   settings: { ...SETTINGS_DEFAULTS },
@@ -401,7 +405,7 @@ const fileAutosave = { handle: null, name: '', status: 'off', lastAt: null, last
 // state are per-session and deliberately left out of the file.
 function serializeProject() {
   const data = { ...state };
-  ['undoStack', 'redoStack', 'selection', 'splitSelection', 'preview', 'splitPreview',
+  ['undoStack', 'redoStack', 'selection', 'splitSelection', 'preview', 'splitPreview', 'underlayDrag', 'underlayCal',
    'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'dimLabelDrag', 'shapeMovePick', 'rewalk', 'offsetPick', 'fenceDraw', 'fenceSelection']
     .forEach(k => delete data[k]);
   return JSON.stringify(data, null, 2);
@@ -931,6 +935,9 @@ function fitView() {
   // Include text-label anchors so notes placed below/around the drawing stay on
   // screen (the 80px pad below covers each label's height).
   labelsOnFloor(state.activeFloor).forEach(l => all.push({ x: l.x, y: l.y }));
+  // Frame the underlay too, so loading a scan into an empty project shows it.
+  const ul = visibleUnderlay();
+  if (ul) all.push({ x: ul.x, y: ul.y }, { x: ul.x + ul.w*ul.ftPerPx, y: ul.y + ul.h*ul.ftPerPx });
   const w = svg.clientWidth || 800, h = svg.clientHeight || 600;
   if (all.length === 0) return { tx: w/2, ty: h/2, scale: 18 };
   const xs = all.map(p=>p.x), ys = all.map(p=>p.y);
@@ -956,6 +963,7 @@ function render() {
   });
   svg.classList.toggle('split-mode', state.mode === 'split');
   svg.classList.toggle('text-mode', state.mode === 'text');
+  svg.classList.toggle('underlay-mode', state.mode === 'underlay');
 
   // Floor tabs
   const ftEl = document.getElementById('floor-tabs');
@@ -966,7 +974,10 @@ function render() {
   syncMarkControls();
   document.getElementById('floor-help').textContent =
     galleryActive() ? 'Gallery: every building in the file, each fitted to its panel. Click one to edit it on its own.' :
-    state.mode==='text' ? 'Click a blank spot to add a text label. Click a label to select it; drag to move it; double-click to edit.' :
+    state.mode==='underlay' ? (state.underlayCal
+      ? (state.underlayCal.first ? 'Calibrate: now click the second end of a wall or scale bar you know the length of.'
+                                 : 'Calibrate: click one end of something on the scan whose real length you know.')
+      : 'Load a scanned plan, set it to scale, then trace over it in Walk mode. Drag the image to position it.') :
     state.mode==='split' ? 'Click two vertices in a shape to split it.' :
     state.mode==='edit' ? 'Click a wall or vertex to edit, or the body of a shape to move/copy/retype it. Esc deselects. Drag a dimension or area label to move it; double-click a dimension label to snap it back.' :
     (state.segments.length === 0
@@ -990,6 +1001,9 @@ function render() {
   viewTransform = v;
   document.documentElement.style.setProperty('--ghost-opacity', state.settings.ghostOpacity);
   const W = p => ({ x: v.tx + p.x*v.scale, y: v.ty + p.y*v.scale });
+
+  // The traced-over scan sits beneath every drawn thing, unless it is pinned on top.
+  renderUnderlay(W, 'below');
 
   // Active floor first…
   shapesOnFloor(state.activeFloor).forEach(sh => renderShape(sh, W, false));
@@ -1060,6 +1074,8 @@ function render() {
       addEl('text', { x: mx, y: my - 10, 'text-anchor':'middle', 'font-size':12, 'font-weight':'bold', fill:'#cc5500' }, `${formatLength(sp.hit.distance)} ${sp.dir}`);
     }
   }
+
+  renderUnderlay(W, 'above');
 
   renderSidebar();
   scheduleAutosave();
@@ -1382,6 +1398,7 @@ function renderSidebar() {
   if (galleryActive()) {
     html += sidebarGallery();
   } else {
+    if (state.mode === 'underlay') html += sidebarUnderlay();
     if (state.mode === 'walk') html += sidebarWalk();
     if (state.mode === 'edit') html += sidebarEdit();
     if (state.mode === 'split') html += sidebarSplit();
@@ -1919,6 +1936,181 @@ function resetDimLabel(shapeId, idx) {
   const o = { ...sh.dimOffsets }; delete o[idx];
   sh.dimOffsets = Object.keys(o).length ? o : undefined;
   render();
+}
+
+// =============================================================================
+// UNDERLAY — trace over a scanned or photographed plan
+// =============================================================================
+// The scan is stored in the project as a downscaled data URL, so a saved sketch
+// travels with the image it was traced from. It draws beneath everything and is
+// tagged ui-overlay, so it never reaches an export. It is deliberately left out
+// of snapshotState(): undo should not churn a few hundred KB, and leaving it out
+// means undo/redo pass over it untouched.
+const UNDERLAY_MAX_PX = 2200;     // longest side after downscaling
+const UNDERLAY_QUALITY = 0.75;
+
+function visibleUnderlay() {
+  const u = state.underlay;
+  if (!u || !u.src) return null;
+  if (u.floor && u.floor !== state.activeFloor) return null;
+  return u;
+}
+
+function renderUnderlay(W, layer) {
+  const u = visibleUnderlay();
+  if (!u) return;
+  if ((layer === 'above') !== !!u.onTop) return;
+  const a = W({ x: u.x, y: u.y });
+  const b = W({ x: u.x + u.w*u.ftPerPx, y: u.y + u.h*u.ftPerPx });
+  const img = addEl('image', {
+    x: a.x, y: a.y, width: Math.max(1, b.x - a.x), height: Math.max(1, b.y - a.y),
+    opacity: u.opacity, preserveAspectRatio: 'none', class: 'ui-overlay',
+  });
+  img.setAttribute('href', u.src);
+  if (state.mode === 'underlay' && !u.locked) {
+    img.style.cursor = 'move';
+    img.addEventListener('mousedown', underlayDragStart);
+  }
+  // While calibrating, mark the first point so the second click has something to aim at.
+  if (state.underlayCal && state.underlayCal.first) {
+    const p = W(state.underlayCal.first);
+    addEl('circle', { cx: p.x, cy: p.y, r: 6, fill: '#e6007a', stroke: '#fff', 'stroke-width': 2, class: 'ui-overlay' });
+  }
+}
+
+function pickUnderlayFile() {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  inp.addEventListener('change', () => { if (inp.files && inp.files[0]) loadUnderlayFile(inp.files[0]); });
+  inp.click();
+}
+
+function loadUnderlayFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      // Downscale so a saved project stays a sane size; a scan far above this
+      // resolution costs file size without helping you trace.
+      const k = Math.min(1, UNDERLAY_MAX_PX / Math.max(im.naturalWidth, im.naturalHeight));
+      const w = Math.round(im.naturalWidth * k), h = Math.round(im.naturalHeight * k);
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(im, 0, 0, w, h);
+      let src;
+      try { src = cv.toDataURL('image/jpeg', UNDERLAY_QUALITY); }
+      catch (e) { src = reader.result; }          // tainted or unsupported — keep the original
+      // Start at a sensible size: as wide as what is already drawn, else 60 ft.
+      const pts = [];
+      visibleShapes().forEach(s => pts.push(...s.points));
+      let spanFt = 60, ox = 0, oy = 0;
+      if (pts.length) {
+        const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+        spanFt = Math.max(12, Math.max(...xs) - Math.min(...xs));
+        ox = Math.min(...xs); oy = Math.min(...ys);
+      }
+      state.underlay = {
+        src, w, h, x: ox, y: oy, ftPerPx: spanFt / w,
+        opacity: 0.55, floor: state.activeFloor, locked: false, name: file.name,
+      };
+      render();
+    };
+    im.onerror = () => alert('That file could not be read as an image.');
+    im.src = reader.result;
+  };
+  reader.onerror = () => alert('That file could not be read.');
+  reader.readAsDataURL(file);
+}
+
+function setUnderlayOpacity(v) { if (state.underlay) { state.underlay.opacity = Math.max(0.05, Math.min(1, +v)); render(); } }
+function toggleUnderlayLock() { if (state.underlay) { state.underlay.locked = !state.underlay.locked; render(); } }
+function toggleUnderlayOnTop() { if (state.underlay) { state.underlay.onTop = !state.underlay.onTop; render(); } }
+function setUnderlayFloor(f) { if (state.underlay) { state.underlay.floor = f; render(); } }
+function removeUnderlay() {
+  if (!state.underlay) return;
+  if (state.settings.confirmDelete && !confirm('Remove the traced-over image? The sketch itself is untouched.')) return;
+  state.underlay = null; state.underlayCal = null; render();
+}
+
+function underlayDragStart(ev) {
+  const u = visibleUnderlay();
+  if (!u || u.locked || state.mode !== 'underlay' || state.underlayCal) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const p = screenToWorld(ev.clientX, ev.clientY);
+  state.underlayDrag = { grabX: p.x - u.x, grabY: p.y - u.y };
+}
+function underlayDragMove(e) {
+  if (!state.underlayDrag) return;
+  const u = state.underlay; if (!u) return;
+  const p = screenToWorld(e.clientX, e.clientY);
+  u.x = p.x - state.underlayDrag.grabX;
+  u.y = p.y - state.underlayDrag.grabY;
+  render();
+}
+function underlayDragUp() { if (state.underlayDrag) state.underlayDrag = null; }
+
+// Two clicks on something of known length, then the real distance — the image is
+// scaled about the first point so that point stays put.
+function startUnderlayCal() {
+  if (!visibleUnderlay()) { alert('Load an image first.'); return; }
+  state.underlayCal = { first: null };
+  render();
+}
+function cancelUnderlayCal() { state.underlayCal = null; render(); }
+
+function handleUnderlayCal(worldPoint) {
+  const cal = state.underlayCal;
+  if (!cal) return;
+  if (!cal.first) { cal.first = { x: worldPoint.x, y: worldPoint.y }; render(); return; }
+  const a = cal.first, b = worldPoint;
+  const spanNow = Math.hypot(b.x - a.x, b.y - a.y);
+  state.underlayCal = null;
+  render();
+  if (spanNow < 1e-6) { alert('Those two points are the same spot — try again.'); return; }
+  const typed = prompt('How long is that in real life?  e.g.  14\'  or  20\'6"', '');
+  if (typed === null) return;
+  const real = parseLength(typed);
+  if (!(real > 0)) { alert('Could not read that length.'); return; }
+  const u = state.underlay; if (!u) return;
+  const k = real / spanNow;
+  u.ftPerPx *= k;
+  u.x = a.x - (a.x - u.x) * k;      // scale about the first clicked point
+  u.y = a.y - (a.y - u.y) * k;
+  render();
+}
+
+function sidebarUnderlay() {
+  const u = state.underlay;
+  if (!u || !u.src) {
+    return `
+    <div class="section">
+      <h2>Trace over an image</h2>
+      <div class="help">Load a scanned or photographed floor plan, set it to scale against something you know the length of, then switch to <b>Walk</b> and trace over it. The image is stored in the sketch file and never appears in an export.</div>
+      <div class="row-buttons"><button data-act="loadUnderlay" class="primary">Load image…</button></div>
+    </div>`;
+  }
+  const spanFt = u.w * u.ftPerPx;
+  const onFloor = !u.floor || u.floor === state.activeFloor;
+  return `
+    <div class="section">
+      <h2>Image — ${escapeHtml(u.name || 'scan')}</h2>
+      <div class="help">${u.w}×${u.h} px · currently ${formatLength(spanFt)} wide${onFloor ? '' : ' · <b>hidden</b>, it belongs to the ' + escapeHtml(u.floor) + ' floor'}</div>
+      <div class="field"><label>Fade</label><input type="range" min="0.05" max="1" step="0.05" value="${u.opacity}" oninput="setUnderlayOpacity(this.value)"></div>
+      <div class="field"><label>Floor</label><select onchange="setUnderlayFloor(this.value)">
+        ${state.floors.map(f => `<option value="${f}"${f === u.floor ? ' selected' : ''}>${f}</option>`).join('')}
+      </select></div>
+      <div class="field"><label></label><label class="inline"><input type="checkbox" ${u.locked ? 'checked' : ''} onchange="toggleUnderlayLock()"> Lock it in place</label></div>
+      <div class="field"><label></label><label class="inline"><input type="checkbox" ${u.onTop ? 'checked' : ''} onchange="toggleUnderlayOnTop()"> Show on top of the drawing</label></div>
+      <div class="help">A finished shape's fill hides the scan underneath it. Tick <b>Show on top</b> and fade the image to check a trace against the plan.</div>
+      <h2 style="margin-top:14px;">Set the scale</h2>
+      ${state.underlayCal ? `
+      <div class="help">${state.underlayCal.first ? 'Now click the <b>other end</b>.' : 'Click <b>one end</b> of a wall, dimension line or scale bar on the image whose real length you know.'} Esc cancels.</div>
+      <div class="row-buttons"><button data-act="cancelUnderlayCal">Cancel</button></div>` : `
+      <div class="help">Click two points on the image a known distance apart, then type that distance. The scale bar printed on most plans is the most reliable thing to use.</div>
+      <div class="row-buttons"><button data-act="startUnderlayCal" class="primary">Calibrate…</button></div>`}
+      <h2 style="margin-top:14px;">Other</h2>
+      <div class="row-buttons"><button data-act="removeUnderlay" class="danger">Remove image</button></div>
+      <div class="help" style="margin-top:6px;">Drag the image on the canvas to line it up with what you have already drawn. Lock it once it is right, so a stray drag cannot move it.</div>
+    </div>`;
 }
 
 function startOffsetPick() {
@@ -2477,6 +2669,10 @@ function sidebarAction(e) {
     case 'cancelSplit': state.splitSelection = null; state.splitPreview = null; state.mode='edit'; render(); break;
     case 'resetStart': resetStart(); break;
     case 'offsetStart': offsetStart(); break;
+    case 'loadUnderlay': pickUnderlayFile(); break;
+    case 'startUnderlayCal': startUnderlayCal(); break;
+    case 'cancelUnderlayCal': cancelUnderlayCal(); break;
+    case 'removeUnderlay': removeUnderlay(); break;
     case 'startOffsetPick': startOffsetPick(); break;
     case 'cancelOffsetPick': cancelOffsetPick(); break;
     case 'removeAnnotation': removeAnnotation(parseInt(i)); break;
@@ -3588,6 +3784,7 @@ svg.addEventListener('click', (e) => {
   const gp = e.target.closest ? e.target.closest('[data-gallery-building]') : null;
   if (gp) { setViewBuilding(gp.getAttribute('data-gallery-building')); return; }
   if (galleryActive()) return;
+  if (state.underlayCal) { handleUnderlayCal(screenToWorld(e.clientX, e.clientY)); return; }
   if (e.target !== svg) return;
   if (state.mode === 'text') {
     // Blank-canvas click in Text mode: place a new label here. If one is
@@ -3619,6 +3816,8 @@ svg.addEventListener('click', (e) => {
 svg.addEventListener('mousedown', fenceMouseDown);
 window.addEventListener('mousemove', fenceMouseMove);
 window.addEventListener('mouseup', fenceMouseUp);
+window.addEventListener('mousemove', underlayDragMove);
+window.addEventListener('mouseup', underlayDragUp);
 window.addEventListener('mousemove', labelDragMove);
 window.addEventListener('mouseup', labelDragUp);
 window.addEventListener('mousemove', shapeLabelDragMove);
@@ -3856,6 +4055,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.33.0', '2026-09-29', 'Trace over a scan: the new Image tab loads a scanned or photographed floor plan, sets it to scale by clicking two points a known distance apart, and lays it under the drawing so you can walk the perimeter straight over it. Fade it, lock it, or flip it on top to check a finished trace against the plan. The image is saved inside the sketch file and never appears in an export.'],
   ['0.32.0', '2026-09-13', 'Closing a shape no longer needs the button: walk the last wall back to where you started and the sketch offers to close it right there — Enter takes it, Esc or Tab waves it off and you carry on walking. The region that would be created is washed green while the offer stands. On the phone the offer is a bar above the keypad with both choices as buttons.'],
   ['0.31.0', '2026-09-10', 'Curved walls: select a wall in Edit mode, type a rise and Make arc — the wall bows into a circular arc whose midpoint sits that far off the straight line, outward for bays and turrets or inward for a curved notch. Areas include the curve; Straighten puts the wall back.'],
   ['0.30.0', '2026-09-10', 'Fence can delete: draw a fence around anything — a stray unfinished walk, whole shapes, offsets — and Delete fenced (or the Delete key) removes what it captured whole, one undo step.'],

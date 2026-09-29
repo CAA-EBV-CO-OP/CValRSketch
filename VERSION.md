@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.32.0`
+**Current version:** `0.33.0`
 **Released:** 2026-09-13
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.33.0  | 2026-09-29 | minor  | **Trace over a scan**: an Image tab loads a scanned or photographed plan, scales it from two clicked points a known distance apart, and draws it under the sketch. Fade, lock, per-floor, or flip on top to check a trace. Stored in the sketch file; never exported. |
 | 0.32.0  | 2026-09-13 | minor  | **Closed walks offer to close themselves**: bring the pen back to the start and an offer appears in place — **Enter** accepts, **Esc** or **Tab** declines and keeps the walk, and both choices are buttons (a bar above the keypad on mobile). The region that would be created is washed green while the offer stands. |
 | 0.31.0  | 2026-09-10 | minor  | **Curved walls**: in Edit mode a selected wall gets a Curve section — type a rise (how far the midpoint moves off the straight line), pick outward or inward, Make arc. The wall bows into a circular arc through its two vertices; the area includes the curve; Straighten puts it back. Mobile has the same row in its wall editor. |
 | 0.30.2  | 2026-09-10 | patch  | **New-area dialog simplified**: type buttons first, then one Label box. The confusing “Or type it” box (a keyboard shortcut for picking a type that read like a free-text type) is gone. The label follows the chosen type until you type your own. |

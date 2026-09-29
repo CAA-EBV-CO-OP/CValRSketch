@@ -14,6 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.33.0] — 2026-09-29
+
+### Added
+- **Trace over a scanned plan.** A new **Image** mode loads a scan or photo of a floor plan, positions it by dragging, and sets it to scale: click two points a known distance apart and type that distance. The image draws beneath the sketch so the perimeter can be walked straight over it.
+- **Fade**, **Lock it in place**, and a per-floor assignment, so a two-storey job can carry a different scan on each floor.
+- **Show on top of the drawing** flips the image above the sketch, which is how you check a finished trace: a completed shape's fill is opaque and hides the scan under it.
+
+### Changed
+- The image is stored in the project file as a downscaled JPEG (longest side capped at 2200 px), so a saved sketch travels with the plan it was traced from. It is tagged `ui-overlay`, so it never reaches an SVG or PNG export.
+- The underlay is deliberately left out of `snapshotState()`: undo should not churn a few hundred KB per step, and leaving it out means undo and redo pass over the image untouched. It is also absent from the localStorage crash-recovery slot, which would otherwise blow its quota — a saved project file carries it, a crash recovery does not.
+
 ## [0.32.0] — 2026-09-13
 
 ### Added
