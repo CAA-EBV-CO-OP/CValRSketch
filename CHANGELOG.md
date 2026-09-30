@@ -25,6 +25,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The image is stored in the project file as a downscaled JPEG (longest side capped at 2200 px), so a saved sketch travels with the plan it was traced from. It is tagged `ui-overlay`, so it never reaches an SVG or PNG export.
 - The underlay is deliberately left out of `snapshotState()`: undo should not churn a few hundred KB per step, and leaving it out means undo and redo pass over the image untouched. It is also absent from the localStorage crash-recovery slot, which would otherwise blow its quota — a saved project file carries it, a crash recovery does not.
 
+---
+
+## [0.32.1] — 2026-09-29
+
+### Changed
+- **Save app copy explains itself first.** A short notice says the copy is free software under the AGPL-3.0, links to the licence and the notice, and offers **Save** or **Cancel**. It is not an "I agree" step: the licence asks nothing of someone who only uses the app.
+
+### Fixed
+- **A saved app copy now carries its licence.** LICENSE and NOTICE are embedded in the saved HTML, as the AGPL requires of a copy that is passed on, and the About dialog in a saved copy opens them from inside the file. Previously its LICENSE and NOTICE links pointed at files that are not beside a single saved page.
+- LICENSE and NOTICE are in the offline cache, so Save app copy works offline too.
+
+---
+
 ## [0.32.0] — 2026-09-13
 
 ### Added

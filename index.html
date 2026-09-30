@@ -41,6 +41,7 @@
   .whatsnew-modal li { margin-bottom: 6px; }
   .whatsnew-modal .ver { font-family: ui-monospace, monospace; color: #2b6cb0; font-weight: 700; }
   .about-modal p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; }
+  .legal-modal pre { max-height: 60vh; overflow: auto; white-space: pre-wrap; font-size: 11.5px; line-height: 1.4; background: #f6f7f9; border: 1px solid #dde2e8; padding: 10px; margin: 0; }
   .about-modal a { color: #2b6cb0; }
   header button, header label.btn { background: #4a6377; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
   header button:hover, header label.btn:hover { background: #5a7388; }
@@ -222,7 +223,7 @@
   </label>
   <button onclick="document.getElementById('add-json').click()" title="Append one or more sketch files' buildings to this one (pick several at once; you name each building as it comes in; each drawing is placed beside what is here)">➕ Add files…</button>
   <input type="file" id="add-json" accept=".json" multiple style="display:none">
-  <button onclick="saveAppCopy()" title="Save a frozen, self-contained copy of this exact version of the app (one HTML file) — keep it in the job folder beside the sketch so the sketch reopens the same way years later">💾 Save app copy</button>
+  <button onclick="confirmSaveAppCopy()" title="Save a frozen, self-contained copy of this exact version of the app (one HTML file) — keep it in the job folder beside the sketch so the sketch reopens the same way years later">💾 Save app copy</button>
   <span id="brand-header" style="margin-left:auto; display:flex; align-items:center; gap:8px; font-size:12px; color:#dfe7ef;"></span>
   <span id="autosave-chip" class="autosave-chip"></span>
 </header>
@@ -4056,6 +4057,7 @@ function exportFilename(ext) {
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
   ['0.33.0', '2026-09-29', 'Trace over a scan: the new Image tab loads a scanned or photographed floor plan, sets it to scale by clicking two points a known distance apart, and lays it under the drawing so you can walk the perimeter straight over it. Fade it, lock it, or flip it on top to check a finished trace against the plan. The image is saved inside the sketch file and never appears in an export.'],
+  ['0.32.1', '2026-09-29', 'Save app copy now explains first: the copy is free software, and the licence (AGPL-3.0) and the OSASI notice are saved inside the file, so anyone you pass it to has them. In a saved copy, About opens both from inside the file.'],
   ['0.32.0', '2026-09-13', 'Closing a shape no longer needs the button: walk the last wall back to where you started and the sketch offers to close it right there — Enter takes it, Esc or Tab waves it off and you carry on walking. The region that would be created is washed green while the offer stands. On the phone the offer is a bar above the keypad with both choices as buttons.'],
   ['0.31.0', '2026-09-10', 'Curved walls: select a wall in Edit mode, type a rise and Make arc — the wall bows into a circular arc whose midpoint sits that far off the straight line, outward for bays and turrets or inward for a curved notch. Areas include the curve; Straighten puts the wall back.'],
   ['0.30.0', '2026-09-10', 'Fence can delete: draw a fence around anything — a stray unfinished walk, whole shapes, offsets — and Delete fenced (or the Delete key) removes what it captured whole, one undo step.'],
@@ -4069,9 +4071,41 @@ const WHATS_NEW = [
   ['0.19.x', '2026-09-10', 'Export layout choice, autosave to file (Chrome/Edge), draggable dimension labels, Move shape by offset or by picking points, fill palette with a deck-plank pattern, Re-walk this wall.'],
 ];
 // ----- Save app copy: a frozen, single-file build of the running version ----------
-// Fetches the app's own three files, inlines the two scripts, drops the PWA
-// manifest/service-worker hooks, and saves one HTML file named for the version.
-// Only possible when the app is served (osasi.org or any local server): a page
+// Shown before saving: the copy is free software, and whoever it is passed to receives the
+// licence inside the file. Not an "I agree" gate - the AGPL needs no acceptance just to run (§9).
+function confirmSaveAppCopy() {
+  if (location.protocol === 'file:') return saveAppCopy();  // explains itself
+  const m = createModal();
+  const div = document.createElement('div');
+  div.className = 'modal about-modal';
+  div.style.maxWidth = '520px';
+  div.innerHTML = `
+    <h3>Save app copy</h3>
+    <p>This saves CValR-Sketch as one self-contained HTML file for the job folder, so the sketch reopens the same way years from now.</p>
+    <p>CValR-Sketch is free software under the <strong>GNU Affero General Public License v3.0</strong>. The licence and its notice are saved inside the file (open <em>About</em> in the copy to read them). If you share the copy or change it, keep those notices and the credit <em>Built on CValRSketch, an OSASI project</em>.</p>
+    <p><a href="LICENSE" target="_blank" rel="noopener">View licence</a> · <a href="NOTICE" target="_blank" rel="noopener">View notice</a></p>
+    <div class="modal-buttons"><button onclick="closeModal()">Cancel</button><button class="primary" onclick="closeModal(); saveAppCopy()">Save</button></div>`;
+  m.appendChild(div);
+}
+
+// In a saved copy LICENSE and NOTICE are embedded (see saveAppCopy); served, they are files beside
+// the page and the link is followed as usual.
+function openLegal(name) {
+  const el = document.getElementById('embedded-' + name);
+  if (!el) return true;
+  const m = createModal();
+  const div = document.createElement('div');
+  div.className = 'modal legal-modal';
+  div.style.maxWidth = '720px';
+  div.innerHTML = `<h3>${escapeHtml(name)}</h3><pre>${escapeHtml(el.textContent.trim())}</pre>
+    <div class="modal-buttons"><button onclick="openAbout()">Back to About</button><button class="primary" onclick="closeModal()">Close</button></div>`;
+  m.appendChild(div);
+  return false;
+}
+
+// Fetches the app's own files, inlines the two scripts, embeds LICENSE and NOTICE,
+// drops the PWA manifest/service-worker hooks, and saves one HTML file named for the
+// version. Only possible when the app is served (osasi.org or any local server): a page
 // opened from disk cannot read its own source.
 async function saveAppCopy() {
   const ver = ((document.getElementById('app-version') || {}).textContent || '').replace(/^v/, '') || 'unknown';
@@ -4081,13 +4115,20 @@ async function saveAppCopy() {
   }
   try {
     const get = async f => { const r = await fetch(f, { cache: 'no-store' }); if (!r.ok) throw new Error(f + ': HTTP ' + r.status); return r.text(); };
-    const [html, core, dict] = await Promise.all([get('index.html'), get('core.js'), get('dictation.js')]);
+    const [html, core, dict, licence, notice] = await Promise.all(
+      [get('index.html'), get('core.js'), get('dictation.js'), get('LICENSE'), get('NOTICE')]);
     const inline = js => '<script>\n' + js.replace(/<\/script/gi, '<\\/script') + '\n<\/script>';
     let out = html;
     out = out.replace(/<script src="core\.js\?v=[^"]*"><\/script>/, () => inline(core));
     out = out.replace(/<script src="dictation\.js\?v=[^"]*"><\/script>/, () => inline(dict));
     out = out.replace(/[ \t]*<link rel="manifest"[^>]*>\r?\n/i, '');
     out = out.replace(/navigator\.serviceWorker\.register\([^)]*\)/g, 'Promise.resolve()');
+    // AGPL §4: a copy handed on must carry the licence, and NOTICE holds the §7 terms. A single
+    // file has no LICENSE beside it, so both travel inside; openLegal() shows them from here.
+    const plain = (id, text) => '<script type="text/plain" id="' + id + '">\n' + text.replace(/<\/script/gi, '<\\/script') + '\n<\/script>\n';
+    const end = out.lastIndexOf('</body>');
+    if (end === -1) throw new Error('no </body> in index.html');
+    out = out.slice(0, end) + plain('embedded-LICENSE', licence) + plain('embedded-NOTICE', notice) + out.slice(end);
     const stamp = '<!-- Frozen copy of CValR-Sketch v' + ver + ', saved ' + new Date().toISOString().slice(0, 10) +
       ' from ' + location.origin + location.pathname + '. Self-contained: open it from anywhere. Source and licence: https://github.com/CAA-EBV-CO-OP/CValRSketch -->\n';
     out = out.replace(/^(<!DOCTYPE html>\r?\n)/i, '$1' + stamp);
@@ -4124,9 +4165,9 @@ function openAbout() {
     <p>Part of <a href="https://osasi.org" target="_blank" rel="noopener"><strong>OSASI</strong> — the Open Source Appraisal Software Initiative</a>, a co-operative of real estate appraisers building shared, open tools. Developed for the CAA-EBV-CO-OP community.</p>
     <p>Copyright &copy; 2026 CAA-EBV-CO-OP and the CValRSketch contributors.</p>
     <p>This program is free software under the <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">GNU Affero General Public License v3.0</a> (or, at your option, any later version). You may use, study, modify and share it. If you redistribute it, or offer a modified version to others over a network, you must make the complete source available under the same licence and keep these notices intact. It is provided <strong>without any warranty</strong>; see the licence for details.</p>
-    <p><strong>Built on CValRSketch, an OSASI project</strong> — <a href="https://osasi.org" target="_blank" rel="noopener">osasi.org</a>. This attribution is an additional term of the licence (AGPL §7(b), see <a href="NOTICE" target="_blank" rel="noopener">NOTICE</a>) and must be preserved in every copy and derivative; modified versions may not be represented as the original or as endorsed by OSASI (§7(c)).</p>
+    <p><strong>Built on CValRSketch, an OSASI project</strong> — <a href="https://osasi.org" target="_blank" rel="noopener">osasi.org</a>. This attribution is an additional term of the licence (AGPL §7(b), see <a href="NOTICE" target="_blank" rel="noopener" onclick="return openLegal('NOTICE')">NOTICE</a>) and must be preserved in every copy and derivative; modified versions may not be represented as the original or as endorsed by OSASI (§7(c)).</p>
     <p><strong>Your branding is welcome.</strong> Add your firm's name and logo, restyle, or rename the app; exported sketch pages carry no required notice. Keep this attribution in the About dialog, and do not present a rebranded copy as the original or as endorsed by OSASI.</p>
-    <p>Source code and licence text: <a href="https://github.com/CAA-EBV-CO-OP/CValRSketch" target="_blank" rel="noopener">github.com/CAA-EBV-CO-OP/CValRSketch</a> · <a href="LICENSE" target="_blank" rel="noopener">LICENSE</a> (local copy)</p>
+    <p>Source code and licence text: <a href="https://github.com/CAA-EBV-CO-OP/CValRSketch" target="_blank" rel="noopener">github.com/CAA-EBV-CO-OP/CValRSketch</a> · <a href="LICENSE" target="_blank" rel="noopener" onclick="return openLegal('LICENSE')">LICENSE</a> (local copy)</p>
     <div class="modal-buttons"><button class="primary" onclick="closeModal()">Close</button></div>`;
   m.appendChild(div);
 }

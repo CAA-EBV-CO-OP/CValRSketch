@@ -10,6 +10,8 @@ const CORE_ASSETS = [
   './icon.svg',
   './icon-192.png',
   './icon-512.png',
+  './LICENSE',
+  './NOTICE',
   './m/',
   './m/index.html',
   './m/manifest.webmanifest',
