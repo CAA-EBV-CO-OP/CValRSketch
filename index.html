@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.34.0"></script>
-<script src="dictation.js?v=0.34.0"></script>
+<script src="core.js?v=0.34.1"></script>
+<script src="dictation.js?v=0.34.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -200,7 +200,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.34.0</span>
+  <span class="version-chip" id="app-version">v0.34.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -3945,6 +3945,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.34.1', '2026-10-01', 'Updates now show up on the first load: when you are online the app always fetches the current version of the page, and only falls back to the saved offline copy when the connection is down or slower than a few seconds. Before, a new release appeared only after a second reload.'],
   ['0.34.0', '2026-10-01', 'Import a floor-plan PDF: 📐 Import PDF… reads an iGUIDE plan and traces each floor\'s outline from the PDF\'s own drawing — on tested plans within about half an inch, and within 1% of iGUIDE\'s stated areas. A check table shows traced vs stated area per floor; floors land on the right tab, multi-building plans come in as separate buildings, and the basement area is taken from the traced basement. Garages and other rooms iGUIDE excludes are inside the outline — cut them off with Split. The PDF is read on your computer and never uploaded.'],
   ['0.33.0', '2026-10-01', 'Measure anywhere: click 📏 Measure in the toolbar (or press M), then click any two points. Corners and walls snap, a live line shows the distance as you move, Alt places a free point and Shift keeps the line level or plumb. It stays on for the next measurement until Esc or Done. Measurements now belong to the floor they were made on.'],
   ['0.32.1', '2026-09-29', 'Save app copy now explains first: the copy is free software, and the licence (AGPL-3.0) and the OSASI notice are saved inside the file, so anyone you pass it to has them. In a saved copy, About opens both from inside the file.'],
