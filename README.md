@@ -3,7 +3,7 @@
 **Floor plan sketching for residential appraisal that runs entirely in the browser.** Use it offline from a local download or host it yourself; your sketches never leave your machine.
 Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
 
-**Version:** 0.32.1 (2026-09-29)
+**Version:** 0.33.0 (2026-10-01)
 **License:** [AGPL-3.0](./LICENSE)
 **Repo:** https://github.com/CAA-EBV-CO-OP/CValRSketch
 **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
@@ -86,7 +86,7 @@ The file is fully self-contained: HTML + inline CSS + vanilla JavaScript. No ext
 - **Copy shape with offset** — duplicate a selected shape at a typed offset (e.g. `10' r`)
 
 ### Measurement Annotations
-- **Offset annotation tool** — click two vertices to place a labeled measurement anywhere on the canvas; persists across save/load
+- **Measure tool** — 📏 Measure (or M), then click any two points: corners and walls snap, Alt for a free point, Shift for level/plumb; labeled measurements belong to their floor and persist across save/load
 
 ### Multi-Floor
 - Floors: Basement / Main / Upper (rename or add as needed)
