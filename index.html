@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.34.1"></script>
-<script src="dictation.js?v=0.34.1"></script>
+<script src="core.js?v=0.35.0"></script>
+<script src="dictation.js?v=0.35.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -200,7 +200,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.34.1</span>
+  <span class="version-chip" id="app-version">v0.35.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -3945,6 +3945,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.35.0', '2026-10-01', 'PDF import now finishes the job: rooms iGUIDE leaves out of floor area (garage, unheated sun room) come in as their own areas, sized to the excluded area iGUIDE states; decks, porches and patios are traced from the outline around their label; and each floor is turned and slid to sit over the main floor, with a check-position flag where that is a judgment call (a suite shorter than its garage).'],
   ['0.34.1', '2026-10-01', 'Updates now show up on the first load: when you are online the app always fetches the current version of the page, and only falls back to the saved offline copy when the connection is down or slower than a few seconds. Before, a new release appeared only after a second reload.'],
   ['0.34.0', '2026-10-01', 'Import a floor-plan PDF: 📐 Import PDF… reads an iGUIDE plan and traces each floor\'s outline from the PDF\'s own drawing — on tested plans within about half an inch, and within 1% of iGUIDE\'s stated areas. A check table shows traced vs stated area per floor; floors land on the right tab, multi-building plans come in as separate buildings, and the basement area is taken from the traced basement. Garages and other rooms iGUIDE excludes are inside the outline — cut them off with Split. The PDF is read on your computer and never uploaded.'],
   ['0.33.0', '2026-10-01', 'Measure anywhere: click 📏 Measure in the toolbar (or press M), then click any two points. Corners and walls snap, a live line shows the distance as you move, Alt places a free point and Shift keeps the line level or plumb. It stays on for the next measurement until Esc or Done. Measurements now belong to the floor they were made on.'],
@@ -4891,7 +4892,7 @@ document.getElementById('add-json').addEventListener('change', async (e) => {
 // pdf-import.mjs and the vendored pdf.js load only when a PDF is picked. Module
 // imports need a served page, so a file:// open or a saved app copy explains
 // instead of failing.
-const PDF_IMPORT_VERSION = '0.34.0';
+const PDF_IMPORT_VERSION = '0.35.0';
 document.getElementById('import-pdf').addEventListener('change', async (e) => {
   const f = e.target.files && e.target.files[0];
   e.target.value = '';
@@ -4932,25 +4933,34 @@ function openPdfImportModal(res, fname) {
     .map(([k, t]) => `<option value="${k}"${k === cur ? ' selected' : ''}>${escapeHtml(t.name)}</option>`).join('');
   const multi = (res.buildings || []).length > 1;
   const rows = res.floors.map((f, i) => {
-    const ext = f.areas.exterior, exc = f.areas.excluded || 0;
-    const stated = ext != null ? ext + exc : null;
+    const exc = f.areas.excluded || 0;
+    const stated = f.stated;
     const diff = stated ? (f.traced / stated - 1) * 100 : null;
     const ok = diff != null && Math.abs(diff) <= 1;
+    const split = f.excludedTraced != null;
     const statedTxt = stated == null ? '—'
-      : `${Math.round(stated)} sf${exc ? `<div class="help" style="margin:0;">${Math.round(ext)} + ${Math.round(exc)} excluded</div>` : ''}`;
+      : `${Math.round(stated)} sf${exc ? `<div class="help" style="margin:0;">${split ? `excluded rooms ${Math.round(f.excludedTraced)} / ${Math.round(exc)} sf` : `incl. ${Math.round(exc)} excluded`}</div>` : ''}`;
     const check = diff == null ? '' : `<span style="color:${ok ? '#2f855a' : '#c05621'}; font-weight:600;">${ok ? '✓' : '⚠'} ${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%</span>`;
+    const kind = { excluded: 'excluded room', outdoor: 'outdoor' }[f.kind];
+    const place = [
+      f.turned ? `turned ${f.turned}°` : '',
+      f.placement === 'aligned' ? 'lined up' : f.placement === 'check' ? '<span style="color:#c05621;">check position</span>' : '',
+    ].filter(Boolean).join(' · ');
     return `<tr>
       <td><input type="checkbox" id="pdfimp-on-${i}" checked></td>
       ${multi ? `<td>${escapeHtml(f.building || '—')}</td>` : ''}
-      <td>${escapeHtml(f.title)}<div class="help" style="margin:0;">page ${f.page}</div></td>
+      <td>${escapeHtml(f.title)}<div class="help" style="margin:0;">page ${f.page}${kind ? ' · ' + kind : ''}${place ? ' · ' + place : ''}</div></td>
       <td><select id="pdfimp-floor-${i}">${floorOpts(f.floor)}</select></td>
       <td><select id="pdfimp-type-${i}">${typeOpts(f.type)}</select></td>
       <td style="text-align:right;">${Math.round(f.traced)} sf</td>
       <td style="text-align:right;">${statedTxt}</td>
       <td>${check}</td></tr>`;
   }).join('');
-  const excludedNote = res.floors.some(f => f.areas.excluded)
-    ? `<li>${escapeHtml(res.format)} leaves some rooms out of its floor area (garages, unheated rooms). They are inside the traced outline: use <b>Split</b> to cut them off as their own area.</li>` : '';
+  const fmt = escapeHtml(res.format);
+  const excludedNote = res.floors.some(f => f.kind === 'excluded')
+    ? `<li>Rooms ${fmt} leaves out of floor area (garages, unheated rooms) come in as their own areas, sized to the excluded area it states; their exterior walls go with them, shared walls stay with the house. Check each one's area type.</li>` : '';
+  const placeNote = res.floors.some(f => f.placement !== 'reference')
+    ? `<li>Each floor is turned and slid to sit over the main floor. Where that is not clear-cut (a suite shorter than the garage under it, a floor scanned separately) it says <b>check position</b>; move it with Fence if needed.</li>` : '';
   div.innerHTML = `
     <h3>Import ${escapeHtml(res.format)} plan: ${escapeHtml(fname)}</h3>
     ${res.address ? `<div class="help" style="margin-bottom:6px;">${escapeHtml(res.address)}</div>` : ''}
@@ -4960,8 +4970,8 @@ function openPdfImportModal(res, fname) {
     </table></div>
     <ul class="help" style="margin:10px 0 0; padding-left:18px;">
       ${excludedNote}
-      <li>Floors are placed where the PDF draws them; plans are not lined up between pages, so check how they stack (Fence, then move).</li>
-      <li>Decks, porches and patios are not traced; add them as usual.</li>
+      ${placeNote}
+      <li>Decks, porches and patios are traced from the outline around their label; one without a closed outline is listed below to draw by hand.</li>
       ${(res.warnings || []).map(w => `<li style="color:#c05621;">${escapeHtml(w)}</li>`).join('')}
     </ul>
     <div class="modal-buttons">
@@ -5000,7 +5010,7 @@ function pdfImportToSketch(res, picked) {
   let nextX = 0;
   names.forEach(n => {
     const group = picked.filter(r => (r.f.building || '') === n);
-    const all = group.flatMap(r => r.f.points);
+    const all = group.flatMap(r => r.f.points);   // floors arrive already stacked
     const ox = Math.min(...all.map(p => p.x)), oy = Math.min(...all.map(p => p.y));
     const w = Math.max(...all.map(p => p.x)) - ox;
     group.forEach(r => {
@@ -5008,13 +5018,14 @@ function pdfImportToSketch(res, picked) {
       const sh = { id: 0, label: r.f.title, type: r.type, floor: r.floor, building: nameOf(r),
                    points: [...pts, { ...pts[0] }], segments: [] };
       rebuildSegments(sh);
+      Object.defineProperty(sh, 'importKind', { value: r.f.kind, enumerable: false });   // not saved
       shapes.push(sh);
     });
     nextX += w + 20;
   });
   const d = { shapes, floors: [...new Set(picked.map(r => r.floor))], subject: res.address || '', basements: {} };
   [...new Set(shapes.map(sh => sh.building))].forEach(b => {
-    const bs = shapes.filter(sh => sh.building === b && sh.floor === 'basement');
+    const bs = shapes.filter(sh => sh.building === b && sh.floor === 'basement' && sh.importKind === 'floor');
     if (bs.length) d.basements[b] = { areaOverride: Math.round(bs.reduce((a, sh) => a + shapeArea(sh), 0)), pctFinished: 100 };
   });
   return d;

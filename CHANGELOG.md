@@ -14,6 +14,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.35.0] — 2026-10-01
+
+### Added
+- **Excluded rooms come in as their own areas.** White rooms enclosed inside a floor (iGUIDE's excluded rooms — garage, unheated sun room, utility) are found, and the combination whose total matches the excluded area the PDF states is cut off from the floor. Each is named from the label printed inside it and typed from that name (Garage → Garage; Sun Room / Porch → Open covered porch; anything else → Misc). A room's exterior walls go with it; walls it shares with the house stay with the house — the usual appraisal convention, which credits the house slightly less than iGUIDE does (Eagle Bay: 1,725 sf vs iGUIDE's 1,741). When no combination of white rooms comes within 6% of the stated figure, the floor is left whole with a note.
+- **Decks, porches, patios and balconies are traced** from the closed thin outline around their label. A label without a closed outline is listed in the dialog to draw by hand.
+- **Floors are stacked.** Each floor page is turned so its walls run the way the main floor's do, at whichever quarter turn its compass agrees with (or, for a floor scanned separately with its own north, whichever lands its walls best), then slid until its walls land on the main floor's walls. Placements that are a judgment call — a suite shorter than the garage under it, a turn the compass does not confirm — are flagged *check position*.
+- The import dialog shows, per row, whether it is a floor, an excluded room or an outdoor area, how it was turned and placed, and on the floor row the excluded rooms' traced total against the stated one.
+
+### Changed
+- The basement area set on import counts only the basement floor itself, not a patio traced on the basement page.
+
+Tested on the same six iGUIDE PDFs as 0.34.0: excluded rooms were split on every traced floor that states an excluded area (10 floors), their traced total 1–14% above the stated figure because they also take their exterior walls; five of seven lower levels line up under their main floor without a flag; five placements are flagged *check position* (two suites over garages, a carriage-house lower level, and a cabin's upstairs and basement).
+
+---
+
 ## [0.34.1] — 2026-10-01
 
 ### Fixed
