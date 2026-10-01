@@ -14,6 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.33.0] — 2026-10-01
+
+### Added
+- **Measure anywhere.** A **📏 Measure** button in the toolbar (or press **M**) arms the measuring tool: click any two points and a labeled measurement drops between them. Points snap to the nearest corner, then to the nearest straight wall, and otherwise land exactly where you click; hold **Alt** for a free point, **Shift** to keep the line level or plumb from the first point. A live line and length follow the pointer after the first click, with a cue showing what it will snap to (square = corner, diamond = wall). The tool stays on for the next measurement; **Esc** drops a half-made one, a second **Esc** (or *Done measuring*) turns it off.
+
+### Changed
+- The old *Measure offset* tool (vertex-only, one measurement per click of the button) is replaced by the above; clicks while measuring no longer select or edit what is under them.
+- **Measurements belong to a floor.** New ones are drawn, listed, fenced and exported only on the floor they were made on, and follow floor renames and deletes. Measurements in older files have no floor and still show on every floor.
+
+---
+
 ## [0.32.1] — 2026-09-29
 
 ### Changed
