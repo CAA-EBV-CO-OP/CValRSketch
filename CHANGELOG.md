@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.34.1] — 2026-10-01
+
+### Fixed
+- **A new release showed up only after a second reload.** The service worker answered page loads from its cache first and refreshed it in the background, so the first visit after a release (0.33.0 and 0.34.0 included) still showed the previous version. Pages are now fetched network-first, revalidating past the browser's own HTTP cache; the cached copy is used when offline or when the network takes more than 4 seconds (weak field signal), and the fresh page still lands in the cache. Scripts and other assets stay cache-first: they are versioned (`?v=`) or cleared by the cache-name bump. Offline, the mobile page falls back to the mobile shell rather than the desktop one.
+
+---
+
 ## [0.34.0] — 2026-10-01
 
 ### Added
