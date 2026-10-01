@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.33.0`
+**Current version:** `0.34.0`
 **Released:** 2026-10-01
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.34.0  | 2026-10-01 | minor  | **Import a floor-plan PDF**: 📐 Import PDF… traces each floor of an iGUIDE plan from its vector drawing (corners within ~1/2", areas within 1% of iGUIDE on tested plans), with a traced-vs-stated check table, floor/type pickers and multi-building support. In-browser only (PDF.js, vendored, loaded on demand). |
 | 0.33.0  | 2026-10-01 | minor  | **Measure anywhere**: a 📏 Measure toolbar button (or M) — click any two points; corners and walls snap, a live line shows the distance, Alt = free point, Shift = level/plumb. Stays armed until Esc/Done; measurements now belong to the floor they were made on. |
 | 0.32.1  | 2026-09-29 | patch  | **Save app copy carries the licence**: a short notice before saving says the copy is AGPL-3.0 free software (Save / Cancel, links to the licence and notice); LICENSE and NOTICE are embedded in the saved HTML and About opens them from there, so a copy passed on still has them. |
 | 0.32.0  | 2026-09-13 | minor  | **Closed walks offer to close themselves**: bring the pen back to the start and an offer appears in place — **Enter** accepts, **Esc** or **Tab** declines and keeps the walk, and both choices are buttons (a bar above the keypad on mobile). The region that would be created is washed green while the offer stands. |

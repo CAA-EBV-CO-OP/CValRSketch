@@ -14,6 +14,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.34.0] — 2026-10-01
+
+### Added
+- **Import a floor-plan PDF.** *📐 Import PDF…* reads an **iGUIDE** floor-plan PDF and creates one shape per floor. The outline comes from the PDF's own vector drawing: every non-white filled path is painted into a ~1/4"-per-pixel bitmap, the region the page edge cannot reach is the footprint, and its traced outline is simplified and each wall re-fitted to the traced pixels so corners land where the drawn walls meet. On the plans tested (six iGUIDE PDFs, 18 floors) traced areas were within 1% of iGUIDE's stated exterior + excluded area on all but three floors (worst 2.7%, from post stubs iGUIDE leaves out), and on the plan checked point by point every corner was within about half an inch of an exact vector trace.
+- An import dialog lists every floor found with its page, a floor and area-type picker, the traced area beside the area iGUIDE states, and a ✓ / ⚠ check (1% threshold). Floor titles pick the tab (Basement → basement / finished, Upstairs / 2nd / Above … → upper, Main / Ground → main).
+- Multi-building iGUIDE files (e.g. a house plus a carriage house) come in as separate buildings, named from iGUIDE's overview pages and set side by side; the usual *Add file* naming dialog appears when there is more than one building or the sketch already has work in it.
+- The basement area is taken from the traced basement rather than the main-floor footprint (which, straight after import, still includes the garage).
+- Floor-plan formats are *format profiles* in `pdf-import.mjs`; iGUIDE is the first. A PDF from an unknown format says so instead of importing nonsense.
+
+### Notes
+- Rooms iGUIDE excludes from floor area (garages, unheated sun rooms) are inside the traced outline — use **Split** to cut them off. Decks, porches and patios are not traced. Floors are placed where each page draws them; iGUIDE does not line floors up across pages, so check how they stack.
+- A floor whose walls are open on one side (a loft open to below) has no closed outline and is skipped with a note.
+- Privacy: the PDF is read in the browser and never uploaded. Import needs a served page (the hosted app or a local web server); a page opened from disk, or a saved app copy, explains this instead.
+- Third-party: Mozilla PDF.js 6.3.289 (Apache-2.0), legacy build, vendored unmodified in `vendor/pdfjs/` and loaded only when a PDF is imported; documents are opened with `isEvalSupported: false`.
+
+---
+
 ## [0.33.0] — 2026-10-01
 
 ### Added

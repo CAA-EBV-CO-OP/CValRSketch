@@ -22,6 +22,8 @@ Any architectural change beyond editing that single file (e.g. splitting into mu
 .
 ├── index.html             ← desktop UI (canonical entry)
 ├── core.js                ← shared pure logic (parsing, geometry, edit ops)
+├── pdf-import.mjs         ← floor-plan PDF import (format profiles + tracing); lazy-loaded ES module
+├── vendor/pdfjs/          ← Mozilla PDF.js (Apache-2.0), vendored unmodified; loaded only on PDF import
 ├── m/index.html           ← mobile-first touch UI
 ├── m/manifest.webmanifest ← mobile PWA manifest
 ├── sketch_walker.html     ← redirect stub for legacy URL

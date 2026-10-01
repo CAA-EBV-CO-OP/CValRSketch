@@ -3,7 +3,7 @@
 **Floor plan sketching for residential appraisal that runs entirely in the browser.** Use it offline from a local download or host it yourself; your sketches never leave your machine.
 Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
 
-**Version:** 0.33.0 (2026-10-01)
+**Version:** 0.34.0 (2026-10-01)
 **License:** [AGPL-3.0](./LICENSE)
 **Repo:** https://github.com/CAA-EBV-CO-OP/CValRSketch
 **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
@@ -101,6 +101,13 @@ The file is fully self-contained: HTML + inline CSS + vanilla JavaScript. No ext
 - Title and legend rendered at full size regardless of sketch scale
 - UI overlays (selection handles, fence rings, vertex pickers) are stripped from exports
 
+### Import a floor-plan PDF
+- **📐 Import PDF…** reads an **iGUIDE** floor-plan PDF and creates one shape per floor, traced from the PDF's vector drawing (not a picture), so corners land within about half an inch
+- A check table compares each traced floor with the area iGUIDE states; floors go to the matching tab, multi-building plans arrive as separate buildings
+- Rooms iGUIDE excludes (garage, unheated rooms) are inside the traced outline — split them off; decks and porches are drawn as usual
+- Runs on your computer: the PDF is never uploaded. Needs the hosted app (or any local web server); a page opened straight from disk cannot load the PDF reader
+- New formats are added as *format profiles* in `pdf-import.mjs`
+
 ### Other
 - Undo / Redo (`Ctrl+Z` / `Ctrl+Y`)
 - Save / Load as JSON
@@ -115,6 +122,7 @@ The file is fully self-contained: HTML + inline CSS + vanilla JavaScript. No ext
 - All code is in a single file (`index.html`, redirected from the legacy `sketch_walker.html`). No build pipeline.
 - Tested in Chromium-based browsers and Firefox. Safari is expected to work but is less tested.
 - Touch/pinch-zoom gestures are not yet implemented.
+- Third-party code: PDF import uses Mozilla [PDF.js](https://github.com/mozilla/pdf.js) (Apache-2.0), vendored unmodified in `vendor/pdfjs/` and loaded only when a PDF is imported.
 
 ---
 
