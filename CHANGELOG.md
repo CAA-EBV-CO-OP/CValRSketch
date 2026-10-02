@@ -14,6 +14,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.43.0] — 2026-10-02
+
+### Added
+- **Zoom and pan the drawing.** The mouse wheel — or a trackpad pinch — zooms about the cursor, so the point under it stays put. Drag with the middle mouse button to pan, or turn on **✋** at the bottom-left and drag with the left button (handy on a trackpad). The controls at the bottom-left of the drawing zoom out and in, show the zoom, and **Fit** returns to the automatic whole-plan view. Clicks that end a pan drag do not also draw, pick or select.
+- Zooming in makes precise clicks practical: calibrating an image, clicking corners to trace it, measuring, picking a start point.
+- **Exports always print the whole plan**, whatever the zoom on screen; your zoom is restored afterwards. Loading or starting a sketch starts at Fit.
+
+---
+
 ## [0.42.1] — 2026-10-02
 
 ### Changed

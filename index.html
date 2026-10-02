@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.42.1"></script>
-<script src="dictation.js?v=0.42.1"></script>
+<script src="core.js?v=0.43.0"></script>
+<script src="dictation.js?v=0.43.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -87,6 +87,13 @@
   #canvas { display: block; width: 100%; height: 100%; cursor: default; }
   #canvas.split-mode { cursor: crosshair; }
   #canvas.measuring { cursor: crosshair; }
+  #canvas.pan-mode { cursor: grab; }
+  #zoom-bar { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,.92);
+    border: 1px solid #c9d3dd; border-radius: 8px; padding: 3px 5px; box-shadow: 0 2px 8px rgba(0,0,0,.12); z-index: 5; font-size: 12px; }
+  #zoom-bar button { border: 1px solid #c9d3dd; background: #fff; border-radius: 5px; min-width: 26px; height: 24px; cursor: pointer; font-size: 13px; color: #2b3a4a; }
+  #zoom-bar button:hover { background: #eef3f8; }
+  #zoom-bar button.on { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+  #zoom-bar .zb-pct { min-width: 38px; text-align: center; color: #2b3a4a; font-variant-numeric: tabular-nums; }
   .pdfimp-table th, .pdfimp-table td { padding: 4px 5px; vertical-align: top; }
   .pdfimp-table td:nth-last-child(-n+3), .pdfimp-table th:nth-last-child(-n+3) { white-space: nowrap; }
   .pdfimp-table select { max-width: 150px; font-size: 12px; }
@@ -229,7 +236,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.42.1</span>
+  <span class="version-chip" id="app-version">v0.43.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -294,6 +301,13 @@
 <main>
   <div id="canvas-wrap">
     <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="zoom-bar" title="Zoom: mouse wheel or pinch (about the cursor). Pan: drag with the middle button, or turn on ✋ and drag.">
+      <button type="button" onclick="zoomAt(1/ZOOM_STEP)" title="Zoom out">−</button>
+      <span class="zb-pct">Fit</span>
+      <button type="button" onclick="zoomAt(ZOOM_STEP)" title="Zoom in">＋</button>
+      <button type="button" onclick="zoomFit()" title="Fit the whole drawing">Fit</button>
+      <button type="button" class="zb-pan" onclick="togglePanMode()" title="Pan: drag the drawing with the left button (middle-drag always pans)">✋</button>
+    </div>
   </div>
 
   <aside id="sidebar"></aside>
@@ -358,6 +372,9 @@ let state = {
 };
 
 let viewTransform = null; // { tx, ty, scale } from latest fitView, used for screen↔world
+// The reader's zoom/pan, same shape as fitView()'s result, or null for the automatic
+// fit. Exports and the gallery always use the fit (see withFitView).
+let userView = null;
 
 function snapshotState() {
   return JSON.stringify({
@@ -1032,7 +1049,7 @@ function render() {
       ? 'Type segments to build a shape — or click any vertex (green) to start from there. Click a blank spot to drop the start, then Shift+Arrow to snap it onto aligned vertices.'
       : 'Type segments to extend the path, or click any vertex to draw a straight line to it. Close Shape when you return to start.');
 
-  if (galleryActive()) { renderGallery(); renderSidebar(); return; }
+  if (galleryActive()) { updateZoomBar(); renderGallery(); renderSidebar(); return; }
 
   // SVG render
   const w = svg.clientWidth, h = svg.clientHeight;
@@ -1045,8 +1062,9 @@ function render() {
       <line x1="0" y1="0" x2="0" y2="8" stroke="#888" stroke-width="1"/>
     </pattern>
   </defs>`;
-  const v = fitView();
+  const v = userView || fitView();
   viewTransform = v;
+  updateZoomBar();
   document.documentElement.style.setProperty('--ghost-opacity', state.settings.ghostOpacity);
   const W = p => ({ x: v.tx + p.x*v.scale, y: v.ty + p.y*v.scale });
 
@@ -4391,6 +4409,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.43.0', '2026-10-02', 'Zoom and pan the drawing: the mouse wheel or a trackpad pinch zooms about the cursor, drag with the middle button (or turn on the hand) to pan, and the controls at the bottom-left of the drawing zoom in, out or back to Fit. Exports always print the whole plan whatever the zoom.'],
   ['0.42.1', '2026-10-02', 'Clicking Image with no image loaded opens the file picker straight away - no extra Load image click.'],
   ['0.42.0', '2026-10-02', 'Trace a scan by clicking its corners: once an image is scaled, click the start corner, then each corner in turn - the app works out every wall from the scale, squares walls that are nearly square and rounds to the inch. A magnifier shows the scan around the cursor so you land on the corner, a live line shows the length before you click, Shift keeps a wall level or plumb, and clicking the start closes the shape.'],
   ['0.41.2', '2026-10-02', 'Fixed: with a traced-over image loaded, clicking on it in Walk mode now sets the start point (the image used to swallow the click). Text labels and the floor menu work over it too.'],
@@ -4703,7 +4722,7 @@ function openHelp() {
     <section data-topic="keys">
     <h4>Keyboard</h4>
     <div class="help-do-row"><a href="#" class="help-do" data-do="undo">↶ Undo</a><a href="#" class="help-do" data-do="measure">📏 Measure</a></div>
-    <p><code>Ctrl+Z</code> undo · <code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code> redo · <code>Ctrl+S</code> save · <code>M</code> measure · <code>F1</code> or <code>?</code> help · <code>PageUp</code> / <code>PageDown</code> floors · <code>Esc</code> cancel / deselect · <code>Delete</code> removes what the fence captured, or the selected note · Walk, box empty: arrows jump the pen; Shift+arrows step the start point.</p>
+    <p><code>Ctrl+Z</code> undo · <code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code> redo · <code>Ctrl+S</code> save · <code>M</code> measure · <code>F1</code> or <code>?</code> help · <code>PageUp</code> / <code>PageDown</code> floors · <code>Esc</code> cancel / deselect · mouse wheel or pinch zooms, middle-drag pans, <b>Fit</b> (bottom-left of the drawing) resets · <code>Delete</code> removes what the fence captured, or the selected note · Walk, box empty: arrows jump the pen; Shift+arrows step the start point.</p>
     </section>
     </div>`;
   document.body.appendChild(el);
@@ -4933,7 +4952,73 @@ function exportPNG(clone, filename) {
 // Snapshot the live canvas for export: the tight bbox of what's actually drawn
 // (screen px, including rendered text extents) plus a stripped clone of the content.
 // Captures whatever floor is on the canvas right now.
+// ----- Zoom and pan ------------------------------------------------------------
+// Wheel (or trackpad pinch) zooms about the cursor; middle-drag, or left-drag with
+// ✋ on, pans; Fit returns to the automatic view. Everything that maps screen to
+// world reads viewTransform, which render() takes from userView when set.
+const ZOOM_STEP = 1.2;
+let panMode = false, panDrag = null;
+function withFitView(fn) {
+  const saved = userView;
+  userView = null; render();
+  try { return fn(); } finally { userView = saved; render(); }
+}
+function svgPoint(clientX, clientY) {
+  const rect = svg.getBoundingClientRect();
+  const vbW = svg.viewBox.baseVal.width || rect.width, vbH = svg.viewBox.baseVal.height || rect.height;
+  return { x: (clientX - rect.left) * (vbW / rect.width), y: (clientY - rect.top) * (vbH / rect.height), kx: vbW / rect.width, ky: vbH / rect.height };
+}
+function zoomAt(factor, sx, sy) {
+  if (galleryActive() || !viewTransform) return;
+  const fit = fitView(), base = userView || viewTransform;
+  const scale = Math.max(fit.scale * 0.25, Math.min(fit.scale * 50, base.scale * factor));
+  const f = scale / base.scale;
+  if (sx === undefined) { const r = svg.getBoundingClientRect(); const c = svgPoint(r.left + r.width / 2, r.top + r.height / 2); sx = c.x; sy = c.y; }
+  userView = { scale, tx: sx - (sx - base.tx) * f, ty: sy - (sy - base.ty) * f };
+  render();
+}
+function zoomFit() { userView = null; render(); }
+function togglePanMode() { panMode = !panMode; svg.classList.toggle('pan-mode', panMode); updateZoomBar(); }
+function updateZoomBar() {
+  const bar = document.getElementById('zoom-bar');
+  if (!bar) return;
+  bar.hidden = galleryActive();
+  const pct = userView ? Math.round(100 * userView.scale / fitView().scale) : 100;
+  bar.querySelector('.zb-pct').textContent = (userView ? pct : 'Fit') + (userView ? '%' : '');
+  bar.querySelector('.zb-pan').classList.toggle('on', panMode);
+}
+svg.addEventListener('wheel', (e) => {
+  if (galleryActive()) return;
+  e.preventDefault();
+  const p = svgPoint(e.clientX, e.clientY);
+  const step = e.ctrlKey ? Math.exp(-e.deltaY * 0.01) : (e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP);   // ctrl = trackpad pinch
+  zoomAt(step, p.x, p.y);
+}, { passive: false });
+svg.addEventListener('mousedown', (e) => {
+  if (galleryActive()) return;
+  if (!(e.button === 1 || (e.button === 0 && panMode))) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const base = userView || viewTransform;
+  panDrag = { x: e.clientX, y: e.clientY, tx: base.tx, ty: base.ty, scale: base.scale, moved: false };
+}, true);
+window.addEventListener('mousemove', (e) => {
+  if (!panDrag) return;
+  const k = svgPoint(e.clientX, e.clientY);
+  const dx = (e.clientX - panDrag.x) * k.kx, dy = (e.clientY - panDrag.y) * k.ky;
+  if (Math.abs(dx) + Math.abs(dy) > 2) panDrag.moved = true;
+  userView = { scale: panDrag.scale, tx: panDrag.tx + dx, ty: panDrag.ty + dy };
+  render();
+});
+window.addEventListener('mouseup', () => { if (panDrag) { panDrag.endedAt = Date.now(); window._panEnded = panDrag; panDrag = null; } });
+// A click that ends a pan drag (or any click while ✋ is on) must not also draw, pick or select.
+svg.addEventListener('click', (e) => {
+  const ended = window._panEnded;
+  if (panMode || (ended && ended.moved && Date.now() - ended.endedAt < 300)) { e.stopImmediatePropagation(); e.preventDefault(); }
+}, true);
+svg.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
+
 function captureLivePanel() {
+  if (userView) return withFitView(() => captureLivePanel());
   const allWorldPts = [];
   const sceneShapes = state.settings.showFloorGhosts ? visibleShapes() : shapesOnFloor(state.activeFloor);
   sceneShapes.forEach(sh => allWorldPts.push(...shapeExtentPoints(sh)));
@@ -4986,6 +5071,7 @@ function captureLivePanel() {
 // Temporarily draw `floor` alone (ghosts off, no in-progress walk or start marker),
 // run fn() against that canvas, then put the live view back exactly as it was.
 function withFloorRendered(floor, fn) {
+  if (userView) return withFitView(() => withFloorRendered(floor, fn));
   const saved = {
     activeFloor: state.activeFloor, segments: state.segments, preview: state.preview,
     startPoint: state.startPoint, ghosts: state.settings.showFloorGhosts,
@@ -5008,6 +5094,7 @@ function withFloorRendered(floor, fn) {
 // run fn() against it, then put the view filter back. Callers re-render afterwards
 // (renderGallery does so implicitly by overwriting the canvas; exports call render()).
 function withBuildingRendered(building, fn) {
+  if (userView) return withFitView(() => withBuildingRendered(building, fn));
   const saved = { view: state.viewBuilding, segments: state.segments, preview: state.preview, startPoint: state.startPoint, selection: state.selection };
   state.viewBuilding = building;
   state.segments = []; state.preview = null; state.startPoint = null; state.selection = null;
@@ -5123,6 +5210,7 @@ const FLOOR_CAPTIONS = { basement: 'Basement', main: 'Main floor', upper: 'Upper
 function floorCaption(f) { return FLOOR_CAPTIONS[f] || (f.charAt(0).toUpperCase() + f.slice(1)); }
 
 function svgForExport() {
+  if (userView) return withFitView(() => svgForExport());
   const ns = 'http://www.w3.org/2000/svg';
   const mk = (tag, attrs, text) => {
     const el = document.createElementNS(ns, tag);
@@ -5772,6 +5860,7 @@ function newProject() {
     if (!confirm('Discard the current sketch and start a new project?\n\n(Use Undo / Ctrl+Z to recover if you change your mind.)')) return;
   }
   pushUndo();
+  userView = null;
   state.shapes = [];
   state.segments = [];
   state.startPoint = null;
@@ -5805,6 +5894,7 @@ function newProject() {
 }
 function applyLoadedProject(text) {
   const d = JSON.parse(text);
+  userView = null;
   Object.assign(state, d);
   state.settings = { ...SETTINGS_DEFAULTS, ...(d.settings || {}) };   // older files lack newer keys
   state.selection = null; state.splitSelection = null;
