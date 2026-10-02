@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.42.1] — 2026-10-02
+
+### Changed
+- **Image opens the file picker** when there is no image yet, instead of showing a panel whose only action is *Load image…*. Cancel the picker and the panel is still there; with an image already loaded, Image opens its controls as before.
+
+---
+
 ## [0.42.0] — 2026-10-02
 
 ### Added

@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.42.0`
+**Current version:** `0.42.1`
 **Released:** 2026-10-02
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.42.1  | 2026-10-02 | patch  | Image tab with no image opens the file picker straight away. |
 | 0.42.0  | 2026-10-02 | minor  | **Click corners to trace a scan**: click start + each corner; walls from the image scale, squared within 2°, rounded to the inch; magnifier, live length, Shift level/plumb, click start to close. |
 | 0.41.2  | 2026-10-02 | patch  | Clicking on a traced-over image in Walk mode sets the start point again (the image no longer swallows clicks outside Image mode). |
 | 0.41.1  | 2026-10-02 | patch  | **Calibration shows it worked**: *Scale set* confirmation with the new width, the calibration line kept on screen in magenta with its length, *Calibrate again…*. |
