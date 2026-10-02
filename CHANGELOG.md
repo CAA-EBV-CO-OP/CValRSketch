@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.37.1] — 2026-10-02
+
+### Changed
+- **Help floats instead of popping up.** It opened as a window over the middle of the drawing that had to be closed before drawing and reopened to read again. It is now a panel that stays open while you draw (the canvas and keyboard work underneath it), drags by its title bar, resizes from its corner, and remembers its position and size. **📌** pins it: a pinned Help reopens with the app. The ❓ Help button toggles it. Position and pin are kept in this browser only, not in the sketch.
+
+---
+
 ## [0.37.0] — 2026-10-02
 
 ### Added
