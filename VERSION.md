@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.39.0`
+**Current version:** `0.39.1`
 **Released:** 2026-10-02
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.39.1  | 2026-10-02 | patch  | **Help pin made meaningful**: unpinned Help closes when you start working; pinned stays open while drawing (title says pinned) and opens with the app. |
 | 0.39.0  | 2026-10-02 | minor  | **Help topic filter**: chips toggle sections on/off, *Follow* adds the current mode/tool, *All* shows everything; picks remembered. |
 | 0.38.0  | 2026-10-02 | minor  | **Help follows you**: opens at and tracks the current mode/tool; sections for every tool plus floors, basement, PDF import, export/saving and keyboard; topic chips; F1 / ? toggle. |
 | 0.37.1  | 2026-10-02 | patch  | **Help is a floating panel**: non-blocking, draggable, resizable, remembers position and size; 📌 pin reopens it with the app. |
