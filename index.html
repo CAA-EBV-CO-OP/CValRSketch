@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.41.0"></script>
-<script src="dictation.js?v=0.41.0"></script>
+<script src="core.js?v=0.41.1"></script>
+<script src="dictation.js?v=0.41.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -229,7 +229,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.41.0</span>
+  <span class="version-chip" id="app-version">v0.41.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -2038,6 +2038,15 @@ function renderUnderlay(W, layer) {
     img.style.cursor = 'move';
     img.addEventListener('mousedown', underlayDragStart);
   }
+  // The line the scale was set on, labelled with its length (Image mode only).
+  if (u.cal && state.mode === 'underlay' && !state.underlayCal) {
+    const at = q => W({ x: u.x + q.px * u.ftPerPx, y: u.y + q.py * u.ftPerPx });
+    const p = at(u.cal.a), q = at(u.cal.b);
+    addEl('line', { x1: p.x, y1: p.y, x2: q.x, y2: q.y, stroke: '#e6007a', 'stroke-width': 3, class: 'ui-overlay' });
+    [p, q].forEach(c => addEl('circle', { cx: c.x, cy: c.y, r: 5, fill: '#e6007a', stroke: '#fff', 'stroke-width': 2, class: 'ui-overlay' }));
+    addEl('text', { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 - 10, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 'bold', fill: '#e6007a',
+      stroke: 'white', 'stroke-width': 3.5, 'paint-order': 'stroke fill', class: 'ui-overlay' }, `scale: ${formatLength(u.cal.len)}`);
+  }
   // While calibrating, mark the first point so the second click has something to aim at.
   if (state.underlayCal && state.underlayCal.first) {
     const p = W(state.underlayCal.first);
@@ -2139,6 +2148,10 @@ function handleUnderlayCal(worldPoint) {
   if (!(real > 0)) { alert('Could not read that length.'); return; }
   const u = state.underlay; if (!u) return;
   const k = real / spanNow;
+  // Remember the calibration line in image pixels, so it moves with the image and
+  // stays on screen as the visible proof of what the scale is based on.
+  const toPx = q => ({ px: (q.x - u.x) / u.ftPerPx, py: (q.y - u.y) / u.ftPerPx });
+  u.cal = { a: toPx(a), b: toPx(b), len: real };
   u.ftPerPx *= k;
   u.x = a.x - (a.x - u.x) * k;      // scale about the first clicked point
   u.y = a.y - (a.y - u.y) * k;
@@ -2172,8 +2185,11 @@ function sidebarUnderlay() {
       ${state.underlayCal ? `
       <div class="help">${state.underlayCal.first ? 'Now click the <b>other end</b>.' : 'Click <b>one end</b> of a wall, dimension line or scale bar on the image whose real length you know.'} Esc cancels.</div>
       <div class="row-buttons"><button data-act="cancelUnderlayCal">Cancel</button></div>` : `
-      <div class="help">Click two points on the image a known distance apart, then type that distance. The scale bar printed on most plans is the most reliable thing to use.</div>
-      <div class="row-buttons"><button data-act="startUnderlayCal" class="primary">Calibrate…</button></div>`}
+      ${u.cal ? `<div style="background:#ecfdf3;border:1px solid #9ad7b0;border-radius:6px;padding:6px 8px;margin:4px 0;font-size:12px;">
+        <b style="color:#1f7a45;">✓ Scale set</b> — ${formatLength(u.cal.len)} between your two points (the <span style="color:#e6007a;font-weight:bold;">magenta line</span>). The image is now <b>${formatLength(spanFt)}</b> wide.
+        <div style="margin-top:4px;color:#555;">Check it: <a href="#" data-act="startOffsetPick">📏 Measure</a> a dimension printed on the plan — it should match within a few inches. Off? Calibrate again on something longer.</div></div>`
+      : `<div class="help">Click two points on the image a known distance apart, then type that distance. The scale bar printed on most plans is the most reliable thing to use; the longer the distance, the more accurate the scale.</div>`}
+      <div class="row-buttons"><button data-act="startUnderlayCal" class="primary">${u.cal ? 'Calibrate again…' : 'Calibrate…'}</button></div>`}
       <h2 style="margin-top:14px;">Other</h2>
       <div class="row-buttons"><button data-act="removeUnderlay" class="danger">Remove image</button></div>
       <div class="help" style="margin-top:6px;">Drag the image on the canvas to line it up with what you have already drawn. Lock it once it is right, so a stray drag cannot move it.</div>
@@ -4238,6 +4254,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.41.1', '2026-10-02', 'Calibrating a traced-over image now shows that it worked: a Scale set confirmation with the new width, and the line you calibrated on stays on screen in magenta with its length. Before, the picture looked unchanged because the view refits to it.'],
   ['0.41.0', '2026-10-02', 'Trace over a scan: the new Image tab lays a scanned or photographed floor plan under the drawing. Set it to scale by clicking two points a known distance apart (the printed scale bar is best), fade or lock it, keep it to one floor, then walk the perimeter straight over it. Show it on top to check a finished trace. The image is saved in the sketch file and never appears in an export.'],
   ['0.40.0', '2026-10-02', 'Help points at the real controls: each section has action links - hover one and the button it means is outlined wherever it sits (toolbar, floor bar or sidebar); click it and Help does what the button does and flashes it, so you learn where it lives. Nothing that discards work is run from Help.'],
   ['0.39.1', '2026-10-02', 'The Help pin now does something you can see: unpinned, Help closes as soon as you start working (a click in the drawing or any change); pinned, it stays open while you draw, says pinned in its title, and opens with the app.'],

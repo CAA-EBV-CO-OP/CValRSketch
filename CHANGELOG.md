@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.41.1] — 2026-10-02
+
+### Fixed
+- **Calibrating an image gave no sign that it worked.** The view always refits to what is on the canvas, so with nothing drawn yet the picture looked exactly the same after setting its scale; the only change was a small "currently … wide" figure. Now a green **✓ Scale set** box says what the scale was set on and the image's new width, the line you calibrated on stays on screen in magenta labelled with its length (Image mode only, never exported, and it moves with the image), and the button reads *Calibrate again…*. The box suggests checking with 📏 Measure against a dimension printed on the plan.
+
+---
+
 ## [0.41.0] — 2026-10-02
 
 ### Added
