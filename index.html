@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.33.0"></script>
-<script src="dictation.js?v=0.33.0"></script>
+<script src="core.js?v=0.40.0"></script>
+<script src="dictation.js?v=0.40.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -38,6 +38,33 @@
   header .osasi-chip b { color: #FF7440; font-weight: 700; }
   header .osasi-chip:hover b { color: #FF8A5F; }
   .whatsnew-modal ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; }
+  .help-panel { position: fixed; z-index: 900; display: flex; flex-direction: column; min-width: 260px; min-height: 140px;
+    background: #fff; border: 1px solid #b8c4d0; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.25); resize: both; overflow: hidden; }
+  .help-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: #2b3a4a; color: #fff; cursor: move; user-select: none; font-size: 13px; }
+  .help-bar button { background: #4a6377; color: #fff; border: none; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 12px; }
+  .help-bar button:hover { background: #5a7388; }
+  .help-bar .help-pin { opacity: .55; }
+  .help-bar .help-pin.on { opacity: 1; background: #d97706; }
+  .help-pinned-tag { font-size: 11px; color: #f6c27a; margin-left: 4px; }
+  .help-body { flex: 1; overflow-y: auto; padding: 4px 12px 10px; }
+  .help-body h4 { margin: 12px 0 4px; font-size: 13px; color: #2b3a4a; }
+  .help-nav { position: sticky; top: 0; z-index: 1; background: #fff; display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0; border-bottom: 1px solid #e3e8ee; }
+  .help-nav a { font-size: 11px; padding: 2px 7px; border: 1px solid #c9d3dd; border-radius: 10px; color: #2b3a4a; text-decoration: none; }
+  .help-nav a.on { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+  .help-nav a.now { border: 1px dashed #2b6cb0; color: #2b6cb0; }
+  .help-nav a[data-follow].on { background: #2f855a; border-color: #2f855a; }
+  .help-nav a[data-all] { margin-left: auto; }
+  .help-do-row { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
+  .help-do { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #fff7e6; border: 1px solid #f0b45a; color: #8a4b00; text-decoration: none; }
+  .help-do:hover { background: #ffe9c2; }
+  .help-do.help-missing { background: #f3f4f6; border-color: #c7ccd3; color: #6b7280; }
+  .help-spot { outline: 3px solid #f59e0b !important; outline-offset: 2px; position: relative; z-index: 5; }
+  .help-flash { animation: helpFlash 0.8s ease-in-out 3; outline-offset: 2px; position: relative; z-index: 5; }
+  @keyframes helpFlash { 0%, 100% { outline: 3px solid rgba(245,158,11,0); box-shadow: 0 0 0 0 rgba(245,158,11,0); } 50% { outline: 3px solid #f59e0b; box-shadow: 0 0 0 6px rgba(245,158,11,.35); } }
+  .help-body section { border-left: 3px solid transparent; padding-left: 7px; margin-left: -10px; }
+  .help-body section.here { border-left-color: #2b6cb0; background: #f5f9fd; }
+  .help-body p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
+  .help-body code { background: #eef2f6; padding: 0 3px; border-radius: 3px; }
   .whatsnew-modal li { margin-bottom: 6px; }
   .whatsnew-modal .ver { font-family: ui-monospace, monospace; color: #2b6cb0; font-weight: 700; }
   .about-modal p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; }
@@ -59,6 +86,12 @@
   #canvas-wrap { flex: 1; background: #fff; position: relative; overflow: hidden; }
   #canvas { display: block; width: 100%; height: 100%; cursor: default; }
   #canvas.split-mode { cursor: crosshair; }
+  #canvas.measuring { cursor: crosshair; }
+  .pdfimp-table th, .pdfimp-table td { padding: 4px 5px; vertical-align: top; }
+  .pdfimp-table td:nth-last-child(-n+3), .pdfimp-table th:nth-last-child(-n+3) { white-space: nowrap; }
+  .pdfimp-table select { max-width: 150px; font-size: 12px; }
+  header button.measure-on { background: #d946ef; }
+  header button.measure-on:hover { background: #c026d3; }
   /* In Text mode the whole drawing is click-through so notes can be placed over
      areas; only the free-text labels themselves stay interactive. */
   #canvas.text-mode { cursor: text; }
@@ -196,9 +229,10 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.33.0</span>
+  <span class="version-chip" id="app-version">v0.40.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
+  <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
@@ -208,6 +242,7 @@
     <button data-mode="text">Text</button>
     <button data-mode="underlay" title="Trace over a scanned or photographed plan">Image</button>
   </div>
+  <button id="btn-measure" onclick="toggleMeasure()" title="Measure between any two points (M). Corners and walls snap; Alt = free point, Shift = level/plumb.">📏 Measure</button>
   <div class="sep"></div>
   <button id="btn-undo" onclick="undoHistory()" title="Undo (Ctrl+Z)">↶ Undo</button>
   <button id="btn-redo" onclick="redoHistory()" title="Redo (Ctrl+Y)">↷ Redo</button>
@@ -223,6 +258,8 @@
   </label>
   <button onclick="document.getElementById('add-json').click()" title="Append one or more sketch files' buildings to this one (pick several at once; you name each building as it comes in; each drawing is placed beside what is here)">➕ Add files…</button>
   <input type="file" id="add-json" accept=".json" multiple style="display:none">
+  <button onclick="document.getElementById('import-pdf').click()" title="Import a floor-plan PDF (iGUIDE): each floor's outline is traced from the PDF's own drawing, on this computer — the file is not uploaded">📐 Import PDF…</button>
+  <input type="file" id="import-pdf" accept=".pdf,application/pdf" style="display:none">
   <button onclick="confirmSaveAppCopy()" title="Save a frozen, self-contained copy of this exact version of the app (one HTML file) — keep it in the job folder beside the sketch so the sketch reopens the same way years later">💾 Save app copy</button>
   <span id="brand-header" style="margin-left:auto; display:flex; align-items:center; gap:8px; font-size:12px; color:#dfe7ef;"></span>
   <span id="autosave-chip" class="autosave-chip"></span>
@@ -249,7 +286,7 @@
   </label>
   <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Subject / project name — appears as the title on SVG/PNG exports">
     Subject:
-    <input type="text" id="subject-input" placeholder="e.g. 113 7th Ave, Nakusp" style="width:240px; font-size:12px; padding:3px 6px;">
+    <input type="text" id="subject-input" placeholder="e.g. 123 Sample Rd, Anytown" style="width:240px; font-size:12px; padding:3px 6px;">
   </label>
   <span style="margin-left:auto;color:#666;font-size:11px;" id="floor-help"></span>
 </div>
@@ -296,7 +333,7 @@ let state = {
   enclose: null,       // { key, idx, off } for the enclosed-area offer at the current pen position   // split-mode projection preview: { shapeId, originIdx, dir, hit: {wallIdx, point, distance} }
   undoStack: [],
   redoStack: [],
-  annotations: [],      // [{ a:{x,y}, b:{x,y} }] — offset measurement labels between two points
+  annotations: [],      // [{ a:{x,y}, b:{x,y}, floor }] — measurement labels between two points (no floor = legacy, shown on every floor)
   basements: {},        // { [building]: { areaOverride: number|null, pctFinished: number } } — declared below-grade area
   labels: [],           // [{ id, x, y, text, floor }] — free-text labels in WORLD coords
   nextLabelId: 1,
@@ -306,7 +343,7 @@ let state = {
   dimLabelDrag: null,   // transient: while dragging a wall's dimension label
   shapeMovePick: null,  // transient: { shapeId, anchor } while moving a shape by picking anchor -> destination
   rewalk: null,         // { original } while a shape is reopened as a walk (Re-walk this wall); closeShape re-applies its attributes
-  offsetPick: null,     // null | { first: {x,y}|null } — active picking state for offset tool
+  offsetPick: null,     // null | { first: {x,y}|null, hover: {p,kind}|null } — Measure tool armed; stays armed until Esc/Done
   fenceDraw: null,      // null | { start:{x,y}, end:{x,y} } in WORLD coords while dragging
   fenceSelection: null, // null | { shapeVerts:[{shapeId,idx}], inProgVerts:[idx], annEnds:[{idx,end}] }
   underlay: null,       // { src, w, h, x, y, ftPerPx, opacity, floor, locked, name } — scan to trace over
@@ -538,6 +575,7 @@ async function idbGet(key) {
 // waving it off sticks for the walk in hand but not past the next change.
 let editTick = 0;
 function pushUndo() {
+  closeUnpinnedHelp();
   editTick++;
   state.undoStack.push(snapshotState());
   if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
@@ -715,6 +753,7 @@ function renameFloor() {
   pushUndo();
   state.floors[state.floors.indexOf(old)] = name;
   state.shapes.forEach(s => { if (s.floor === old) s.floor = name; });
+  state.annotations.forEach(a => { if (a.floor === old) a.floor = name; });
   state.activeFloor = name;
   render();
 }
@@ -724,6 +763,7 @@ function removeFloor() {
   if (used && !confirm(`Floor "${f}" has shapes on it. Delete them too?`)) return;
   pushUndo();
   state.shapes = state.shapes.filter(s => s.floor !== f);
+  state.annotations = state.annotations.filter(a => a.floor !== f);
   state.floors = state.floors.filter(x => x !== f);
   if (!state.floors.length) state.floors = ['main'];
   state.activeFloor = state.floors[0];
@@ -963,6 +1003,10 @@ function render() {
     b.classList.toggle('active', b.dataset.mode === state.mode);
   });
   svg.classList.toggle('split-mode', state.mode === 'split');
+  svg.classList.toggle('measuring', !!state.offsetPick);
+  syncHelpTopic();
+  const mb = document.getElementById('btn-measure');
+  if (mb) mb.classList.toggle('measure-on', !!state.offsetPick);
   svg.classList.toggle('text-mode', state.mode === 'text');
   svg.classList.toggle('underlay-mode', state.mode === 'underlay');
 
@@ -1007,6 +1051,7 @@ function render() {
   renderUnderlay(W, 'below');
 
   // Active floor first…
+  drawnLabelBoxes = [];
   shapesOnFloor(state.activeFloor).forEach(sh => renderShape(sh, W, false));
   // …then other floors as a faded dashed-outline overlay on top, so their outline
   // and label stay visible even where they sit under the active floor's fill.
@@ -1158,6 +1203,9 @@ function patternOptions(selected) {
   return Object.entries(FILL_PATTERNS).map(([k, v]) => `<option value="${k}"${k === selected ? ' selected' : ''}>${v}</option>`).join('');
 }
 
+// Area-label boxes (screen px) drawn this render, so another floor's faded label can
+// step down out of the way instead of printing over the active floor's.
+let drawnLabelBoxes = [];
 function renderShape(sh, W, isGhost) {
   const t = TYPES[sh.type] || TYPES.living;
   const screenPts = sh.points.map(W);
@@ -1271,7 +1319,6 @@ function renderShape(sh, W, isGhost) {
         hit.addEventListener('click', (ev) => {
           ev.stopPropagation();
           if (state.shapeMovePick) { handleShapeMovePick(sh, i); return; }
-          if (state.offsetPick) { handleOffsetPick(sh.points[i]); return; }
           if (canPickStart) setStartPoint(sh.points[i]);
           else if (canSnapTo) snapWalkToPoint(sh.points[i]);
           else if (state.mode === 'split') handleSplitClick(sh.id, i);
@@ -1287,6 +1334,10 @@ function renderShape(sh, W, isGhost) {
     const base = polygonCentroid(sh.points);
     const off = sh.labelOffset || { dx: 0, dy: 0 };
     const c = W({ x: base.x + off.dx, y: base.y + off.dy });
+    const box = () => ({ x0: c.x - Math.max(44, sh.label.length * 8) / 2, x1: c.x + Math.max(44, sh.label.length * 8) / 2, y0: c.y - 20, y1: c.y + 14 });
+    const hits = b => drawnLabelBoxes.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
+    if (isGhost) for (let k = 0; k < 4 && hits(box()); k++) c.y += 36;
+    drawnLabelBoxes.push(box());
     const area = shapeArea(sh);
     const halo = { stroke: 'white', 'stroke-width': 3.5, 'paint-order': 'stroke fill' };
     // Other-floor (ghost) labels render a touch smaller and in a muted blue-grey so
@@ -1337,16 +1388,7 @@ function renderInProgress(W) {
   }
   // Offset-tool picking: make every in-progress vertex clickable
   const wpts = pathPointsHere(state.segments);
-  if (state.offsetPick) {
-    wpts.forEach((wp, i) => {
-      const sp = W(wp);
-      const h = addEl('circle', { cx: sp.x, cy: sp.y, r: 12, class: 'hit-vertex ui-overlay' });
-      h.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        handleOffsetPick(wp);
-      });
-    });
-  } else if (state.mode === 'walk' && state.segments.length > 0) {
+  if (!state.offsetPick && state.mode === 'walk' && state.segments.length > 0) {
     // Click-to-snap: any walk vertex except the pen itself (clicking the start
     // draws the closing line straight back to it).
     wpts.forEach((wp, i) => {
@@ -1524,7 +1566,7 @@ function finalizeFenceSelection(a, b) {
     });
   }
   // Offset annotation endpoints
-  state.annotations.forEach((ann, i) => {
+  annotationsOnFloor(state.activeFloor).forEach(({ ann, i }) => {
     if (inside(ann.a)) sel.annEnds.push({ idx: i, end: 'a' });
     if (inside(ann.b)) sel.annEnds.push({ idx: i, end: 'b' });
   });
@@ -1659,25 +1701,26 @@ function sidebarOffsets() {
   const picking = !!state.offsetPick;
   const pickHint = picking
     ? (state.offsetPick.first
-        ? 'Click the <b>second vertex</b> to drop the offset label.'
-        : 'Click the <b>first vertex</b> (any vertex of any shape, or the pen/start dot of an in-progress walk).')
-    : 'Drop a labeled <b>offset measurement</b> between any two vertices on the canvas.';
+        ? 'Click the <b>second point</b>. Esc drops the first point.'
+        : 'Click the <b>first point</b>. Corners and walls snap; hold <b>Alt</b> for a free point, <b>Shift</b> to keep the line level or plumb. Esc when done.')
+    : 'Click <b>📏 Measure</b> (or press <b>M</b>), then click any two points to drop a measurement.';
   const button = picking
-    ? '<button data-act="cancelOffsetPick" class="danger">Cancel pick</button>'
-    : '<button data-act="startOffsetPick" class="primary">Measure offset</button>';
-  const listHtml = state.annotations.length === 0
-    ? '<div class="help" style="margin-top:6px;">No offsets yet.</div>'
-    : state.annotations.map((ann, i) => {
+    ? '<button data-act="cancelOffsetPick" class="danger">Done measuring</button>'
+    : '<button data-act="startOffsetPick" class="primary">📏 Measure</button>';
+  const here = annotationsOnFloor(state.activeFloor);
+  const listHtml = here.length === 0
+    ? '<div class="help" style="margin-top:6px;">No measurements on this floor.</div>'
+    : here.map(({ ann, i }, n) => {
         const dx = ann.b.x - ann.a.x, dy = ann.b.y - ann.a.y;
         const len = Math.hypot(dx, dy);
-        return `<div class="seg-item"><span>${i+1}. ${formatLength(len)} (${formatGapBreakdown(dx, dy)})</span><button data-act="removeAnnotation" data-i="${i}" title="Remove">×</button></div>`;
+        return `<div class="seg-item"><span>${n+1}. ${formatLength(len)} (${formatGapBreakdown(dx, dy)})</span><button data-act="removeAnnotation" data-i="${i}" title="Remove">×</button></div>`;
       }).join('');
-  const clearBtn = state.annotations.length
+  const clearBtn = here.length
     ? '<div class="row-buttons" style="margin-top:6px;"><button data-act="clearAnnotations" class="danger">Clear all</button></div>'
     : '';
   return `
     <div class="section">
-      <h2>Offset Measurements</h2>
+      <h2>Measurements</h2>
       <div class="help">${pickHint}</div>
       <div class="row-buttons" style="margin-top:6px;">${button}</div>
       <div id="ann-list" style="margin-top:6px;">${listHtml}</div>
@@ -1686,23 +1729,15 @@ function sidebarOffsets() {
   `;
 }
 
+// Measurements made before they carried a floor show on every floor.
+function annotationsOnFloor(floor) {
+  return state.annotations.map((ann, i) => ({ ann, i })).filter(({ ann }) => !ann.floor || ann.floor === floor);
+}
+
 function renderAnnotations(W) {
-  // First-pick highlight (pulse-like ring) — UI-only, stripped from exports
-  if (state.offsetPick && state.offsetPick.first) {
-    const p = W(state.offsetPick.first);
-    addEl('circle', { cx: p.x, cy: p.y, r: 9, fill: 'none', stroke: '#d946ef', 'stroke-width': 2, 'stroke-dasharray': '3,2', class: 'ui-overlay' });
-  }
-  state.annotations.forEach((ann) => {
-    const aS = W(ann.a), bS = W(ann.b);
-    addEl('path', {
-      d: `M${aS.x} ${aS.y} L${bS.x} ${bS.y}`,
-      fill: 'none', stroke: '#d946ef', 'stroke-width': 1.5, 'stroke-dasharray': '4,4'
-    });
-    addEl('circle', { cx: aS.x, cy: aS.y, r: 3, fill: '#d946ef' });
-    addEl('circle', { cx: bS.x, cy: bS.y, r: 3, fill: '#d946ef' });
-    const dx = ann.b.x - ann.a.x, dy = ann.b.y - ann.a.y;
-    const len = Math.hypot(dx, dy);
-    const breakdown = formatGapBreakdown(dx, dy);
+  const MAG = '#d946ef';
+  const drawLabel = (aS, bS, a, b, extra) => {
+    const dx = b.x - a.x, dy = b.y - a.y;
     const mx = (aS.x + bS.x) / 2, my = (aS.y + bS.y) / 2;
     const sdx = bS.x - aS.x, sdy = bS.y - aS.y;
     const slen = Math.hypot(sdx, sdy) || 1;
@@ -1710,10 +1745,41 @@ function renderAnnotations(W) {
     addEl('text', {
       x: mx + nx * 14, y: my + ny * 14,
       'text-anchor': 'middle', 'dominant-baseline': 'middle',
-      'font-size': 12, 'font-weight': 'bold', fill: '#d946ef',
-      stroke: 'white', 'stroke-width': 3, 'paint-order': 'stroke fill'
-    }, `${formatLength(len)} (${breakdown})`);
+      'font-size': 12, 'font-weight': 'bold', fill: MAG,
+      stroke: 'white', 'stroke-width': 3, 'paint-order': 'stroke fill', ...extra
+    }, formatLength(Math.hypot(dx, dy)));
+  };
+  annotationsOnFloor(state.activeFloor).forEach(({ ann }) => {
+    const aS = W(ann.a), bS = W(ann.b);
+    addEl('path', {
+      d: `M${aS.x} ${aS.y} L${bS.x} ${bS.y}`,
+      fill: 'none', stroke: MAG, 'stroke-width': 1.5, 'stroke-dasharray': '4,4'
+    });
+    addEl('circle', { cx: aS.x, cy: aS.y, r: 3, fill: MAG });
+    addEl('circle', { cx: bS.x, cy: bS.y, r: 3, fill: MAG });
+    drawLabel(aS, bS, ann.a, ann.b, {});
   });
+  // Measure tool in progress — all UI-only, stripped from exports.
+  const pick = state.offsetPick;
+  if (!pick) return;
+  if (pick.first) {
+    const p = W(pick.first);
+    addEl('circle', { cx: p.x, cy: p.y, r: 9, fill: 'none', stroke: MAG, 'stroke-width': 2, 'stroke-dasharray': '3,2', class: 'ui-overlay' });
+  }
+  if (pick.hover) {
+    const h = W(pick.hover.p);
+    if (pick.first) {
+      const f = W(pick.first);
+      addEl('path', { d: `M${f.x} ${f.y} L${h.x} ${h.y}`, fill: 'none', stroke: MAG, 'stroke-width': 1.5, 'stroke-dasharray': '2,3', class: 'ui-overlay', 'pointer-events': 'none' });
+      drawLabel(f, h, pick.first, pick.hover.p, { class: 'ui-overlay', 'pointer-events': 'none' });
+    }
+    // Snap cue: square = corner, diamond = on a wall, small ring = free point.
+    const k = pick.hover.kind;
+    const cue = { fill: 'none', stroke: MAG, 'stroke-width': 2, class: 'ui-overlay', 'pointer-events': 'none' };
+    if (k === 'vertex') addEl('rect', { x: h.x - 6, y: h.y - 6, width: 12, height: 12, ...cue });
+    else if (k === 'wall') addEl('path', { d: `M${h.x} ${h.y-7} L${h.x+7} ${h.y} L${h.x} ${h.y+7} L${h.x-7} ${h.y} Z`, ...cue });
+    else addEl('circle', { cx: h.x, cy: h.y, r: 4, ...cue });
+  }
 }
 
 // Free-text labels (Text mode). Stored in world coords; rendered on top of shapes.
@@ -2115,25 +2181,68 @@ function sidebarUnderlay() {
 }
 
 function startOffsetPick() {
-  state.offsetPick = { first: null };
+  state.offsetPick = { first: null, hover: null };
   render();
 }
 function cancelOffsetPick() {
   state.offsetPick = null;
   render();
 }
+function toggleMeasure() {
+  if (state.offsetPick) cancelOffsetPick(); else startOffsetPick();
+}
 function handleOffsetPick(worldPoint) {
   if (!state.offsetPick) return;
   const p = { x: worldPoint.x, y: worldPoint.y };
-  if (!state.offsetPick.first) {
+  const first = state.offsetPick.first;
+  if (!first) {
     state.offsetPick.first = p;
     render();
-  } else {
+  } else if (Math.hypot(p.x - first.x, p.y - first.y) > 0.01) {
     pushUndo();
-    state.annotations.push({ a: state.offsetPick.first, b: p });
-    state.offsetPick = null;
+    state.annotations.push({ a: first, b: p, floor: state.activeFloor });
+    state.offsetPick.first = null;   // stay armed for the next measurement
     render();
   }
+}
+// Where a Measure click lands: the nearest corner within reach, else the nearest
+// point on a straight wall, else exactly where the pointer is. Corners/walls come
+// from the active floor and the in-progress walk. Alt skips snapping; Shift then
+// keeps the line level or plumb from the first point.
+function measureSnap(raw, free, ortho) {
+  let best = { p: { x: raw.x, y: raw.y }, kind: 'free' };
+  if (!free && viewTransform) {
+    const reach = 12 / viewTransform.scale;
+    const corners = [];
+    shapesOnFloor(state.activeFloor).forEach(sh => corners.push(...sh.points));
+    if (state.segments.length) corners.push(...pathPointsHere(state.segments));
+    let bestD = reach;
+    corners.forEach(c => {
+      const d = Math.hypot(c.x - raw.x, c.y - raw.y);
+      if (d < bestD) { bestD = d; best = { p: { x: c.x, y: c.y }, kind: 'vertex' }; }
+    });
+    if (best.kind === 'free') {
+      bestD = reach * 0.75;
+      shapesOnFloor(state.activeFloor).forEach(sh => {
+        for (let i = 0; i < sh.points.length - 1; i++) {
+          if (wallArc(sh, i)) continue;   // a chord projection would land off a curved wall
+          const a = sh.points[i], b = sh.points[i + 1];
+          const vx = b.x - a.x, vy = b.y - a.y, L2 = vx * vx + vy * vy;
+          if (L2 < 1e-9) continue;
+          const t = Math.max(0, Math.min(1, ((raw.x - a.x) * vx + (raw.y - a.y) * vy) / L2));
+          const q = { x: a.x + t * vx, y: a.y + t * vy };
+          const d = Math.hypot(q.x - raw.x, q.y - raw.y);
+          if (d < bestD) { bestD = d; best = { p: q, kind: 'wall' }; }
+        }
+      });
+    }
+  }
+  const first = state.offsetPick && state.offsetPick.first;
+  if (ortho && first) {
+    if (Math.abs(best.p.x - first.x) >= Math.abs(best.p.y - first.y)) best.p.y = first.y;
+    else best.p.x = first.x;
+  }
+  return best;
 }
 function removeAnnotation(i) {
   pushUndo();
@@ -2172,7 +2281,7 @@ function sidebarWalk() {
     ? `(${state.startPoint.x.toFixed(2)}, ${state.startPoint.y.toFixed(2)}) ft — picked`
     : 'origin (0, 0)';
   const startHint = state.segments.length === 0
-    ? 'Click a green vertex to anchor the start there. Then use "Offset" to nudge it along a wall (or any direction) by a typed distance — useful for starting partway along an existing wall.'
+    ? 'Click a green vertex (or a blank spot) to start there; Offset nudges it by a typed distance.'
     : 'Cancel current segments to change start point.';
   const offsetSection = state.segments.length === 0 ? `
     <div class="input-row" style="margin-top:8px;">
@@ -2212,7 +2321,7 @@ function sidebarWalk() {
           </select>
         </div>
       </div>
-      <div class="help">Type a length, then click a direction on the compass (or pick it in the list) — the wall goes that way. Directions are absolute: up is the top of the drawing, always. Pick the direction first and Enter adds the wall the same way; <code>&#8592; &#8593; &#8594; &#8595;</code> still work for the four cardinals. The bracketed command is what you would type or say.</div>
+      <div class="help">e.g. <code>16'4 u</code> · <code>10 r 45</code> · <code>16'4 u, 26'9 r</code> — or a length plus a compass click. <a href="#" data-act="help" title="Typing walls, angles, snapping, pen-jump">Syntax &amp; shortcuts</a></div>
       <div id="micStatus" style="font-size:11px;color:#666;margin-top:4px;min-height:14px;"></div>
       <pre id="micLog" style="font-size:10px;color:#777;background:#f4f7fa;border:1px solid #e0e6ec;border-radius:4px;margin-top:4px;padding:4px 6px;max-height:120px;overflow:auto;white-space:pre-wrap;line-height:1.35;"></pre>
       <div class="row-buttons">
@@ -2267,29 +2376,32 @@ function sidebarWalk() {
       </div>
     </div>`;
     })() : ''}
-    <div class="section">
-      <h2>Format</h2>
-      <div class="help">
-        <code>&lt;length&gt; &lt;dir&gt; [angle]</code><br>
-        Length: <code>16'4</code>, <code>3'6"</code>, <code>8</code>, <code>0.5</code><br>
-        Direction: <code>r l u d</code>. Angle (after <code>r</code>/<code>l</code>): degrees turned from your previous heading — <code>r</code> turns right, <code>l</code> turns left. (First segment, or <code>u</code>/<code>d</code> with angle: degrees CW from cardinal base.)<br>
-        Batch (separate walls): <code>16'4 u, 26'9 r, 8 d</code><br>
-        Diagonal from components (one wall): <code>5'd 2'l</code> or <code>5'd, 2'l</code><br>
-        <b>Snap-to-vertex:</b> type just <code>r</code> (no length) + Enter to <i>preview</i> the next aligned vertex. Press <code>r</code>+Enter again to cycle. Press Enter on an empty input to accept — accepting also lines up the next snap in that direction, so <code>r⏎ ⏎ ⏎</code> walks three alignments right, then <code>u⏎ ⏎</code> two up. Esc stops stepping.<br>
-        <b>Pen-jump (arrow keys):</b> with the input empty, press <code>← ↑ → ↓</code> to <i>jump</i> the pen to the next aligned vertex without drawing a wall. Press the same arrow again to skip further. Enter accepts (and arms the next jump), Esc cancels.
-      </div>
-    </div>
-    <div class="section">
+    ${state.segments.length || state.rewalk ? `<div class="section">
       ${state.rewalk ? `<div style="background:#fff4e6;border:2px solid #ff8800;border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:12px;"><b style="color:#cc5500;">Re-walking “${escapeHtml(state.rewalk.original.label)}”</b> — the pen is at the removed wall's start. Type the replacement legs, then Close Shape. × on the last legs removes further walls; Cancel puts the original back.</div>` : ''}
       <h2>Current Shape ${closedTag}</h2>
       <div id="seg-list">${segListHtml}</div>
-    </div>
+    </div>` : ''}
   `;
+}
+
+// Basement vs main-floor outline, with the one-click match, where the basement is
+// being worked on (basement tab, or a basement area selected) rather than only in
+// the Basement panel further down.
+function basementMatchBlock(b) {
+  const drawn = basementFoundationShapes(b), main = mainLivingShapes(b);
+  if (!drawn.length || !main.length) return '';
+  const da = Math.round(drawn.reduce((a, sh) => a + shapeArea(sh), 0)), ma = Math.round(main.reduce((a, sh) => a + shapeArea(sh), 0));
+  const diff = da - ma;
+  return `<div class="help" style="margin:6px 0 4px;">${buildingsPresent().length > 1 ? `<b>${escapeHtml(b)}:</b> ` : ''}basement outline <b>${da} sf</b> · main floor <b>${ma} sf</b>${diff ? ` (${diff > 0 ? '+' : ''}${diff} sf)` : ' (same)'}</div>
+    ${diff ? `<div class="row-buttons"><button data-act="matchBasement" data-b="${escapeHtml(b)}" title="Replace this basement outline with a copy of the main floor's enclosed-living outline (Undo puts it back)">Match to main floor outline</button></div>` : ''}`;
 }
 
 function sidebarEdit() {
   const sel = state.selection;
-  if (!sel) return `<div class="section"><h2>Edit</h2><div class="help">Click a <b>wall</b> or <b>vertex</b> in a completed area to edit. Click the polygon body to select the whole shape.</div></div>`;
+  if (!sel) {
+    const bm = state.activeFloor === 'basement' ? buildingsPresent().map(basementMatchBlock).join('') : '';
+    return `<div class="section"><h2>Edit</h2><div class="help">Click a <b>wall</b> or <b>vertex</b> in a completed area to edit. Click the polygon body to select the whole shape.</div>${bm}</div>`;
+  }
 
   const sh = state.shapes.find(s => s.id === sel.shapeId);
   if (!sh) return '';
@@ -2358,6 +2470,7 @@ function sidebarEdit() {
     return `
       <div class="section">
         <h2>Shape "${escapeHtml(sh.label)}"</h2>
+        ${sh.floor === 'basement' && FOUNDATION_TYPES.includes(sh.type) ? basementMatchBlock(sh.building || DEFAULT_BUILDING) : ''}
         <div class="field"><label>Label</label><input id="sh-label" value="${escapeHtml(sh.label)}"></div>
         <div class="field"><label>Type</label><select id="sh-type">
           ${Object.entries(TYPES).map(([k,v])=>`<option value="${k}"${k===sh.type?' selected':''}>${v.name}</option>`).join('')}
@@ -2519,6 +2632,46 @@ function setBasementPct(b, val) {
   render();
 }
 
+// Basement outline = main-floor outline. For when the appraiser has verified the
+// above-grade walls and the exposed part of the foundation agrees with them, but a
+// traced or walked basement outline (an iGUIDE scan from inside, say) does not.
+const FOUNDATION_TYPES = ['finished', 'unfinished'];
+function mainLivingShapes(b) {
+  return state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === b && sh.floor === 'main' && sh.type === 'living');
+}
+function basementFoundationShapes(b) {
+  return state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === b && sh.floor === 'basement' && FOUNDATION_TYPES.includes(sh.type));
+}
+function matchBasementToMain(b, noAsk) {
+  const main = mainLivingShapes(b);
+  if (!main.length) { alert(`${b} has no enclosed living area on the main floor to copy.`); return; }
+  const old = basementFoundationShapes(b);
+  const mainArea = Math.round(main.reduce((a, sh) => a + shapeArea(sh), 0));
+  const oldArea = Math.round(old.reduce((a, sh) => a + shapeArea(sh), 0));
+  const msg = old.length
+    ? `Replace the basement outline of ${b} (${oldArea} sf) with the main floor's outline (${mainArea} sf)?\n\nDecks, patios and other areas on the basement floor stay as they are. Undo restores the old outline.`
+    : `Add a basement to ${b} with the main floor's outline (${mainArea} sf)?`;
+  if (!noAsk && !confirm(msg)) return;
+  pushUndo();
+  const like = old[0];
+  state.shapes = state.shapes.filter(sh => !old.includes(sh));
+  main.forEach((m, k) => {
+    const sh = JSON.parse(JSON.stringify(m));
+    sh.id = state.nextShapeId++;
+    sh.floor = 'basement';
+    sh.type = like ? like.type : 'finished';
+    sh.label = (like && like.label ? like.label : 'Basement') + (main.length > 1 ? ` (${k + 1})` : '');
+    delete sh.labelOffset; delete sh.dimOffsets;
+    rebuildSegments(sh);
+    state.shapes.push(sh);
+  });
+  if (!state.floors.includes('basement')) state.floors.unshift('basement');
+  const bm = state.basements[b] || (state.basements[b] = { areaOverride: null, pctFinished: 100 });
+  bm.areaOverride = null;   // auto = main-floor footprint, which is now the basement outline
+  state.selection = null;
+  render();
+}
+
 function sidebarBasement() {
   const buildings = buildingsPresent();
   if (buildings.length === 0) return '';
@@ -2530,6 +2683,13 @@ function sidebarBasement() {
     html += `<div style="padding:6px 0; border-bottom:1px solid #eee;">
       <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:bold; cursor:pointer;">
         <input type="checkbox" onchange="toggleBasement('${b}', this.checked)" ${enabled ? 'checked' : ''}> ${escapeHtml(b)}</label>`;
+    if (mainLivingShapes(b).length) {
+      const drawn = basementFoundationShapes(b);
+      const drawnArea = Math.round(drawn.reduce((a, sh) => a + shapeArea(sh), 0));
+      html += `<div class="row-buttons" style="margin:4px 0;"><button data-act="matchBasement" data-b="${escapeHtml(b)}"
+        title="Replace the basement outline with a copy of the main floor's enclosed living outline — use when the foundation you measured matches the walls above">Match basement to main floor</button></div>
+        ${drawn.length ? `<div class="help" style="margin:0 0 4px;">Basement drawn: <b>${drawnArea} sf</b> · main floor: <b>${auto} sf</b>${Math.abs(drawnArea - auto) >= 1 ? ` (${drawnArea > auto ? '+' : ''}${drawnArea - auto} sf)` : ' (same)'}</div>` : ''}`;
+    }
     if (enabled) {
       const area = Math.round(basementArea(b));
       const pct = bm.pctFinished;
@@ -2677,6 +2837,8 @@ function sidebarAction(e) {
     case 'startOffsetPick': startOffsetPick(); break;
     case 'cancelOffsetPick': cancelOffsetPick(); break;
     case 'removeAnnotation': removeAnnotation(parseInt(i)); break;
+    case 'matchBasement': matchBasementToMain(e.currentTarget.dataset.b); break;
+    case 'help': e.preventDefault(); if (!document.getElementById('help-panel')) openHelp(); break;
     case 'clearAnnotations': clearAnnotations(); break;
     case 'applyGroupMove': applyGroupMove(); break;
     case 'clearFenceSelection': clearFenceSelection(); break;
@@ -3814,6 +3976,26 @@ svg.addEventListener('click', (e) => {
   render();
 });
 
+// Measure tool: capture-phase, so a click picks a point and never also selects
+// or edits the wall/vertex/shape under it.
+svg.addEventListener('click', (e) => {
+  if (!state.offsetPick || galleryActive()) return;
+  e.stopImmediatePropagation();
+  e.preventDefault();
+  handleOffsetPick(measureSnap(screenToWorld(e.clientX, e.clientY), e.altKey, e.shiftKey).p);
+}, true);
+svg.addEventListener('mousemove', (e) => {
+  if (!state.offsetPick || galleryActive()) return;
+  const h = measureSnap(screenToWorld(e.clientX, e.clientY), e.altKey, e.shiftKey);
+  const o = state.offsetPick.hover;
+  if (o && o.kind === h.kind && Math.abs(o.p.x - h.p.x) < 1e-3 && Math.abs(o.p.y - h.p.y) < 1e-3) return;
+  state.offsetPick.hover = h;
+  render();
+});
+svg.addEventListener('mouseleave', () => {
+  if (state.offsetPick && state.offsetPick.hover) { state.offsetPick.hover = null; render(); }
+});
+svg.addEventListener('pointerdown', closeUnpinnedHelp, true);
 svg.addEventListener('mousedown', fenceMouseDown);
 window.addEventListener('mousemove', fenceMouseMove);
 window.addEventListener('mouseup', fenceMouseUp);
@@ -4056,7 +4238,18 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
-  ['0.33.0', '2026-09-29', 'Trace over a scan: the new Image tab loads a scanned or photographed floor plan, sets it to scale by clicking two points a known distance apart, and lays it under the drawing so you can walk the perimeter straight over it. Fade it, lock it, or flip it on top to check a finished trace against the plan. The image is saved inside the sketch file and never appears in an export.'],
+  ['0.40.0', '2026-10-02', 'Help points at the real controls: each section has action links - hover one and the button it means is outlined wherever it sits (toolbar, floor bar or sidebar); click it and Help does what the button does and flashes it, so you learn where it lives. Nothing that discards work is run from Help.'],
+  ['0.39.1', '2026-10-02', 'The Help pin now does something you can see: unpinned, Help closes as soon as you start working (a click in the drawing or any change); pinned, it stays open while you draw, says pinned in its title, and opens with the app.'],
+  ['0.39.0', '2026-10-02', 'Help shows only what you pick: each topic chip switches its section on or off, Follow adds the section for what you are doing now, and All shows everything. Your picks are remembered.'],
+  ['0.38.0', '2026-10-02', 'Help follows what you are doing: it opens at the section for your current mode or tool and moves with you as you switch, with sections for every tool, floors and buildings, the basement, PDF import, export and saving, and a keyboard list; topic chips jump between them, and F1 or ? opens and closes it.'],
+  ['0.37.1', '2026-10-02', 'Help is now a floating panel instead of a pop-up: it stays open while you draw, drags by its title bar, resizes from its corner and remembers where you left it; pin it and it opens with the app.'],
+  ['0.37.0', '2026-10-02', 'A Help button: the wall-typing reference (lengths, angles, batch entry, snapping, pen-jump) moves out of the Walk sidebar into a Help window, so the sidebar keeps to the drawing in hand - Current Shape appears once you have typed a wall, and Measurements and Areas move up into view.'],
+  ['0.36.1', '2026-10-01', 'PDF import can use the main floor outline for the basement straight away (a checkbox in the import dialog), the import dialog fits without side-scrolling, and another floor’s faded area label steps aside instead of printing over the label of the floor you are on.'],
+  ['0.36.0', '2026-10-01', 'Match basement to main floor: in the Basement panel, one click replaces the basement outline of a building with a copy of its main-floor outline - for when you have measured the walls above grade and the exposed foundation agrees with them, but a traced or walked basement outline (an iGUIDE scan taken from inside, say) does not. The panel shows the drawn basement against the main floor so the gap is visible first; Undo puts the old outline back.'],
+  ['0.35.0', '2026-10-01', 'PDF import now finishes the job: rooms iGUIDE leaves out of floor area (garage, unheated sun room) come in as their own areas, sized to the excluded area iGUIDE states; decks, porches and patios are traced from the outline around their label; and each floor is turned and slid to sit over the main floor, with a check-position flag where that is a judgment call (a suite shorter than its garage).'],
+  ['0.34.1', '2026-10-01', 'Updates now show up on the first load: when you are online the app always fetches the current version of the page, and only falls back to the saved offline copy when the connection is down or slower than a few seconds. Before, a new release appeared only after a second reload.'],
+  ['0.34.0', '2026-10-01', 'Import a floor-plan PDF: 📐 Import PDF… reads an iGUIDE plan and traces each floor\'s outline from the PDF\'s own drawing — on tested plans within about half an inch, and within 1% of iGUIDE\'s stated areas. A check table shows traced vs stated area per floor; floors land on the right tab, multi-building plans come in as separate buildings, and the basement area is taken from the traced basement. Garages and other rooms iGUIDE excludes are inside the outline — cut them off with Split. The PDF is read on your computer and never uploaded.'],
+  ['0.33.0', '2026-10-01', 'Measure anywhere: click 📏 Measure in the toolbar (or press M), then click any two points. Corners and walls snap, a live line shows the distance as you move, Alt places a free point and Shift keeps the line level or plumb. It stays on for the next measurement until Esc or Done. Measurements now belong to the floor they were made on.'],
   ['0.32.1', '2026-09-29', 'Save app copy now explains first: the copy is free software, and the licence (AGPL-3.0) and the OSASI notice are saved inside the file, so anyone you pass it to has them. In a saved copy, About opens both from inside the file.'],
   ['0.32.0', '2026-09-13', 'Closing a shape no longer needs the button: walk the last wall back to where you started and the sketch offers to close it right there — Enter takes it, Esc or Tab waves it off and you carry on walking. The region that would be created is washed green while the offer stands. On the phone the offer is a bar above the keypad with both choices as buttons.'],
   ['0.31.0', '2026-09-10', 'Curved walls: select a wall in Edit mode, type a rise and Make arc — the wall bows into a circular arc whose midpoint sits that far off the straight line, outward for bays and turrets or inward for a curved notch. Areas include the curve; Straighten puts the wall back.'],
@@ -4151,6 +4344,266 @@ function openWhatsNew() {
     <p style="font-size:12px; color:#666; margin:10px 0 0;">Full history: <a href="https://github.com/CAA-EBV-CO-OP/CValRSketch/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG.md</a></p>
     <div class="modal-buttons"><button class="primary" onclick="closeModal()">Close</button></div>`;
   m.appendChild(div);
+}
+
+// Reference for typing walls and the drawing tools. It used to sit in the Walk
+// sidebar (the old Format card and the long hints), where it pushed the controls
+// for the drawing in hand off the screen. It is a floating panel, not a modal:
+// it stays open while you draw, drags by its title bar, resizes from its corner,
+// and remembers where it was. Pinned, it also reopens with the app. Position and
+// pin live in this browser only (a viewer preference, not part of the sketch).
+const HELP_KEY = 'cvalrsketch-help';
+// Help's action links: hovering one outlines the real control wherever it is;
+// clicking does what that control does and flashes it, so the reader learns where
+// it lives. 'run' is false for controls that are only pointed at (a box to type
+// in, a list, a panel). Nothing that discards work (New, Delete floor) is here.
+const sidebarSection = title => [...document.querySelectorAll('#sidebar .section')].find(x => (x.querySelector('h2') || {}).textContent?.trim().toLowerCase().startsWith(title));
+const HELP_ACTIONS = {
+  walk: { find: () => document.querySelector('#mode-tabs button[data-mode="walk"]'), run: true },
+  edit: { find: () => document.querySelector('#mode-tabs button[data-mode="edit"]'), run: true },
+  split: { find: () => document.querySelector('#mode-tabs button[data-mode="split"]'), run: true },
+  fence: { find: () => document.querySelector('#mode-tabs button[data-mode="fence"]'), run: true },
+  text: { find: () => document.querySelector('#mode-tabs button[data-mode="text"]'), run: true },
+  measure: { find: () => document.getElementById('btn-measure'), run: true },
+  cmd: { find: () => document.getElementById('cmd'), focus: true, mode: 'walk' },
+  compass: { find: () => document.querySelector('#sidebar .rose-row'), mode: 'walk' },
+  dictate: { find: () => document.getElementById('btnMic'), mode: 'walk' },
+  offset: { find: () => document.getElementById('start-offset'), focus: true, mode: 'walk' },
+  measurelist: { find: () => sidebarSection('measurements') },
+  floors: { find: () => document.getElementById('floor-tabs') },
+  addfloor: { find: () => document.querySelector('#floor-bar button[onclick="addFloor()"]'), run: true },
+  building: { find: () => document.getElementById('building-select'), focus: true },
+  addfiles: { find: () => document.querySelector('header button[onclick*="add-json"]'), run: true },
+  basement: { find: () => sidebarSection('basement') },
+  import: { find: () => document.querySelector('header button[onclick*="import-pdf"]'), run: true },
+  export: { find: () => document.querySelector('header button[onclick="openExportPreview()"]'), run: true },
+  save: { find: () => document.querySelector('header button[onclick="saveJSON()"]'), run: true },
+  saveas: { find: () => document.querySelector('header button[onclick="saveJSONAs()"]'), run: true },
+  recent: { find: () => document.querySelector('header button[onclick="openRecentsModal()"]'), run: true },
+  appcopy: { find: () => document.querySelector('header button[onclick="confirmSaveAppCopy()"]'), run: true },
+  undo: { find: () => document.getElementById('btn-undo') },
+};
+function helpSpot(key, on) {
+  const a = HELP_ACTIONS[key]; const t = a && a.find();
+  if (!t) return null;
+  t.classList.toggle('help-spot', on);
+  if (on && t.closest('#sidebar')) t.scrollIntoView({ block: 'nearest' });
+  return t;
+}
+function helpDo(key) {
+  const a = HELP_ACTIONS[key];
+  if (!a) return;
+  if (a.mode && state.mode !== a.mode) document.querySelector(`#mode-tabs button[data-mode="${a.mode}"]`).click();   // the control only exists in that mode's sidebar
+  const before = a.find();
+  if (before) before.classList.remove('help-spot');
+  if (a.run && before) before.click();
+  // The click may have re-rendered the sidebar; find the control again to flash it.
+  setTimeout(() => {
+    const t = a.find();
+    if (!t) return;
+    if (t.closest('#sidebar')) t.scrollIntoView({ block: 'nearest' });
+    t.classList.remove('help-flash'); void t.offsetWidth; t.classList.add('help-flash');
+    setTimeout(() => t.classList.remove('help-flash'), 2400);
+    if (a.focus) t.focus();
+  }, 0);
+}
+const HELP_TOPICS = [['walk', 'Walk'], ['edit', 'Edit'], ['split', 'Split'], ['fence', 'Fence'], ['text', 'Text'], ['measure', 'Measure'],
+  ['floors', 'Floors'], ['basement', 'Basement'], ['import', 'Import PDF'], ['export', 'Export & save'], ['keys', 'Keyboard']];
+// The section for what you are doing now: the measure tool, else the mode.
+function helpTopicNow() { return state.offsetPick ? 'measure' : state.mode; }
+// Which sections show: the topics the reader switched on, plus — while Follow is
+// on — the one for what they are doing now. Everything else is hidden, so the
+// panel holds only what is needed at the moment. Selection is remembered.
+function helpFilter() {
+  const pr = helpPrefs();
+  return { follow: pr.follow !== false, topics: Array.isArray(pr.topics) ? pr.topics : [] };
+}
+function applyHelpFilter() {
+  const el = document.getElementById('help-panel');
+  if (!el) return;
+  const f = helpFilter(), now = helpTopicNow();
+  const shown = new Set(f.topics);
+  if (f.follow) shown.add(now);
+  el.querySelectorAll('.help-body section').forEach(sec => {
+    sec.hidden = !shown.has(sec.dataset.topic);
+    sec.classList.toggle('here', f.follow && sec.dataset.topic === now);
+  });
+  el.querySelectorAll('.help-nav a[data-help]').forEach(a => {
+    a.classList.toggle('on', f.topics.includes(a.dataset.help));
+    a.classList.toggle('now', f.follow && a.dataset.help === now && !f.topics.includes(a.dataset.help));
+  });
+  const fol = el.querySelector('.help-nav a[data-follow]');
+  fol.classList.toggle('on', f.follow);
+  fol.textContent = f.follow ? `Follow: ${(HELP_TOPICS.find(([k]) => k === now) || [now, now])[1]}` : 'Follow';
+  el.querySelector('.help-nav a[data-all]').classList.toggle('on', f.topics.length === HELP_TOPICS.length);
+  el.querySelector('.help-empty').hidden = shown.size > 0;
+  el.dataset.auto = now;
+}
+function toggleHelpChip(a) {
+  const f = helpFilter();
+  if (a.dataset.follow !== undefined) saveHelpPrefs({ follow: !f.follow });
+  else if (a.dataset.all !== undefined) saveHelpPrefs({ topics: f.topics.length === HELP_TOPICS.length ? [] : HELP_TOPICS.map(([k]) => k) });
+  else {
+    const k = a.dataset.help;
+    saveHelpPrefs({ topics: f.topics.includes(k) ? f.topics.filter(t => t !== k) : [...f.topics, k] });
+  }
+  applyHelpFilter();
+  helpScrollTop();
+}
+function helpScrollTop() { const b = document.querySelector('#help-panel .help-body'); if (b) b.scrollTop = 0; }
+// Called from render(): an open Help follows you into another mode or tool.
+function syncHelpTopic() {
+  const el = document.getElementById('help-panel');
+  if (el && el.dataset.auto !== helpTopicNow()) { applyHelpFilter(); helpScrollTop(); }
+}
+function helpPrefs() { try { return JSON.parse(localStorage.getItem(HELP_KEY)) || {}; } catch (e) { return {}; } }
+function saveHelpPrefs(p) { try { localStorage.setItem(HELP_KEY, JSON.stringify({ ...helpPrefs(), ...p })); } catch (e) { /* private window: no memory, still works */ } }
+function openHelp() {
+  const open = document.getElementById('help-panel');
+  if (open) { closeHelp(); return; }
+  const pr = helpPrefs();
+  const el = document.createElement('div');
+  el.id = 'help-panel';
+  el.className = 'help-panel';
+  const w = Math.min(Math.max(pr.w || 460, 260), window.innerWidth - 24), h = Math.min(Math.max(pr.h || 420, 200), window.innerHeight - 80);
+  el.style.width = w + 'px'; el.style.height = h + 'px';
+  el.style.left = Math.max(8, Math.min(pr.x ?? 16, window.innerWidth - w - 8)) + 'px';
+  el.style.top = Math.max(8, Math.min(pr.y ?? (window.innerHeight - h - 16), window.innerHeight - 60)) + 'px';
+  el.innerHTML = `
+    <div class="help-bar" title="Drag to move">
+      <b>❓ Help</b><span class="help-pinned-tag"${pr.pinned ? '' : ' hidden'}>· pinned</span>
+      <span style="flex:1;"></span>
+      <button type="button" class="help-pin${pr.pinned ? ' on' : ''}" title="${pr.pinned ? 'Pinned: stays open while you work, and opens with the app. Click to unpin' : 'Pin: keep Help open while you work (unpinned it closes when you start drawing), and open it with the app'}">📌</button>
+      <button type="button" class="help-x" title="Close (the ❓ Help button opens it again)">✕</button>
+    </div>
+    <div class="help-body">
+    <div class="help-nav"><a href="#" data-follow title="Also show the section for what you are doing now; it changes as you switch modes">Follow</a>${HELP_TOPICS.map(([k, t]) => `<a href="#" data-help="${k}" title="Show or hide this section">${t}</a>`).join('')}<a href="#" data-all title="Show every section, or clear your picks">All</a></div>
+    <p class="help-empty" hidden>Pick one or more topics above, or turn on <b>Follow</b> to see help for what you are doing.</p>
+    <section data-topic="walk">
+    <h4>Walk — typing walls</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="walk">▶ Walk</a><a href="#" class="help-do" data-do="cmd">⌨ Segment box</a><a href="#" class="help-do" data-do="compass">🧭 Compass</a><a href="#" class="help-do" data-do="dictate">🎤 Dictate</a><a href="#" class="help-do" data-do="offset">↔ Start offset</a></div>
+    <p><code>&lt;length&gt; &lt;dir&gt; [angle]</code> — length <code>16'4</code>, <code>3'6"</code>, <code>8</code>, <code>0.5</code>; direction <code>r l u d</code>.</p>
+    <p><b>Angles:</b> after <code>r</code> / <code>l</code>, the angle is degrees turned from your previous heading — <code>r</code> turns right, <code>l</code> turns left. On the first wall, or with <code>u</code> / <code>d</code>, it is degrees clockwise from that direction.</p>
+    <p><b>Several walls at once:</b> <code>16'4 u, 26'9 r, 8 d</code>. <b>One diagonal wall from its parts:</b> <code>5'd 2'l</code> or <code>5'd, 2'l</code>.</p>
+    <p><b>Compass:</b> type a length, then click a direction on the compass (or pick it in the list) — the wall goes that way. Directions are absolute: up is the top of the drawing. Pick the direction first and Enter adds the wall the same way; <code>&#8592; &#8593; &#8594; &#8595;</code> still work for the four cardinals. The bracketed command in the list is what you would type or say. <i>Steps</i> switches between 8 and 16 directions.</p>
+    <p><b>Start point:</b> click a green vertex to start there, or a blank spot; Shift+Arrow then steps the start onto aligned vertices. <i>Offset</i> nudges the start along a wall (or any direction) by a typed distance.</p>
+    <p><b>Snap-to-vertex:</b> type just <code>r</code> (no length) + Enter to <i>preview</i> the next aligned vertex; <code>r</code>+Enter again cycles. Enter on an empty box accepts — and lines up the next snap in that direction, so <code>r⏎ ⏎ ⏎</code> walks three alignments right, then <code>u⏎ ⏎</code> two up. Esc stops stepping.</p>
+    <p><b>Pen-jump:</b> with the box empty, <code>&#8592; &#8593; &#8594; &#8595;</code> <i>jumps</i> the pen to the next aligned vertex without drawing a wall; the same arrow again skips further. Enter accepts (and arms the next jump), Esc cancels.</p>
+    <p><b>Closing:</b> walk back to the start and the shape offers to close (Enter takes it). Land on an existing wall and the area you have fenced off is offered instead. <i>Dictate</i> takes the same commands by voice.</p>
+    </section>
+    <section data-topic="edit">
+    <h4>Edit</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="edit">▶ Edit</a></div>
+    <p>Click a <b>wall</b> to change its length, move it, bow it into a curve, or re-walk it (the shape reopens at that wall so you can type replacement legs). Click a <b>corner</b> to move or delete it. Click inside an <b>area</b> to change its label, type, floor, building or fill, copy it to a typed offset, or move it. Dimension and area labels drag to tidy spots.</p>
+    </section>
+    <section data-topic="split">
+    <h4>Split</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="split">▶ Split</a></div>
+    <p>Click a first corner, then a second corner of the same area, and it is divided in two; both halves keep the label, type and floor. Or, after the first corner, type a direction (<code>r l u d</code>) to project from it to the first wall it hits, then confirm.</p>
+    </section>
+    <section data-topic="fence">
+    <h4>Fence</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="fence">▶ Fence</a></div>
+    <p>Drag a rectangle on the canvas: corners inside it are captured. Type an offset and <i>Move</i> — walls with both ends captured move, walls crossing the fence stretch. <i>Delete fenced</i> (or Delete) removes whatever was captured whole: shapes, an unfinished walk, measurements.</p>
+    </section>
+    <section data-topic="text">
+    <h4>Text</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="text">▶ Text</a></div>
+    <p>Click a blank spot to add a note. Click a note to select it, drag to move, double-click to edit; Delete removes it. Notes can run over several lines, and the first line can be a larger heading.</p>
+    </section>
+    <section data-topic="measure">
+    <h4>📏 Measure</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="measure">📏 Measure</a><a href="#" class="help-do" data-do="measurelist">Measurements list</a></div>
+    <p>Click <b>📏 Measure</b> (or press M), then any two points. Clicks snap to corners, then walls; Alt places a free point, Shift keeps the line level or plumb. It stays on for the next one; Esc drops a half-made measurement, Esc again (or <i>Done measuring</i>) turns it off. Measurements belong to their floor; × in the sidebar list removes one.</p>
+    </section>
+    <section data-topic="floors">
+    <h4>Floors and buildings</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="floors">Floor tabs</a><a href="#" class="help-do" data-do="addfloor">+ Floor</a><a href="#" class="help-do" data-do="building">Building list</a><a href="#" class="help-do" data-do="addfiles">➕ Add files…</a></div>
+    <p>The floor tabs switch floors (PageUp / PageDown cycle them; double-click a blank spot for a floor menu). Other floors show faded under the one you are on (Settings). The <i>Building</i> list shows one building or <i>All</i>, a gallery of every building; <i>Add files…</i> merges other sketches in as buildings.</p>
+    </section>
+    <section data-topic="basement">
+    <h4>Basement</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="basement">Basement panel</a></div>
+    <p>The Basement panel declares a building's below-grade area and % finished. Its area follows the main floor unless you type one. When the basement you drew (or imported) differs from the main floor but the foundation you measured agrees with the walls above, <i>Match to main floor outline</i> — on the basement tab in Edit, or in the Basement panel — replaces the basement shape with a copy of the main floor's outline.</p>
+    </section>
+    <section data-topic="import">
+    <h4>📐 Import PDF</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="import">📐 Import PDF…</a></div>
+    <p>An iGUIDE floor-plan PDF becomes the sketch: every floor traced from the drawing, the garage and other excluded rooms split off, decks and porches traced, floors stacked over the main floor. The dialog checks each floor against iGUIDE's stated area and flags placements to check. The PDF is read on your computer, never uploaded; it needs the hosted app or a local web server.</p>
+    </section>
+    <section data-topic="export">
+    <h4>Export and saving</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="export">🖨 Export / Preview</a><a href="#" class="help-do" data-do="save">Save</a><a href="#" class="help-do" data-do="saveas">Save As…</a><a href="#" class="help-do" data-do="recent">📂 Recent</a><a href="#" class="help-do" data-do="appcopy">💾 Save app copy</a></div>
+    <p><i>Export / Preview</i> shows the printable sheet — page size, title, legend, floors side by side or one per building — and saves PNG or SVG. <i>Save</i> (Ctrl+S) / <i>Save As…</i> write the sketch file; in Chrome or Edge the file you saved or loaded is then autosaved after every change. <i>Recent</i> reopens sketches kept in this browser. <i>Save app copy</i> keeps a frozen copy of this version of the app beside a job.</p>
+    </section>
+    <section data-topic="keys">
+    <h4>Keyboard</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="undo">↶ Undo</a><a href="#" class="help-do" data-do="measure">📏 Measure</a></div>
+    <p><code>Ctrl+Z</code> undo · <code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code> redo · <code>Ctrl+S</code> save · <code>M</code> measure · <code>F1</code> or <code>?</code> help · <code>PageUp</code> / <code>PageDown</code> floors · <code>Esc</code> cancel / deselect · <code>Delete</code> removes what the fence captured, or the selected note · Walk, box empty: arrows jump the pen; Shift+arrows step the start point.</p>
+    </section>
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector('.help-x').addEventListener('click', closeHelp);
+  el.querySelectorAll('.help-nav a').forEach(a => a.addEventListener('click', ev => { ev.preventDefault(); toggleHelpChip(a); }));
+  el.querySelectorAll('.help-do').forEach(a => {
+    const k = a.dataset.do;
+    a.title = HELP_ACTIONS[k] && HELP_ACTIONS[k].run ? 'Hover to see where it is; click to use it' : 'Hover or click to see where it is';
+    a.addEventListener('mouseenter', () => helpSpot(k, true));
+    a.addEventListener('mouseleave', () => helpSpot(k, false));
+    a.addEventListener('click', ev => {
+      ev.preventDefault(); helpSpot(k, false); helpDo(k);
+      // A control that only appears when it applies (the Basement panel needs a building):
+      // say so instead of doing nothing.
+      setTimeout(() => {
+        if (HELP_ACTIONS[k].find()) return;
+        a.classList.add('help-missing'); a.dataset.was = a.dataset.was || a.textContent;
+        a.textContent = a.dataset.was + ' — not on screen yet';
+        setTimeout(() => { a.classList.remove('help-missing'); a.textContent = a.dataset.was; }, 2500);
+      }, 30);
+    });
+  });
+  applyHelpFilter();
+  el.querySelector('.help-pin').addEventListener('click', ev => {
+    const on = !helpPrefs().pinned;
+    saveHelpPrefs({ pinned: on });
+    ev.currentTarget.classList.toggle('on', on);
+    ev.currentTarget.title = on ? 'Pinned: stays open while you work, and opens with the app. Click to unpin'
+      : 'Pin: keep Help open while you work (unpinned it closes when you start drawing), and open it with the app';
+    el.querySelector('.help-pinned-tag').hidden = !on;
+  });
+  const bar = el.querySelector('.help-bar');
+  bar.addEventListener('mousedown', ev => {
+    if (ev.target.closest('button')) return;
+    ev.preventDefault();
+    const sx = ev.clientX - el.offsetLeft, sy = ev.clientY - el.offsetTop;
+    const move = e => {
+      el.style.left = Math.max(0, Math.min(e.clientX - sx, window.innerWidth - 60)) + 'px';
+      el.style.top = Math.max(0, Math.min(e.clientY - sy, window.innerHeight - 30)) + 'px';
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up);
+      saveHelpPrefs({ x: el.offsetLeft, y: el.offsetTop });
+    };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  });
+  if (window.ResizeObserver) {
+    let t = null;
+    // Only a size the reader set: a hidden tab reports collapsed sizes, which must not stick.
+    new ResizeObserver(() => { clearTimeout(t); t = setTimeout(() => {
+      if (document.visibilityState === 'visible' && el.isConnected && el.offsetWidth >= 260 && el.offsetHeight >= 140) saveHelpPrefs({ w: el.offsetWidth, h: el.offsetHeight });
+    }, 250); }).observe(el);
+  }
+  saveHelpPrefs({ open: true });
+}
+// Unpinned, Help is a read-then-go reference: it closes once you start working —
+// a click in the drawing or any change to the sketch. Pinned, it stays.
+function closeUnpinnedHelp() {
+  if (document.getElementById('help-panel') && !helpPrefs().pinned) closeHelp();
+}
+function closeHelp() {
+  const el = document.getElementById('help-panel');
+  if (el) el.remove();
+  saveHelpPrefs({ open: false });
 }
 
 function openAbout() {
@@ -4321,7 +4774,7 @@ function captureLivePanel() {
   const sceneShapes = state.settings.showFloorGhosts ? visibleShapes() : shapesOnFloor(state.activeFloor);
   sceneShapes.forEach(sh => allWorldPts.push(...shapeExtentPoints(sh)));
   if (state.segments.length) allWorldPts.push(...pathPointsHere(state.segments));
-  state.annotations.forEach(a => { allWorldPts.push(a.a); allWorldPts.push(a.b); });
+  annotationsOnFloor(state.activeFloor).forEach(({ ann }) => { allWorldPts.push(ann.a); allWorldPts.push(ann.b); });
   labelsOnFloor(state.activeFloor).forEach(l => allWorldPts.push({ x: l.x, y: l.y }));
 
   let tight;
@@ -4996,6 +5449,156 @@ document.getElementById('add-json').addEventListener('change', async (e) => {
   }
 });
 
+// ===== FLOOR-PLAN PDF IMPORT =====
+// pdf-import.mjs and the vendored pdf.js load only when a PDF is picked. Module
+// imports need a served page, so a file:// open or a saved app copy explains
+// instead of failing.
+const PDF_IMPORT_VERSION = '0.35.0';
+document.getElementById('import-pdf').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (f) await importFloorPlanPdf(f);
+});
+async function importFloorPlanPdf(file) {
+  if (location.protocol === 'file:') {
+    alert('PDF import needs the hosted app (https://caa-ebv-co-op.github.io/CValRSketch/) or a local web server. A page opened straight from disk, or a saved app copy, cannot load the PDF reader.');
+    return;
+  }
+  const busy = createModal();
+  busy.innerHTML = `<div class="modal" style="max-width:420px;"><h3>Reading ${escapeHtml(file.name)}…</h3><div class="help">Tracing each floor on this computer. Nothing is uploaded.</div></div>`;
+  let res;
+  try {
+    const [pdfjs, imp] = await Promise.all([
+      import('./vendor/pdfjs/pdf.min.mjs'),
+      import('./pdf-import.mjs?v=' + PDF_IMPORT_VERSION),
+    ]);
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('vendor/pdfjs/pdf.worker.min.mjs', location.href).href;
+    res = await imp.readFloorPlanPdf(new Uint8Array(await file.arrayBuffer()), pdfjs);
+  } catch (err) {
+    closeModal();
+    alert('Could not read ' + file.name + ': ' + (err && err.message || err));
+    return;
+  }
+  closeModal();
+  if (!res.ok) { alert(file.name + ': ' + res.message + (res.warnings && res.warnings.length ? '\n\n' + res.warnings.join('\n') : '')); return; }
+  openPdfImportModal(res, file.name);
+}
+function openPdfImportModal(res, fname) {
+  const m = createModal();
+  const div = document.createElement('div');
+  div.className = 'modal';
+  div.style.maxWidth = 'min(900px, calc(100vw - 32px))';
+  const floorOpts = cur => [...new Set([...state.floors, 'basement', 'main', 'upper', 'other'])]
+    .map(f => `<option value="${escapeHtml(f)}"${f === cur ? ' selected' : ''}>${escapeHtml(f)}</option>`).join('');
+  const typeOpts = cur => Object.entries(TYPES)
+    .map(([k, t]) => `<option value="${k}"${k === cur ? ' selected' : ''}>${escapeHtml(t.name)}</option>`).join('');
+  const multi = (res.buildings || []).length > 1;
+  const rows = res.floors.map((f, i) => {
+    const exc = f.areas.excluded || 0;
+    const stated = f.stated;
+    const diff = stated ? (f.traced / stated - 1) * 100 : null;
+    const ok = diff != null && Math.abs(diff) <= 1;
+    const split = f.excludedTraced != null;
+    const statedTxt = stated == null ? '—'
+      : `${Math.round(stated)} sf${exc ? `<div class="help" style="margin:0;">${split ? `excluded rooms ${Math.round(f.excludedTraced)} / ${Math.round(exc)} sf` : `incl. ${Math.round(exc)} excluded`}</div>` : ''}`;
+    const check = diff == null ? '' : `<span style="color:${ok ? '#2f855a' : '#c05621'}; font-weight:600;">${ok ? '✓' : '⚠'} ${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%</span>`;
+    const kind = { excluded: 'excluded room', outdoor: 'outdoor' }[f.kind];
+    const place = [
+      f.turned ? `turned ${f.turned}°` : '',
+      f.placement === 'aligned' ? 'lined up' : f.placement === 'check' ? '<span style="color:#c05621;">check position</span>' : '',
+    ].filter(Boolean).join(' · ');
+    return `<tr>
+      <td><input type="checkbox" id="pdfimp-on-${i}" checked></td>
+      ${multi ? `<td>${escapeHtml(f.building || '—')}</td>` : ''}
+      <td>${escapeHtml(f.title)}<div class="help" style="margin:0;">page ${f.page}${kind ? ' · ' + kind : ''}${place ? ' · ' + place : ''}</div></td>
+      <td><select id="pdfimp-floor-${i}">${floorOpts(f.floor)}</select></td>
+      <td><select id="pdfimp-type-${i}">${typeOpts(f.type)}</select></td>
+      <td style="text-align:right;">${Math.round(f.traced)} sf</td>
+      <td style="text-align:right;">${statedTxt}</td>
+      <td>${check}</td></tr>`;
+  }).join('');
+  const fmt = escapeHtml(res.format);
+  const excludedNote = res.floors.some(f => f.kind === 'excluded')
+    ? `<li>Rooms ${fmt} leaves out of floor area (garages, unheated rooms) come in as their own areas, sized to the excluded area it states; their exterior walls go with them, shared walls stay with the house. Check each one's area type.</li>` : '';
+  const placeNote = res.floors.some(f => f.placement !== 'reference')
+    ? `<li>Each floor is turned and slid to sit over the main floor. Where that is not clear-cut (a suite shorter than the garage under it, a floor scanned separately) it says <b>check position</b>; move it with Fence if needed.</li>` : '';
+  div.innerHTML = `
+    <h3>Import ${escapeHtml(res.format)} plan: ${escapeHtml(fname)}</h3>
+    ${res.address ? `<div class="help" style="margin-bottom:6px;">${escapeHtml(res.address)}</div>` : ''}
+    <div style="overflow-x:auto;"><table class="pdfimp-table" style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead><tr style="text-align:left; color:#555;"><th></th>${multi ? '<th>Building</th>' : ''}<th>Floor in PDF</th><th>Floor</th><th>Area type</th><th style="text-align:right;">Traced</th><th style="text-align:right;">${escapeHtml(res.format)} says</th><th>Check</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    ${res.floors.some(f => f.kind === 'floor' && f.floor === 'basement') && res.floors.some(f => f.kind === 'floor' && f.floor === 'main') ? `
+    <label style="display:flex; gap:6px; align-items:flex-start; margin-top:8px; font-size:13px;"><input type="checkbox" id="pdfimp-bm-main" style="margin-top:2px;">
+      <span><b>Basement: use the main floor's outline</b> instead of the scanned one &mdash; when the foundation you can see lines up with the walls above.
+      A scanner sees a basement only from inside and estimates its outside face. (Also later: Basement panel &rarr; <i>Match basement to main floor</i>.)</span></label>` : ''}
+    <ul class="help" style="margin:10px 0 0; padding-left:18px;">
+      ${excludedNote}
+      ${placeNote}
+      <li>Decks, porches and patios are traced from the outline around their label; one without a closed outline is listed below to draw by hand.</li>
+      ${(res.warnings || []).map(w => `<li style="color:#c05621;">${escapeHtml(w)}</li>`).join('')}
+    </ul>
+    <div class="modal-buttons">
+      <button id="pdfimp-cancel">Cancel</button>
+      <button class="primary" id="pdfimp-go">Import</button>
+    </div>`;
+  m.appendChild(div);
+  div.querySelector('#pdfimp-cancel').addEventListener('click', closeModal);
+  div.querySelector('#pdfimp-go').addEventListener('click', async () => {
+    const picked = res.floors.map((f, i) => ({
+      f, on: div.querySelector('#pdfimp-on-' + i).checked,
+      floor: div.querySelector('#pdfimp-floor-' + i).value,
+      type: div.querySelector('#pdfimp-type-' + i).value,
+    })).filter(r => r.on);
+    if (!picked.length) { alert('Tick at least one floor to import.'); return; }
+    const bmMain = !!(div.querySelector('#pdfimp-bm-main') || {}).checked;
+    closeModal();
+    const firstNew = state.nextShapeId;
+    const d = pdfImportToSketch(res, picked);
+    const oneBuilding = new Set(d.shapes.map(sh => sh.building)).size === 1;
+    if (!state.shapes.length && oneBuilding) addFileToProject(d, { [DEFAULT_BUILDING]: DEFAULT_BUILDING }, false);
+    else if (!(await openAddFileModal(d, fname, ''))) return;
+    if (!(state.subject || '').trim() && d.subject) {
+      state.subject = d.subject;
+      const subjInp = document.getElementById('subject-input'); if (subjInp) subjInp.value = d.subject;
+    }
+    if (bmMain) [...new Set(state.shapes.filter(sh => sh.id >= firstNew).map(sh => sh.building || DEFAULT_BUILDING))].forEach(b => { if (basementFoundationShapes(b).length && mainLivingShapes(b).length) matchBasementToMain(b, true); });
+    const main = picked.find(r => r.floor === 'main');
+    setActiveFloor(main ? 'main' : picked[0].floor);
+  });
+}
+// Traced floors -> a sketch object addFileToProject can merge (walls with labels,
+// each building moved near the origin and set beside the previous one, basement
+// area taken from the traced basement). One-building files use the default name.
+function pdfImportToSketch(res, picked) {
+  const names = [...new Set(picked.map(r => r.f.building || ''))];
+  const nameOf = r => names.length > 1 ? (r.f.building || DEFAULT_BUILDING) : DEFAULT_BUILDING;
+  const shapes = [];
+  let nextX = 0;
+  names.forEach(n => {
+    const group = picked.filter(r => (r.f.building || '') === n);
+    const all = group.flatMap(r => r.f.points);   // floors arrive already stacked
+    const ox = Math.min(...all.map(p => p.x)), oy = Math.min(...all.map(p => p.y));
+    const w = Math.max(...all.map(p => p.x)) - ox;
+    group.forEach(r => {
+      const pts = r.f.points.map(p => ({ x: +(p.x - ox + nextX).toFixed(4), y: +(p.y - oy).toFixed(4) }));
+      const sh = { id: 0, label: r.f.title, type: r.type, floor: r.floor, building: nameOf(r),
+                   points: [...pts, { ...pts[0] }], segments: [] };
+      rebuildSegments(sh);
+      Object.defineProperty(sh, 'importKind', { value: r.f.kind, enumerable: false });   // not saved
+      shapes.push(sh);
+    });
+    nextX += w + 20;
+  });
+  const d = { shapes, floors: [...new Set(picked.map(r => r.floor))], subject: res.address || '', basements: {} };
+  [...new Set(shapes.map(sh => sh.building))].forEach(b => {
+    const bs = shapes.filter(sh => sh.building === b && sh.floor === 'basement' && sh.importKind === 'floor');
+    if (bs.length) d.basements[b] = { areaOverride: Math.round(bs.reduce((a, sh) => a + shapeArea(sh), 0)), pctFinished: 100 };
+  });
+  return d;
+}
+
 function newProject() {
   const hasWork = state.shapes.length || state.segments.length || state.annotations.length || (state.subject || '').trim();
   if (hasWork) {
@@ -5139,6 +5742,8 @@ window.addEventListener('keydown', (e) => {
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   if (document.getElementById('modal-host')?.childElementCount) return;   // a dialog owns the keyboard; never pull typing into the walk box
   const mod = e.ctrlKey || e.metaKey;
+  if (!mod && !e.altKey && (e.key === 'm' || e.key === 'M') && !galleryActive()) { e.preventDefault(); toggleMeasure(); return; }
+  if (e.key === 'F1' || (!mod && !e.altKey && e.key === '?')) { e.preventDefault(); openHelp(); return; }
   // Walk mode: a printable key with nothing focused starts typing in the segment box.
   if (!mod && !e.altKey && state.mode === 'walk' && e.key.length === 1 && !galleryActive()) {
     const cmd = document.getElementById('cmd');
@@ -5149,7 +5754,7 @@ window.addEventListener('keydown', (e) => {
   if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undoHistory(); }
   else if (mod && !e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); saveJSON(); }
   else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoHistory(); }
-  else if (e.key === 'Escape' && state.offsetPick) { cancelOffsetPick(); }
+  else if (e.key === 'Escape' && state.offsetPick) { if (state.offsetPick.first) { state.offsetPick.first = null; render(); } else cancelOffsetPick(); }
   else if (e.key === 'Escape' && state.shapeMovePick) { cancelShapeMovePick(); }
   else if (e.key === 'Escape' && state.mode === 'edit' && state.selection) { state.selection = null; render(); }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && state.mode === 'fence' && state.fenceSelection) { e.preventDefault(); deleteFenced(); }
@@ -5167,6 +5772,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 autoRestoreSession();   // silently reopen the last session before the first paint
+if (helpPrefs().pinned && helpPrefs().open) openHelp();   // a pinned Help panel comes back with the app
 restoreFileHandle();    // pick the autosave file back up (or offer to resume it)
 render();
 setTimeout(focusWalkInput, 0);

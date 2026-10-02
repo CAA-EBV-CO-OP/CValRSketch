@@ -1,11 +1,11 @@
 // CValRSketch service worker — offline-first cache of the single-file app.
 // Bumping CACHE_NAME forces a fresh fetch + cache rebuild on next install.
-const CACHE_NAME = 'cvalrsketch-v0.33.0';
+const CACHE_NAME = 'cvalrsketch-v0.40.0';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './core.js?v=0.33.0',
-  './dictation.js?v=0.33.0',
+  './core.js?v=0.40.0',
+  './dictation.js?v=0.40.0',
   './manifest.webmanifest',
   './icon.svg',
   './icon-192.png',
@@ -37,10 +37,45 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Pages are network-first: online users get a new release on the first load
+// instead of one load late (cache-first served the previous index.html until a
+// second reload). A slow connection falls back to the cached page after a few
+// seconds, and the fresh copy still lands in the cache for next time.
+// Everything else stays cache-first: core.js / dictation.js / pdf-import.mjs
+// carry ?v=<version>, and a CACHE_NAME bump clears the rest.
+const PAGE_TIMEOUT_MS = 4000;
+
+function isPage(request) {
+  return request.mode === 'navigate' || request.destination === 'document';
+}
+
+function networkFirstPage(request) {
+  const cache = caches.open(CACHE_NAME);
+  // A navigate-mode Request can't be re-issued with options, so fetch by URL;
+  // no-cache makes the browser revalidate instead of reusing its own HTTP copy.
+  const network = fetch(request.url, { cache: 'no-cache', credentials: 'same-origin' })
+    .then((resp) => {
+      if (resp && resp.ok) {
+        const clone = resp.clone();
+        cache.then((c) => c.put(request, clone));
+      }
+      return resp;
+    });
+  const timeout = new Promise((resolve) => setTimeout(resolve, PAGE_TIMEOUT_MS));
+  const shell = new URL(request.url).pathname.includes('/m/') ? './m/index.html' : './index.html';
+  const fromCache = () => caches.match(request, { ignoreSearch: true }).then((hit) => hit || caches.match(shell));
+  return Promise.race([network.catch(() => null), timeout])
+    .then((resp) => resp || fromCache().then((hit) => hit || network));
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== location.origin) return;
+  if (isPage(event.request)) {
+    event.respondWith(networkFirstPage(event.request));
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;

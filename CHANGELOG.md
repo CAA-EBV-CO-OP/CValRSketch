@@ -14,16 +14,124 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [0.33.0] — 2026-09-29
+## [0.40.0] — 2026-10-02
 
 ### Added
-- **Trace over a scanned plan.** A new **Image** mode loads a scan or photo of a floor plan, positions it by dragging, and sets it to scale: click two points a known distance apart and type that distance. The image draws beneath the sketch so the perimeter can be walked straight over it.
-- **Fade**, **Lock it in place**, and a per-floor assignment, so a two-storey job can carry a different scan on each floor.
-- **Show on top of the drawing** flips the image above the sketch, which is how you check a finished trace: a completed shape's fill is opaque and hides the scan under it.
+- **Help points at the real controls.** Each Help section starts with a row of action links — *▶ Fence*, *📏 Measure*, *⌨ Segment box*, *🧭 Compass*, *📐 Import PDF…*, *🖨 Export / Preview*, *Basement panel* and so on (24 in all). Hovering one outlines the actual control wherever it sits — toolbar, floor bar or sidebar, scrolling the sidebar to it if needed. Clicking one does what that control does (switch mode, start Measure, open Import, put the cursor in the segment box) and flashes it, so the reader learns where it lives and may not need Help next time. Controls that are only pointed at — a list, a panel, the compass — are outlined and scrolled to. A control that is not on screen yet (the Basement panel before there is a building) says so on the link.
+- Nothing that discards work — New, Delete floor — is run from Help.
+
+---
+
+## [0.39.1] — 2026-10-02
 
 ### Changed
-- The image is stored in the project file as a downscaled JPEG (longest side capped at 2200 px), so a saved sketch travels with the plan it was traced from. It is tagged `ui-overlay`, so it never reaches an SVG or PNG export.
-- The underlay is deliberately left out of `snapshotState()`: undo should not churn a few hundred KB per step, and leaving it out means undo and redo pass over the image untouched. It is also absent from the localStorage crash-recovery slot, which would otherwise blow its quota — a saved project file carries it, a crash recovery does not.
+- **The Help pin does something you can see.** Before, pinning only made Help reopen with the app — during a session it behaved the same either way. Now an **unpinned** Help is a read-then-go reference: it closes as soon as you start working (a click in the drawing, or any change to the sketch — a wall added, a shape edited). A **pinned** Help stays open while you draw, its title reads *Help · pinned*, and it reopens with the app. It floats either way (docking it beside the sidebar was considered and dropped: too crowded next to the drawing).
+
+---
+
+## [0.39.0] — 2026-10-02
+
+### Changed
+- **Help shows only what you pick.** The topic chips are now switches: each one shows or hides its section, so the panel holds just what you need (say Walk + Keyboard while sketching). **Follow** (on by default) adds the section for what you are doing now and swaps it as you change mode or tool; it is drawn dashed so it is clear it came from Follow, not from your picks. **All** shows every section; click it again to clear. With nothing picked and Follow off, Help says so. Your picks are remembered with the panel's position and size.
+
+### Fixed
+- A Help panel resized while its tab was in the background could save a collapsed size and reopen as a thin strip. Only a size set while the page is visible is kept, and a saved size is never smaller than the panel's minimum.
+
+---
+
+## [0.38.0] — 2026-10-02
+
+### Added
+- **Help follows what you are doing.** It opens at the section for the current mode (Walk, Edit, Split, Fence, Text) or tool (Measure), marks it, and moves with you as you switch — so a pinned Help panel always shows the part that applies.
+- **Help covers the whole app**: sections for every mode, Measure, floors and buildings, the basement (including *Match to main floor outline*), PDF import, export and saving, and a keyboard-shortcut list taken from the shortcuts the app actually has. A row of topic chips at the top jumps between them.
+- **F1 or ? opens and closes Help** (when you are not typing in a box).
+
+---
+
+## [0.37.1] — 2026-10-02
+
+### Changed
+- **Help floats instead of popping up.** It opened as a window over the middle of the drawing that had to be closed before drawing and reopened to read again. It is now a panel that stays open while you draw (the canvas and keyboard work underneath it), drags by its title bar, resizes from its corner, and remembers its position and size. **📌** pins it: a pinned Help reopens with the app. The ❓ Help button toggles it. Position and pin are kept in this browser only, not in the sketch.
+
+---
+
+## [0.37.0] — 2026-10-02
+
+### Added
+- **❓ Help** in the top bar opens a reference window: typing a wall (lengths, directions, turn angles, batch entry, diagonals from parts), the compass, start point and offset, snap-to-vertex and pen-jump, closing, and a line on each of the other tools.
+
+### Changed
+- **The Walk sidebar keeps to the drawing in hand.** The Format card and the long hints under *Start point* and *New segment* moved into Help; in their place is a one-line example (`16'4 u` · `10 r 45` · `16'4 u, 26'9 r`) with a *Syntax & shortcuts* link. *Current Shape* appears only once a wall has been typed. Measurements, Areas, Basement and Totals now sit in view instead of below the fold.
+
+---
+
+## [0.36.1] — 2026-10-01
+
+### Added
+- **Basement from the main floor at import.** When a PDF has both a main floor and a basement, the import dialog offers *Basement: use the main floor's outline* — the same as *Match basement to main floor* afterwards, applied only to the buildings coming in from that PDF.
+- **The basement match where you work on the basement.** On the basement floor tab in Edit mode, and whenever a basement area is selected, the Edit panel shows the basement outline against the main floor ("basement outline 1648 sf · main floor 1716 sf (−68 sf)") with a *Match to main floor outline* button. It edits the drawing — the basement shape becomes a copy of the main-floor outline — not just the total; Undo restores it. Previously it lived only in the Basement panel at the bottom of the sidebar.
+
+### Fixed
+- **Overlapping area labels.** Another floor's faded label (a basement under the main floor, a suite over the garage) printed on top of the active floor's label when their centres coincided. It now steps down until it clears.
+- **The import dialog side-scrolled** on a typical laptop screen; it is wider, its pickers narrower, and the floor names wrap, so the table fits.
+
+---
+
+## [0.36.0] — 2026-10-01
+
+### Added
+- **Match basement to main floor.** The Basement panel shows each building's drawn basement area against its main-floor footprint ("Basement drawn: 1648 sf · main floor: 1716 sf (−68 sf)") and offers *Match basement to main floor*, which replaces the basement outline (finished/unfinished areas on the basement floor) with a copy of the main floor's enclosed-living outline, keeping the old area type and label, and sets the basement area back to auto. Decks, patios and other areas on the basement floor are left alone; Undo restores the old outline. For the common case where the appraiser has verified the above-grade walls and the exposed part of the foundation agrees with them, but a traced basement outline — an iGUIDE scan taken from inside, where the outside face of the foundation is inferred — does not.
+
+---
+
+## [0.35.0] — 2026-10-01
+
+### Added
+- **Excluded rooms come in as their own areas.** White rooms enclosed inside a floor (iGUIDE's excluded rooms — garage, unheated sun room, utility) are found, and the combination whose total matches the excluded area the PDF states is cut off from the floor. Each is named from the label printed inside it and typed from that name (Garage → Garage; Sun Room / Porch → Open covered porch; anything else → Misc). A room's exterior walls go with it; walls it shares with the house stay with the house — the usual appraisal convention, which credits the house slightly less than iGUIDE does (Eagle Bay: 1,725 sf vs iGUIDE's 1,741). When no combination of white rooms comes within 6% of the stated figure, the floor is left whole with a note.
+- **Decks, porches, patios and balconies are traced** from the closed thin outline around their label. A label without a closed outline is listed in the dialog to draw by hand.
+- **Floors are stacked.** Each floor page is turned so its walls run the way the main floor's do, at whichever quarter turn its compass agrees with (or, for a floor scanned separately with its own north, whichever lands its walls best), then slid until its walls land on the main floor's walls. Placements that are a judgment call — a suite shorter than the garage under it, a turn the compass does not confirm — are flagged *check position*.
+- **Neighbouring shapes share their corners.** Floor, excluded rooms and outdoor areas are traced separately, so where they meet their corners used to land a few inches apart, leaving clusters of dots and 4–6" zigzag edges. Corners of neighbouring shapes within 9" now become one shared corner (placed where the floor had it), and no edge shorter than 3" survives.
+- The import dialog shows, per row, whether it is a floor, an excluded room or an outdoor area, how it was turned and placed, and on the floor row the excluded rooms' traced total against the stated one.
+
+### Changed
+- The basement area set on import counts only the basement floor itself, not a patio traced on the basement page.
+
+Tested on the same six iGUIDE PDFs as 0.34.0: excluded rooms were split on every traced floor that states an excluded area (10 floors), their traced total 1–14% above the stated figure because they also take their exterior walls; five of seven lower levels line up under their main floor without a flag; five placements are flagged *check position* (two suites over garages, a carriage-house lower level, and a cabin's upstairs and basement).
+
+---
+
+## [0.34.1] — 2026-10-01
+
+### Fixed
+- **A new release showed up only after a second reload.** The service worker answered page loads from its cache first and refreshed it in the background, so the first visit after a release (0.33.0 and 0.34.0 included) still showed the previous version. Pages are now fetched network-first, revalidating past the browser's own HTTP cache; the cached copy is used when offline or when the network takes more than 4 seconds (weak field signal), and the fresh page still lands in the cache. Scripts and other assets stay cache-first: they are versioned (`?v=`) or cleared by the cache-name bump. Offline, the mobile page falls back to the mobile shell rather than the desktop one.
+
+---
+
+## [0.34.0] — 2026-10-01
+
+### Added
+- **Import a floor-plan PDF.** *📐 Import PDF…* reads an **iGUIDE** floor-plan PDF and creates one shape per floor. The outline comes from the PDF's own vector drawing: every non-white filled path is painted into a ~1/4"-per-pixel bitmap, the region the page edge cannot reach is the footprint, and its traced outline is simplified and each wall re-fitted to the traced pixels so corners land where the drawn walls meet. On the plans tested (six iGUIDE PDFs, 18 floors) traced areas were within 1% of iGUIDE's stated exterior + excluded area on all but three floors (worst 2.7%, from post stubs iGUIDE leaves out), and on the plan checked point by point every corner was within about half an inch of an exact vector trace.
+- An import dialog lists every floor found with its page, a floor and area-type picker, the traced area beside the area iGUIDE states, and a ✓ / ⚠ check (1% threshold). Floor titles pick the tab (Basement → basement / finished, Upstairs / 2nd / Above … → upper, Main / Ground → main).
+- Multi-building iGUIDE files (e.g. a house plus a carriage house) come in as separate buildings, named from iGUIDE's overview pages and set side by side; the usual *Add file* naming dialog appears when there is more than one building or the sketch already has work in it.
+- The basement area is taken from the traced basement rather than the main-floor footprint (which, straight after import, still includes the garage).
+- Floor-plan formats are *format profiles* in `pdf-import.mjs`; iGUIDE is the first. A PDF from an unknown format says so instead of importing nonsense.
+
+### Notes
+- Rooms iGUIDE excludes from floor area (garages, unheated sun rooms) are inside the traced outline — use **Split** to cut them off. Decks, porches and patios are not traced. Floors are placed where each page draws them; iGUIDE does not line floors up across pages, so check how they stack.
+- A floor whose walls are open on one side (a loft open to below) has no closed outline and is skipped with a note.
+- Privacy: the PDF is read in the browser and never uploaded. Import needs a served page (the hosted app or a local web server); a page opened from disk, or a saved app copy, explains this instead.
+- Third-party: Mozilla PDF.js 6.3.289 (Apache-2.0), legacy build, vendored unmodified in `vendor/pdfjs/` and loaded only when a PDF is imported; documents are opened with `isEvalSupported: false`.
+
+---
+
+## [0.33.0] — 2026-10-01
+
+### Added
+- **Measure anywhere.** A **📏 Measure** button in the toolbar (or press **M**) arms the measuring tool: click any two points and a labeled measurement drops between them. Points snap to the nearest corner, then to the nearest straight wall, and otherwise land exactly where you click; hold **Alt** for a free point, **Shift** to keep the line level or plumb from the first point. A live line and length follow the pointer after the first click, with a cue showing what it will snap to (square = corner, diamond = wall). The tool stays on for the next measurement; **Esc** drops a half-made one, a second **Esc** (or *Done measuring*) turns it off.
+
+### Changed
+- The old *Measure offset* tool (vertex-only, one measurement per click of the button) is replaced by the above; clicks while measuring no longer select or edit what is under them.
+- **Measurements belong to a floor.** New ones are drawn, listed, fenced and exported only on the floor they were made on, and follow floor renames and deletes. Measurements in older files have no floor and still show on every floor.
 
 ---
 
@@ -626,7 +734,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   1. **`window.showSaveFilePicker`** (desktop Chrome / Edge / Opera / Brave) — a real native **Save As** dialog with folder navigation and a Create New Folder button. The browser remembers the last folder you saved to *for this app + file type*, so the second save defaults there automatically. `startIn: 'documents'` is the initial hint before the first save.
   2. **`navigator.share({files})`** (iOS Safari 15+, Android Chrome) — the system share sheet, which includes **Save to Files** so you can navigate to any folder, including creating new ones.
   3. **Direct download fallback** — for Firefox / older browsers / unsupported MIME types, behaviour is unchanged (file lands in the browser's default Downloads folder).
-- Export filenames now derive from the **Subject** (sanitized: non-word characters replaced with `_`) instead of being hardcoded to `sketch.svg` / `sketch.png` / `sketch.json`. So `295 Browns Rd, Nakusp` saves as `295_Browns_Rd__Nakusp.svg`.
+- Export filenames now derive from the **Subject** (sanitized: non-word characters replaced with `_`) instead of being hardcoded to `sketch.svg` / `sketch.png` / `sketch.json`. So `123 Sample Rd, Anytown` saves as `123_Sample_Rd__Anytown.svg`.
 
 ### Notes
 - **Browsers don't let web apps set a default folder programmatically.** The two APIs above are the closest available: they let the user navigate and create folders themselves, with `showSaveFilePicker` remembering the last location across sessions.
