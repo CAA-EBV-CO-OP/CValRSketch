@@ -1,30 +1,39 @@
 # CValRSketch
 
-**Floor plan sketching for residential appraisal that runs entirely in the browser.** Use it offline from a local download or host it yourself; your sketches never leave your machine.
-Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
+**Free, open-source floor-plan sketching for residential appraisers.** Sketch by typing or speaking wall lengths, or import an iGUIDE PDF; get GLA and below-grade totals and print-ready sketches. Everything runs in your browser — your sketches never leave your machine.
 
-**Version:** 0.40.0 (2026-10-02)
-**License:** [AGPL-3.0](./LICENSE)
-**Repo:** https://github.com/CAA-EBV-CO-OP/CValRSketch
-**Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
+**▶ Use it now:** [Desktop](https://caa-ebv-co-op.github.io/CValRSketch/) · [Phone](https://caa-ebv-co-op.github.io/CValRSketch/m/) · [Download the latest release](https://github.com/CAA-EBV-CO-OP/CValRSketch/releases/latest)
+
+<!-- Screenshot: docs/screenshot.png — the sample house (docs/sample-house.json) open in the desktop app. -->
+
+**Version:** 0.40.0 (2026-10-02) · **License:** [AGPL-3.0](./LICENSE) · **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
+
+Want a new feature? [Request it](https://github.com/CAA-EBV-CO-OP/CValRSketch/issues), or build it yourself — see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ---
 
 ## Overview
 
-Create a sketch with simple distance and direction into the tool to produce a clean drawing with area totals. CValRSketch is a single self-contained HTML file that handles this step: enter measurements directly, review the resulting polygon, label areas, and export a print-ready sketch.
+Walk the perimeter by entering distances and directions — typed, spoken, or clicked on a compass — and the app draws the plan, labels every wall, totals the areas above and below grade, and exports a print-ready sketch. Or start from an iGUIDE floor-plan PDF and let it trace every floor for you.
 
-The file requires no installation, no server, and no account. Sketches are saved and loaded as JSON files on the local machine. **Save app copy** (header) writes a frozen, self-contained HTML of the running version — keep it in the job folder beside the sketch so the sketch reopens the same way years later (works from a served copy such as osasi.org; a copy opened from disk cannot read its own source).
+It needs no installation, no server and no account: a static web page with plain HTML, CSS and JavaScript and no build step. Sketches are saved and loaded as JSON files on the local machine. **Save app copy** (header) writes a frozen, self-contained HTML of the running version — keep it in the job folder beside the sketch so the sketch reopens the same way years later (works from a served copy such as osasi.org; a copy opened from disk cannot read its own source).
 
 Developed for the CAA-EBV-CO-OP community as part of [OSASI](https://osasi.org), the Open Source Appraisal Software Initiative — a co-operative of real estate appraisers building shared, open tools that run entirely in the browser.
+
+### Why CValRSketch
+
+CValRSketch began as a stop-gap when the desktop sketch software many of us relied on fell behind on support. It grew into a full sketching tool built by appraisers, for appraisers: quick to learn, free to use, and open, so it keeps working and keeps improving no matter what happens to any one vendor.
+
+To try it with something already drawn, load [`docs/sample-house.json`](./docs/sample-house.json) (a made-up house) with **Load** in the app.
 
 ---
 
 ## Quick Start
 
 ### Desktop (Chrome / Edge / Firefox / Safari)
-1. Clone or download this repo.
-2. Open `index.html` in any modern browser (Chrome, Edge, Firefox, Safari).
+- **Online:** open **https://caa-ebv-co-op.github.io/CValRSketch/** — nothing to install; it also works offline once loaded.
+- **Your own copy:** download the [latest release](https://github.com/CAA-EBV-CO-OP/CValRSketch/releases/latest) (or clone this repo) and open `index.html`. Everything works from disk except **Import PDF**, which needs the page served: run `python -m http.server` in the folder and open `http://localhost:8000/`.
+- Press **F1** (or **❓ Help**) in the app for a guide that follows whatever you are doing.
 
 ### Mobile (iPhone / Android) — touch-first version
 
@@ -47,7 +56,7 @@ If you specifically want the desktop UI on your phone (with its three-column lay
 
 Service workers do not run on `file://`, so PWA install requires hosting. For local testing, run any static server (e.g. `python -m http.server` in the repo folder) and open `http://localhost:8000/`.
 
-The file is fully self-contained: HTML + inline CSS + vanilla JavaScript. No external dependencies, no network calls.
+Everything runs in the browser: plain HTML, CSS and vanilla JavaScript, nothing sent anywhere. The one third-party library, Mozilla PDF.js (Apache-2.0), is kept in `vendor/pdfjs/` and loaded only when you import a PDF.
 
 ---
 
@@ -109,6 +118,15 @@ The file is fully self-contained: HTML + inline CSS + vanilla JavaScript. No ext
 - Runs on your computer: the PDF is never uploaded. Needs the hosted app (or any local web server); a page opened straight from disk cannot load the PDF reader
 - New formats are added as *format profiles* in `pdf-import.mjs`
 
+### Basement and buildings
+- Basement panel: below-grade area and % finished per building; the area follows the main floor unless you type one
+- **Match basement to main floor** — replace a scanned or walked basement outline with the main floor's (at import, in Edit on the basement tab, or in the Basement panel)
+- Named buildings (house, cabin, shop…) in one file, with an *All* gallery; **Add files…** merges sketches as buildings
+
+### Help
+- **❓ Help** (or `F1` / `?`) — a floating panel that follows the mode or tool you are using; pick the topics you want shown; pin it to keep it open while you draw
+- Action links in Help outline the real button and use it, so you learn where everything lives
+
 ### Other
 - Undo / Redo (`Ctrl+Z` / `Ctrl+Y`)
 - Save / Load as JSON
@@ -120,9 +138,9 @@ The file is fully self-contained: HTML + inline CSS + vanilla JavaScript. No ext
 ## Notes
 
 - Runs entirely client-side. No data is transmitted externally.
-- All code is in a single file (`index.html`, redirected from the legacy `sketch_walker.html`). No build pipeline.
+- No build pipeline: `index.html` (desktop), `m/index.html` (phone), `core.js` (shared logic), `pdf-import.mjs` (PDF import, loaded on demand). The legacy `sketch_walker.html` redirects.
 - Tested in Chromium-based browsers and Firefox. Safari is expected to work but is less tested.
-- Touch/pinch-zoom gestures are not yet implemented.
+- On touch devices use the phone page (`m/`); the desktop page has no touch gestures.
 - Third-party code: PDF import uses Mozilla [PDF.js](https://github.com/mozilla/pdf.js) (Apache-2.0), vendored unmodified in `vendor/pdfjs/` and loaded only when a PDF is imported.
 
 ---
