@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.41.1"></script>
-<script src="dictation.js?v=0.41.1"></script>
+<script src="core.js?v=0.41.2"></script>
+<script src="dictation.js?v=0.41.2"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -229,7 +229,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.41.1</span>
+  <span class="version-chip" id="app-version">v0.41.2</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -2034,6 +2034,9 @@ function renderUnderlay(W, layer) {
     opacity: u.opacity, preserveAspectRatio: 'none', class: 'ui-overlay',
   });
   img.setAttribute('href', u.src);
+  // Outside Image mode the scan must not catch clicks: Walk's start point, Text's
+  // labels and the floor menu all act on a click that reaches the bare canvas.
+  if (state.mode !== 'underlay') img.style.pointerEvents = 'none';
   if (state.mode === 'underlay' && !u.locked) {
     img.style.cursor = 'move';
     img.addEventListener('mousedown', underlayDragStart);
@@ -4254,6 +4257,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.41.2', '2026-10-02', 'Fixed: with a traced-over image loaded, clicking on it in Walk mode now sets the start point (the image used to swallow the click). Text labels and the floor menu work over it too.'],
   ['0.41.1', '2026-10-02', 'Calibrating a traced-over image now shows that it worked: a Scale set confirmation with the new width, and the line you calibrated on stays on screen in magenta with its length. Before, the picture looked unchanged because the view refits to it.'],
   ['0.41.0', '2026-10-02', 'Trace over a scan: the new Image tab lays a scanned or photographed floor plan under the drawing. Set it to scale by clicking two points a known distance apart (the printed scale bar is best), fade or lock it, keep it to one floor, then walk the perimeter straight over it. Show it on top to check a finished trace. The image is saved in the sketch file and never appears in an export.'],
   ['0.40.0', '2026-10-02', 'Help points at the real controls: each section has action links - hover one and the button it means is outlined wherever it sits (toolbar, floor bar or sidebar); click it and Help does what the button does and flashes it, so you learn where it lives. Nothing that discards work is run from Help.'],
