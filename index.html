@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.39.0"></script>
-<script src="dictation.js?v=0.39.0"></script>
+<script src="core.js?v=0.39.1"></script>
+<script src="dictation.js?v=0.39.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -45,6 +45,7 @@
   .help-bar button:hover { background: #5a7388; }
   .help-bar .help-pin { opacity: .55; }
   .help-bar .help-pin.on { opacity: 1; background: #d97706; }
+  .help-pinned-tag { font-size: 11px; color: #f6c27a; margin-left: 4px; }
   .help-body { flex: 1; overflow-y: auto; padding: 4px 12px 10px; }
   .help-body h4 { margin: 12px 0 4px; font-size: 13px; color: #2b3a4a; }
   .help-nav { position: sticky; top: 0; z-index: 1; background: #fff; display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0; border-bottom: 1px solid #e3e8ee; }
@@ -221,7 +222,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.39.0</span>
+  <span class="version-chip" id="app-version">v0.39.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -563,6 +564,7 @@ async function idbGet(key) {
 // waving it off sticks for the walk in hand but not past the next change.
 let editTick = 0;
 function pushUndo() {
+  closeUnpinnedHelp();
   editTick++;
   state.undoStack.push(snapshotState());
   if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
@@ -3789,6 +3791,7 @@ svg.addEventListener('mousemove', (e) => {
 svg.addEventListener('mouseleave', () => {
   if (state.offsetPick && state.offsetPick.hover) { state.offsetPick.hover = null; render(); }
 });
+svg.addEventListener('pointerdown', closeUnpinnedHelp, true);
 svg.addEventListener('mousedown', fenceMouseDown);
 window.addEventListener('mousemove', fenceMouseMove);
 window.addEventListener('mouseup', fenceMouseUp);
@@ -4029,6 +4032,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.39.1', '2026-10-02', 'The Help pin now does something you can see: unpinned, Help closes as soon as you start working (a click in the drawing or any change); pinned, it stays open while you draw, says pinned in its title, and opens with the app.'],
   ['0.39.0', '2026-10-02', 'Help shows only what you pick: each topic chip switches its section on or off, Follow adds the section for what you are doing now, and All shows everything. Your picks are remembered.'],
   ['0.38.0', '2026-10-02', 'Help follows what you are doing: it opens at the section for your current mode or tool and moves with you as you switch, with sections for every tool, floors and buildings, the basement, PDF import, export and saving, and a keyboard list; topic chips jump between them, and F1 or ? opens and closes it.'],
   ['0.37.1', '2026-10-02', 'Help is now a floating panel instead of a pop-up: it stays open while you draw, drags by its title bar, resizes from its corner and remembers where you left it; pin it and it opens with the app.'],
@@ -4206,9 +4210,9 @@ function openHelp() {
   el.style.top = Math.max(8, Math.min(pr.y ?? (window.innerHeight - h - 16), window.innerHeight - 60)) + 'px';
   el.innerHTML = `
     <div class="help-bar" title="Drag to move">
-      <b>❓ Help</b>
+      <b>❓ Help</b><span class="help-pinned-tag"${pr.pinned ? '' : ' hidden'}>· pinned</span>
       <span style="flex:1;"></span>
-      <button type="button" class="help-pin${pr.pinned ? ' on' : ''}" title="Pin: keep Help open, also the next time you open the app">📌</button>
+      <button type="button" class="help-pin${pr.pinned ? ' on' : ''}" title="${pr.pinned ? 'Pinned: stays open while you work, and opens with the app. Click to unpin' : 'Pin: keep Help open while you work (unpinned it closes when you start drawing), and open it with the app'}">📌</button>
       <button type="button" class="help-x" title="Close (the ❓ Help button opens it again)">✕</button>
     </div>
     <div class="help-body">
@@ -4274,6 +4278,9 @@ function openHelp() {
     const on = !helpPrefs().pinned;
     saveHelpPrefs({ pinned: on });
     ev.currentTarget.classList.toggle('on', on);
+    ev.currentTarget.title = on ? 'Pinned: stays open while you work, and opens with the app. Click to unpin'
+      : 'Pin: keep Help open while you work (unpinned it closes when you start drawing), and open it with the app';
+    el.querySelector('.help-pinned-tag').hidden = !on;
   });
   const bar = el.querySelector('.help-bar');
   bar.addEventListener('mousedown', ev => {
@@ -4298,6 +4305,11 @@ function openHelp() {
     }, 250); }).observe(el);
   }
   saveHelpPrefs({ open: true });
+}
+// Unpinned, Help is a read-then-go reference: it closes once you start working —
+// a click in the drawing or any change to the sketch. Pinned, it stays.
+function closeUnpinnedHelp() {
+  if (document.getElementById('help-panel') && !helpPrefs().pinned) closeHelp();
 }
 function closeHelp() {
   const el = document.getElementById('help-panel');

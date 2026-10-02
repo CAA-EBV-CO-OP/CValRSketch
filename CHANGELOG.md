@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.39.1] — 2026-10-02
+
+### Changed
+- **The Help pin does something you can see.** Before, pinning only made Help reopen with the app — during a session it behaved the same either way. Now an **unpinned** Help is a read-then-go reference: it closes as soon as you start working (a click in the drawing, or any change to the sketch — a wall added, a shape edited). A **pinned** Help stays open while you draw, its title reads *Help · pinned*, and it reopens with the app. It floats either way (docking it beside the sidebar was considered and dropped: too crowded next to the drawing).
+
+---
+
 ## [0.39.0] — 2026-10-02
 
 ### Changed
