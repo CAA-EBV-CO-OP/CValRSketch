@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.42.0"></script>
-<script src="dictation.js?v=0.42.0"></script>
+<script src="core.js?v=0.42.1"></script>
+<script src="dictation.js?v=0.42.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -229,7 +229,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.42.0</span>
+  <span class="version-chip" id="app-version">v0.42.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -4015,6 +4015,9 @@ document.querySelectorAll('#mode-tabs button').forEach(b => {
     state.preview = null;
     state.splitPreview = null;
     render();
+    // Image mode with no image has one job: pick one. Open the file picker now,
+    // still inside the click, which browsers require for a file dialog.
+    if (b.dataset.mode === 'underlay' && !state.underlay) pickUnderlayFile();
   });
 });
 
@@ -4388,6 +4391,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.42.1', '2026-10-02', 'Clicking Image with no image loaded opens the file picker straight away - no extra Load image click.'],
   ['0.42.0', '2026-10-02', 'Trace a scan by clicking its corners: once an image is scaled, click the start corner, then each corner in turn - the app works out every wall from the scale, squares walls that are nearly square and rounds to the inch. A magnifier shows the scan around the cursor so you land on the corner, a live line shows the length before you click, Shift keeps a wall level or plumb, and clicking the start closes the shape.'],
   ['0.41.2', '2026-10-02', 'Fixed: with a traced-over image loaded, clicking on it in Walk mode now sets the start point (the image used to swallow the click). Text labels and the floor menu work over it too.'],
   ['0.41.1', '2026-10-02', 'Calibrating a traced-over image now shows that it worked: a Scale set confirmation with the new width, and the line you calibrated on stays on screen in magenta with its length. Before, the picture looked unchanged because the view refits to it.'],
