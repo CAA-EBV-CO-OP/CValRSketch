@@ -14,6 +14,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.39.0] — 2026-10-02
+
+### Changed
+- **Help shows only what you pick.** The topic chips are now switches: each one shows or hides its section, so the panel holds just what you need (say Walk + Keyboard while sketching). **Follow** (on by default) adds the section for what you are doing now and swaps it as you change mode or tool; it is drawn dashed so it is clear it came from Follow, not from your picks. **All** shows every section; click it again to clear. With nothing picked and Follow off, Help says so. Your picks are remembered with the panel's position and size.
+
+### Fixed
+- A Help panel resized while its tab was in the background could save a collapsed size and reopen as a thin strip. Only a size set while the page is visible is kept, and a saved size is never smaller than the panel's minimum.
+
+---
+
 ## [0.38.0] — 2026-10-02
 
 ### Added

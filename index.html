@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.38.0"></script>
-<script src="dictation.js?v=0.38.0"></script>
+<script src="core.js?v=0.39.0"></script>
+<script src="dictation.js?v=0.39.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -50,6 +50,9 @@
   .help-nav { position: sticky; top: 0; z-index: 1; background: #fff; display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0; border-bottom: 1px solid #e3e8ee; }
   .help-nav a { font-size: 11px; padding: 2px 7px; border: 1px solid #c9d3dd; border-radius: 10px; color: #2b3a4a; text-decoration: none; }
   .help-nav a.on { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+  .help-nav a.now { border: 1px dashed #2b6cb0; color: #2b6cb0; }
+  .help-nav a[data-follow].on { background: #2f855a; border-color: #2f855a; }
+  .help-nav a[data-all] { margin-left: auto; }
   .help-body section { border-left: 3px solid transparent; padding-left: 7px; margin-left: -10px; }
   .help-body section.here { border-left-color: #2b6cb0; background: #f5f9fd; }
   .help-body p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
@@ -218,7 +221,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.38.0</span>
+  <span class="version-chip" id="app-version">v0.39.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -4026,6 +4029,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.39.0', '2026-10-02', 'Help shows only what you pick: each topic chip switches its section on or off, Follow adds the section for what you are doing now, and All shows everything. Your picks are remembered.'],
   ['0.38.0', '2026-10-02', 'Help follows what you are doing: it opens at the section for your current mode or tool and moves with you as you switch, with sections for every tool, floors and buildings, the basement, PDF import, export and saving, and a keyboard list; topic chips jump between them, and F1 or ? opens and closes it.'],
   ['0.37.1', '2026-10-02', 'Help is now a floating panel instead of a pop-up: it stays open while you draw, drags by its title bar, resizes from its corner and remembers where you left it; pin it and it opens with the app.'],
   ['0.37.0', '2026-10-02', 'A Help button: the wall-typing reference (lengths, angles, batch entry, snapping, pen-jump) moves out of the Walk sidebar into a Help window, so the sidebar keeps to the drawing in hand - Current Shape appears once you have typed a wall, and Measurements and Areas move up into view.'],
@@ -4142,23 +4146,50 @@ const HELP_TOPICS = [['walk', 'Walk'], ['edit', 'Edit'], ['split', 'Split'], ['f
   ['floors', 'Floors'], ['basement', 'Basement'], ['import', 'Import PDF'], ['export', 'Export & save'], ['keys', 'Keyboard']];
 // The section for what you are doing now: the measure tool, else the mode.
 function helpTopicNow() { return state.offsetPick ? 'measure' : state.mode; }
-// Bring a section to the top of the panel and mark it.
-function showHelpTopic(topic) {
+// Which sections show: the topics the reader switched on, plus — while Follow is
+// on — the one for what they are doing now. Everything else is hidden, so the
+// panel holds only what is needed at the moment. Selection is remembered.
+function helpFilter() {
+  const pr = helpPrefs();
+  return { follow: pr.follow !== false, topics: Array.isArray(pr.topics) ? pr.topics : [] };
+}
+function applyHelpFilter() {
   const el = document.getElementById('help-panel');
   if (!el) return;
-  const sec = el.querySelector(`section[data-topic="${topic}"]`);
-  if (!sec) return;
-  el.querySelectorAll('section.here').forEach(x => x.classList.remove('here'));
-  el.querySelectorAll('.help-nav a').forEach(a => a.classList.toggle('on', a.dataset.help === topic));
-  sec.classList.add('here');
-  const body = el.querySelector('.help-body');
-  body.scrollTop = sec.offsetTop - body.querySelector('.help-nav').offsetHeight - 6;
-  el.dataset.topic = topic;
+  const f = helpFilter(), now = helpTopicNow();
+  const shown = new Set(f.topics);
+  if (f.follow) shown.add(now);
+  el.querySelectorAll('.help-body section').forEach(sec => {
+    sec.hidden = !shown.has(sec.dataset.topic);
+    sec.classList.toggle('here', f.follow && sec.dataset.topic === now);
+  });
+  el.querySelectorAll('.help-nav a[data-help]').forEach(a => {
+    a.classList.toggle('on', f.topics.includes(a.dataset.help));
+    a.classList.toggle('now', f.follow && a.dataset.help === now && !f.topics.includes(a.dataset.help));
+  });
+  const fol = el.querySelector('.help-nav a[data-follow]');
+  fol.classList.toggle('on', f.follow);
+  fol.textContent = f.follow ? `Follow: ${(HELP_TOPICS.find(([k]) => k === now) || [now, now])[1]}` : 'Follow';
+  el.querySelector('.help-nav a[data-all]').classList.toggle('on', f.topics.length === HELP_TOPICS.length);
+  el.querySelector('.help-empty').hidden = shown.size > 0;
+  el.dataset.auto = now;
 }
+function toggleHelpChip(a) {
+  const f = helpFilter();
+  if (a.dataset.follow !== undefined) saveHelpPrefs({ follow: !f.follow });
+  else if (a.dataset.all !== undefined) saveHelpPrefs({ topics: f.topics.length === HELP_TOPICS.length ? [] : HELP_TOPICS.map(([k]) => k) });
+  else {
+    const k = a.dataset.help;
+    saveHelpPrefs({ topics: f.topics.includes(k) ? f.topics.filter(t => t !== k) : [...f.topics, k] });
+  }
+  applyHelpFilter();
+  helpScrollTop();
+}
+function helpScrollTop() { const b = document.querySelector('#help-panel .help-body'); if (b) b.scrollTop = 0; }
 // Called from render(): an open Help follows you into another mode or tool.
 function syncHelpTopic() {
   const el = document.getElementById('help-panel');
-  if (el && el.dataset.auto !== helpTopicNow()) { el.dataset.auto = helpTopicNow(); showHelpTopic(helpTopicNow()); }
+  if (el && el.dataset.auto !== helpTopicNow()) { applyHelpFilter(); helpScrollTop(); }
 }
 function helpPrefs() { try { return JSON.parse(localStorage.getItem(HELP_KEY)) || {}; } catch (e) { return {}; } }
 function saveHelpPrefs(p) { try { localStorage.setItem(HELP_KEY, JSON.stringify({ ...helpPrefs(), ...p })); } catch (e) { /* private window: no memory, still works */ } }
@@ -4169,7 +4200,7 @@ function openHelp() {
   const el = document.createElement('div');
   el.id = 'help-panel';
   el.className = 'help-panel';
-  const w = Math.min(pr.w || 460, window.innerWidth - 24), h = Math.min(pr.h || 420, window.innerHeight - 80);
+  const w = Math.min(Math.max(pr.w || 460, 260), window.innerWidth - 24), h = Math.min(Math.max(pr.h || 420, 200), window.innerHeight - 80);
   el.style.width = w + 'px'; el.style.height = h + 'px';
   el.style.left = Math.max(8, Math.min(pr.x ?? 16, window.innerWidth - w - 8)) + 'px';
   el.style.top = Math.max(8, Math.min(pr.y ?? (window.innerHeight - h - 16), window.innerHeight - 60)) + 'px';
@@ -4181,7 +4212,8 @@ function openHelp() {
       <button type="button" class="help-x" title="Close (the ❓ Help button opens it again)">✕</button>
     </div>
     <div class="help-body">
-    <div class="help-nav">${HELP_TOPICS.map(([k, t]) => `<a href="#" data-help="${k}">${t}</a>`).join('')}</div>
+    <div class="help-nav"><a href="#" data-follow title="Also show the section for what you are doing now; it changes as you switch modes">Follow</a>${HELP_TOPICS.map(([k, t]) => `<a href="#" data-help="${k}" title="Show or hide this section">${t}</a>`).join('')}<a href="#" data-all title="Show every section, or clear your picks">All</a></div>
+    <p class="help-empty" hidden>Pick one or more topics above, or turn on <b>Follow</b> to see help for what you are doing.</p>
     <section data-topic="walk">
     <h4>Walk — typing walls</h4>
     <p><code>&lt;length&gt; &lt;dir&gt; [angle]</code> — length <code>16'4</code>, <code>3'6"</code>, <code>8</code>, <code>0.5</code>; direction <code>r l u d</code>.</p>
@@ -4236,9 +4268,8 @@ function openHelp() {
     </div>`;
   document.body.appendChild(el);
   el.querySelector('.help-x').addEventListener('click', closeHelp);
-  el.querySelectorAll('.help-nav a').forEach(a => a.addEventListener('click', ev => { ev.preventDefault(); showHelpTopic(a.dataset.help); }));
-  el.dataset.auto = helpTopicNow();
-  setTimeout(() => showHelpTopic(helpTopicNow()), 0);
+  el.querySelectorAll('.help-nav a').forEach(a => a.addEventListener('click', ev => { ev.preventDefault(); toggleHelpChip(a); }));
+  applyHelpFilter();
   el.querySelector('.help-pin').addEventListener('click', ev => {
     const on = !helpPrefs().pinned;
     saveHelpPrefs({ pinned: on });
@@ -4261,7 +4292,10 @@ function openHelp() {
   });
   if (window.ResizeObserver) {
     let t = null;
-    new ResizeObserver(() => { clearTimeout(t); t = setTimeout(() => saveHelpPrefs({ w: el.offsetWidth, h: el.offsetHeight }), 250); }).observe(el);
+    // Only a size the reader set: a hidden tab reports collapsed sizes, which must not stick.
+    new ResizeObserver(() => { clearTimeout(t); t = setTimeout(() => {
+      if (document.visibilityState === 'visible' && el.isConnected && el.offsetWidth >= 260 && el.offsetHeight >= 140) saveHelpPrefs({ w: el.offsetWidth, h: el.offsetHeight });
+    }, 250); }).observe(el);
   }
   saveHelpPrefs({ open: true });
 }
