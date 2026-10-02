@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.36.0"></script>
-<script src="dictation.js?v=0.36.0"></script>
+<script src="core.js?v=0.36.1"></script>
+<script src="dictation.js?v=0.36.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -60,7 +60,9 @@
   #canvas { display: block; width: 100%; height: 100%; cursor: default; }
   #canvas.split-mode { cursor: crosshair; }
   #canvas.measuring { cursor: crosshair; }
-  .pdfimp-table th, .pdfimp-table td { padding: 4px 6px; vertical-align: top; white-space: nowrap; }
+  .pdfimp-table th, .pdfimp-table td { padding: 4px 5px; vertical-align: top; }
+  .pdfimp-table td:nth-last-child(-n+3), .pdfimp-table th:nth-last-child(-n+3) { white-space: nowrap; }
+  .pdfimp-table select { max-width: 150px; font-size: 12px; }
   header button.measure-on { background: #d946ef; }
   header button.measure-on:hover { background: #c026d3; }
   /* In Text mode the whole drawing is click-through so notes can be placed over
@@ -200,7 +202,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.36.0</span>
+  <span class="version-chip" id="app-version">v0.36.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
@@ -1005,6 +1007,7 @@ function render() {
   const W = p => ({ x: v.tx + p.x*v.scale, y: v.ty + p.y*v.scale });
 
   // Active floor first…
+  drawnLabelBoxes = [];
   shapesOnFloor(state.activeFloor).forEach(sh => renderShape(sh, W, false));
   // …then other floors as a faded dashed-outline overlay on top, so their outline
   // and label stay visible even where they sit under the active floor's fill.
@@ -1154,6 +1157,9 @@ function patternOptions(selected) {
   return Object.entries(FILL_PATTERNS).map(([k, v]) => `<option value="${k}"${k === selected ? ' selected' : ''}>${v}</option>`).join('');
 }
 
+// Area-label boxes (screen px) drawn this render, so another floor's faded label can
+// step down out of the way instead of printing over the active floor's.
+let drawnLabelBoxes = [];
 function renderShape(sh, W, isGhost) {
   const t = TYPES[sh.type] || TYPES.living;
   const screenPts = sh.points.map(W);
@@ -1282,6 +1288,10 @@ function renderShape(sh, W, isGhost) {
     const base = polygonCentroid(sh.points);
     const off = sh.labelOffset || { dx: 0, dy: 0 };
     const c = W({ x: base.x + off.dx, y: base.y + off.dy });
+    const box = () => ({ x0: c.x - Math.max(44, sh.label.length * 8) / 2, x1: c.x + Math.max(44, sh.label.length * 8) / 2, y0: c.y - 20, y1: c.y + 14 });
+    const hits = b => drawnLabelBoxes.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
+    if (isGhost) for (let k = 0; k < 4 && hits(box()); k++) c.y += 36;
+    drawnLabelBoxes.push(box());
     const area = shapeArea(sh);
     const halo = { stroke: 'white', 'stroke-width': 3.5, 'paint-order': 'stroke fill' };
     // Other-floor (ghost) labels render a touch smaller and in a muted blue-grey so
@@ -2406,7 +2416,7 @@ function mainLivingShapes(b) {
 function basementFoundationShapes(b) {
   return state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === b && sh.floor === 'basement' && FOUNDATION_TYPES.includes(sh.type));
 }
-function matchBasementToMain(b) {
+function matchBasementToMain(b, noAsk) {
   const main = mainLivingShapes(b);
   if (!main.length) { alert(`${b} has no enclosed living area on the main floor to copy.`); return; }
   const old = basementFoundationShapes(b);
@@ -2415,7 +2425,7 @@ function matchBasementToMain(b) {
   const msg = old.length
     ? `Replace the basement outline of ${b} (${oldArea} sf) with the main floor's outline (${mainArea} sf)?\n\nDecks, patios and other areas on the basement floor stay as they are. Undo restores the old outline.`
     : `Add a basement to ${b} with the main floor's outline (${mainArea} sf)?`;
-  if (!confirm(msg)) return;
+  if (!noAsk && !confirm(msg)) return;
   pushUndo();
   const like = old[0];
   state.shapes = state.shapes.filter(sh => !old.includes(sh));
@@ -3993,6 +4003,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.36.1', '2026-10-01', 'PDF import can use the main floor outline for the basement straight away (a checkbox in the import dialog), the import dialog fits without side-scrolling, and another floor’s faded area label steps aside instead of printing over the label of the floor you are on.'],
   ['0.36.0', '2026-10-01', 'Match basement to main floor: in the Basement panel, one click replaces the basement outline of a building with a copy of its main-floor outline - for when you have measured the walls above grade and the exposed foundation agrees with them, but a traced or walked basement outline (an iGUIDE scan taken from inside, say) does not. The panel shows the drawn basement against the main floor so the gap is visible first; Undo puts the old outline back.'],
   ['0.35.0', '2026-10-01', 'PDF import now finishes the job: rooms iGUIDE leaves out of floor area (garage, unheated sun room) come in as their own areas, sized to the excluded area iGUIDE states; decks, porches and patios are traced from the outline around their label; and each floor is turned and slid to sit over the main floor, with a check-position flag where that is a judgment call (a suite shorter than its garage).'],
   ['0.34.1', '2026-10-01', 'Updates now show up on the first load: when you are online the app always fetches the current version of the page, and only falls back to the saved offline copy when the connection is down or slower than a few seconds. Before, a new release appeared only after a second reload.'],
@@ -4975,7 +4986,7 @@ function openPdfImportModal(res, fname) {
   const m = createModal();
   const div = document.createElement('div');
   div.className = 'modal';
-  div.style.maxWidth = 'min(760px, calc(100vw - 32px))';
+  div.style.maxWidth = 'min(900px, calc(100vw - 32px))';
   const floorOpts = cur => [...new Set([...state.floors, 'basement', 'main', 'upper', 'other'])]
     .map(f => `<option value="${escapeHtml(f)}"${f === cur ? ' selected' : ''}>${escapeHtml(f)}</option>`).join('');
   const typeOpts = cur => Object.entries(TYPES)
@@ -5017,6 +5028,10 @@ function openPdfImportModal(res, fname) {
       <thead><tr style="text-align:left; color:#555;"><th></th>${multi ? '<th>Building</th>' : ''}<th>Floor in PDF</th><th>Floor</th><th>Area type</th><th style="text-align:right;">Traced</th><th style="text-align:right;">${escapeHtml(res.format)} says</th><th>Check</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
+    ${res.floors.some(f => f.kind === 'floor' && f.floor === 'basement') && res.floors.some(f => f.kind === 'floor' && f.floor === 'main') ? `
+    <label style="display:flex; gap:6px; align-items:flex-start; margin-top:8px; font-size:13px;"><input type="checkbox" id="pdfimp-bm-main" style="margin-top:2px;">
+      <span><b>Basement: use the main floor's outline</b> instead of the scanned one &mdash; when the foundation you can see lines up with the walls above.
+      A scanner sees a basement only from inside and estimates its outside face. (Also later: Basement panel &rarr; <i>Match basement to main floor</i>.)</span></label>` : ''}
     <ul class="help" style="margin:10px 0 0; padding-left:18px;">
       ${excludedNote}
       ${placeNote}
@@ -5036,7 +5051,9 @@ function openPdfImportModal(res, fname) {
       type: div.querySelector('#pdfimp-type-' + i).value,
     })).filter(r => r.on);
     if (!picked.length) { alert('Tick at least one floor to import.'); return; }
+    const bmMain = !!(div.querySelector('#pdfimp-bm-main') || {}).checked;
     closeModal();
+    const firstNew = state.nextShapeId;
     const d = pdfImportToSketch(res, picked);
     const oneBuilding = new Set(d.shapes.map(sh => sh.building)).size === 1;
     if (!state.shapes.length && oneBuilding) addFileToProject(d, { [DEFAULT_BUILDING]: DEFAULT_BUILDING }, false);
@@ -5045,6 +5062,7 @@ function openPdfImportModal(res, fname) {
       state.subject = d.subject;
       const subjInp = document.getElementById('subject-input'); if (subjInp) subjInp.value = d.subject;
     }
+    if (bmMain) [...new Set(state.shapes.filter(sh => sh.id >= firstNew).map(sh => sh.building || DEFAULT_BUILDING))].forEach(b => { if (basementFoundationShapes(b).length && mainLivingShapes(b).length) matchBasementToMain(b, true); });
     const main = picked.find(r => r.floor === 'main');
     setActiveFloor(main ? 'main' : picked[0].floor);
   });

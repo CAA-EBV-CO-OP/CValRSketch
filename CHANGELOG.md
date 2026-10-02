@@ -14,6 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.36.1] — 2026-10-01
+
+### Added
+- **Basement from the main floor at import.** When a PDF has both a main floor and a basement, the import dialog offers *Basement: use the main floor's outline* — the same as *Match basement to main floor* afterwards, applied only to the buildings coming in from that PDF.
+
+### Fixed
+- **Overlapping area labels.** Another floor's faded label (a basement under the main floor, a suite over the garage) printed on top of the active floor's label when their centres coincided. It now steps down until it clears.
+- **The import dialog side-scrolled** on a typical laptop screen; it is wider, its pickers narrower, and the floor names wrap, so the table fits.
+
+---
+
 ## [0.36.0] — 2026-10-01
 
 ### Added
