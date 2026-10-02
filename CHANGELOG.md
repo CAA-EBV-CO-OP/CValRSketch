@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.36.0] — 2026-10-01
+
+### Added
+- **Match basement to main floor.** The Basement panel shows each building's drawn basement area against its main-floor footprint ("Basement drawn: 1648 sf · main floor: 1716 sf (−68 sf)") and offers *Match basement to main floor*, which replaces the basement outline (finished/unfinished areas on the basement floor) with a copy of the main floor's enclosed-living outline, keeping the old area type and label, and sets the basement area back to auto. Decks, patios and other areas on the basement floor are left alone; Undo restores the old outline. For the common case where the appraiser has verified the above-grade walls and the exposed part of the foundation agrees with them, but a traced basement outline — an iGUIDE scan taken from inside, where the outside face of the foundation is inferred — does not.
+
+---
+
 ## [0.35.0] — 2026-10-01
 
 ### Added
