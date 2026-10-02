@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.44.1] — 2026-10-02
+
+### Changed
+- **Corner dragging uses a crosshair pointer** instead of the four-way move arrow, which hid the exact spot the corner would land on. Over a traced image, the **magnifier** (the same one used for clicking corners) follows the corner while you drag.
+
+---
+
 ## [0.44.0] — 2026-10-02
 
 ### Added

@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.44.0"></script>
-<script src="dictation.js?v=0.44.0"></script>
+<script src="core.js?v=0.44.1"></script>
+<script src="dictation.js?v=0.44.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -88,6 +88,7 @@
   #canvas.split-mode { cursor: crosshair; }
   #canvas.measuring { cursor: crosshair; }
   #canvas.pan-mode { cursor: grab; }
+  #canvas.vertex-dragging, #canvas.vertex-dragging * { cursor: crosshair !important; }
   #zoom-bar { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,.92);
     border: 1px solid #c9d3dd; border-radius: 8px; padding: 3px 5px; box-shadow: 0 2px 8px rgba(0,0,0,.12); z-index: 5; font-size: 12px; }
   #zoom-bar button { border: 1px solid #c9d3dd; background: #fff; border-radius: 5px; min-width: 26px; height: 24px; cursor: pointer; font-size: 13px; color: #2b3a4a; }
@@ -236,7 +237,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.44.0</span>
+  <span class="version-chip" id="app-version">v0.44.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -1341,7 +1342,7 @@ function renderShape(sh, W, isGhost) {
       if (addHits) {
         const hit = addEl('circle', { cx: p.x, cy: p.y, r: 12, class: 'hit-vertex' });
         if (!isGhost && state.mode === 'edit' && !state.shapeMovePick) {
-          hit.style.cursor = 'move';
+          hit.style.cursor = 'crosshair';
           hit.addEventListener('mousedown', (ev) => startVertexDrag(ev, sh.id, i));
         }
         hit.addEventListener('click', (ev) => {
@@ -2059,8 +2060,11 @@ function vertexDragMove(e) {
     if (Math.abs(e.clientX - vd.x) + Math.abs(e.clientY - vd.y) < 4) return;
     pushUndo(); vd.moved = true;
     state.selection = { kind: 'vertex', shapeId: vd.shapeId, idx: vd.idx };
+    svg.classList.add('vertex-dragging');
   }
-  const t = vertexDragTarget(screenToWorld(e.clientX, e.clientY), e.ctrlKey || e.metaKey);
+  const w = screenToWorld(e.clientX, e.clientY);
+  if (visibleUnderlay()) drawTraceLoupe(e.clientX, e.clientY, w);   // over a scan, the magnifier shows the corner being matched
+  const t = vertexDragTarget(w, e.ctrlKey || e.metaKey);
   vd.linked.forEach(l => {
     const o = state.shapes.find(s => s.id === l.id);
     if (!o) return;
@@ -2074,6 +2078,8 @@ function vertexDragUp() {
   const vd = state.vertexDrag;
   if (!vd) return;
   state.vertexDrag = null;
+  svg.classList.remove('vertex-dragging');
+  hideTraceLoupe();
   if (vd.moved) { vertexDragEnded = Date.now(); render(); }
 }
 function renderVertexDrag(W) {
@@ -4594,6 +4600,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.44.1', '2026-10-02', 'Dragging a corner now uses a crosshair pointer instead of the four-way arrow, so you can see exactly where it lands, and over a traced image the magnifier follows the corner while you drag.'],
   ['0.44.0', '2026-10-02', 'Drag corners with the mouse in Edit: a corner follows the pointer, snapping to other corners and to the inch, and a corner shared with another area moves in both. Hold Ctrl while dragging to square it up with its neighbours, so walls that are nearly plumb or level become exactly plumb or level.'],
   ['0.43.1', '2026-10-02', 'The start of a walk is now a flagged START pin, easy to find when it is time to close. While clicking corners on an image, it grows and reads CLICK TO CLOSE when the cursor is on it. Garages are now a light grey, so they no longer look like living area. Remove this wall (Edit) now lets you choose how the outline closes, with a preview: merge with the area on the other side (undo a split), run the neighbouring walls on until they meet, or join across either corner. Tab cycles, Enter applies.'],
   ['0.43.0', '2026-10-02', 'Zoom and pan the drawing: the mouse wheel or a trackpad pinch zooms about the cursor, drag with the middle button (or turn on the hand) to pan, and the controls at the bottom-left of the drawing zoom in, out or back to Fit. Exports always print the whole plan whatever the zoom.'],
