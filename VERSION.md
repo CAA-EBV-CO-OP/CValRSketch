@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.35.0`
+**Current version:** `0.36.0`
 **Released:** 2026-10-01
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.36.0  | 2026-10-01 | minor  | **Match basement to main floor**: one click in the Basement panel copies the main-floor outline onto the basement (replacing the drawn basement outline; decks/patios stay), with drawn-vs-main areas shown first. |
 | 0.35.0  | 2026-10-01 | minor  | **PDF import finishes the job**: excluded rooms (garage, sun room) split off and sized to the stated excluded area; decks/porches/patios traced from their labelled outlines; floors turned and slid over the main floor, flagged *check position* when ambiguous. |
 | 0.34.1  | 2026-10-01 | patch  | **Updates arrive on the first load**: the service worker fetches pages network-first (4 s timeout, then the cached copy) instead of cache-first, so a release no longer needs a second reload to appear. |
 | 0.34.0  | 2026-10-01 | minor  | **Import a floor-plan PDF**: 📐 Import PDF… traces each floor of an iGUIDE plan from its vector drawing (corners within ~1/2", areas within 1% of iGUIDE on tested plans), with a traced-vs-stated check table, floor/type pickers and multi-building support. In-browser only (PDF.js, vendored, loaded on demand). |
