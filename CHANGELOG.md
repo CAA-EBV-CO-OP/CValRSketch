@@ -14,6 +14,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.37.0] — 2026-10-02
+
+### Added
+- **❓ Help** in the top bar opens a reference window: typing a wall (lengths, directions, turn angles, batch entry, diagonals from parts), the compass, start point and offset, snap-to-vertex and pen-jump, closing, and a line on each of the other tools.
+
+### Changed
+- **The Walk sidebar keeps to the drawing in hand.** The Format card and the long hints under *Start point* and *New segment* moved into Help; in their place is a one-line example (`16'4 u` · `10 r 45` · `16'4 u, 26'9 r`) with a *Syntax & shortcuts* link. *Current Shape* appears only once a wall has been typed. Measurements, Areas, Basement and Totals now sit in view instead of below the fold.
+
+---
+
 ## [0.36.1] — 2026-10-01
 
 ### Added

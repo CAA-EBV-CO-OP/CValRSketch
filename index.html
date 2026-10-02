@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.36.1"></script>
-<script src="dictation.js?v=0.36.1"></script>
+<script src="core.js?v=0.37.0"></script>
+<script src="dictation.js?v=0.37.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -38,6 +38,10 @@
   header .osasi-chip b { color: #FF7440; font-weight: 700; }
   header .osasi-chip:hover b { color: #FF8A5F; }
   .whatsnew-modal ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; }
+  .help-modal { max-height: 85vh; overflow-y: auto; }
+  .help-modal h4 { margin: 12px 0 4px; font-size: 13px; color: #2b3a4a; }
+  .help-modal p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
+  .help-modal code { background: #eef2f6; padding: 0 3px; border-radius: 3px; }
   .whatsnew-modal li { margin-bottom: 6px; }
   .whatsnew-modal .ver { font-family: ui-monospace, monospace; color: #2b6cb0; font-weight: 700; }
   .about-modal p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; }
@@ -202,9 +206,10 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.36.1</span>
+  <span class="version-chip" id="app-version">v0.37.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
+  <button onclick="openHelp()" title="How to type walls, snap to corners, jump the pen, and the other tools">❓ Help</button>
   <a class="osasi-chip" href="https://osasi.org" target="_blank" rel="noopener" title="CValRSketch is part of OSASI, the Open Source Appraisal Software Initiative — free software under AGPL-3.0">provided by <b>osasi.org</b></a>
   <div class="mode-tabs" id="mode-tabs">
     <button data-mode="walk" class="active">Walk</button>
@@ -2059,7 +2064,7 @@ function sidebarWalk() {
     ? `(${state.startPoint.x.toFixed(2)}, ${state.startPoint.y.toFixed(2)}) ft — picked`
     : 'origin (0, 0)';
   const startHint = state.segments.length === 0
-    ? 'Click a green vertex to anchor the start there. Then use "Offset" to nudge it along a wall (or any direction) by a typed distance — useful for starting partway along an existing wall.'
+    ? 'Click a green vertex (or a blank spot) to start there; Offset nudges it by a typed distance.'
     : 'Cancel current segments to change start point.';
   const offsetSection = state.segments.length === 0 ? `
     <div class="input-row" style="margin-top:8px;">
@@ -2099,7 +2104,7 @@ function sidebarWalk() {
           </select>
         </div>
       </div>
-      <div class="help">Type a length, then click a direction on the compass (or pick it in the list) — the wall goes that way. Directions are absolute: up is the top of the drawing, always. Pick the direction first and Enter adds the wall the same way; <code>&#8592; &#8593; &#8594; &#8595;</code> still work for the four cardinals. The bracketed command is what you would type or say.</div>
+      <div class="help">e.g. <code>16'4 u</code> · <code>10 r 45</code> · <code>16'4 u, 26'9 r</code> — or a length plus a compass click. <a href="#" data-act="help" title="Typing walls, angles, snapping, pen-jump">Syntax &amp; shortcuts</a></div>
       <div id="micStatus" style="font-size:11px;color:#666;margin-top:4px;min-height:14px;"></div>
       <pre id="micLog" style="font-size:10px;color:#777;background:#f4f7fa;border:1px solid #e0e6ec;border-radius:4px;margin-top:4px;padding:4px 6px;max-height:120px;overflow:auto;white-space:pre-wrap;line-height:1.35;"></pre>
       <div class="row-buttons">
@@ -2154,23 +2159,11 @@ function sidebarWalk() {
       </div>
     </div>`;
     })() : ''}
-    <div class="section">
-      <h2>Format</h2>
-      <div class="help">
-        <code>&lt;length&gt; &lt;dir&gt; [angle]</code><br>
-        Length: <code>16'4</code>, <code>3'6"</code>, <code>8</code>, <code>0.5</code><br>
-        Direction: <code>r l u d</code>. Angle (after <code>r</code>/<code>l</code>): degrees turned from your previous heading — <code>r</code> turns right, <code>l</code> turns left. (First segment, or <code>u</code>/<code>d</code> with angle: degrees CW from cardinal base.)<br>
-        Batch (separate walls): <code>16'4 u, 26'9 r, 8 d</code><br>
-        Diagonal from components (one wall): <code>5'd 2'l</code> or <code>5'd, 2'l</code><br>
-        <b>Snap-to-vertex:</b> type just <code>r</code> (no length) + Enter to <i>preview</i> the next aligned vertex. Press <code>r</code>+Enter again to cycle. Press Enter on an empty input to accept — accepting also lines up the next snap in that direction, so <code>r⏎ ⏎ ⏎</code> walks three alignments right, then <code>u⏎ ⏎</code> two up. Esc stops stepping.<br>
-        <b>Pen-jump (arrow keys):</b> with the input empty, press <code>← ↑ → ↓</code> to <i>jump</i> the pen to the next aligned vertex without drawing a wall. Press the same arrow again to skip further. Enter accepts (and arms the next jump), Esc cancels.
-      </div>
-    </div>
-    <div class="section">
+    ${state.segments.length || state.rewalk ? `<div class="section">
       ${state.rewalk ? `<div style="background:#fff4e6;border:2px solid #ff8800;border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:12px;"><b style="color:#cc5500;">Re-walking “${escapeHtml(state.rewalk.original.label)}”</b> — the pen is at the removed wall's start. Type the replacement legs, then Close Shape. × on the last legs removes further walls; Cancel puts the original back.</div>` : ''}
       <h2>Current Shape ${closedTag}</h2>
       <div id="seg-list">${segListHtml}</div>
-    </div>
+    </div>` : ''}
   `;
 }
 
@@ -2624,6 +2617,7 @@ function sidebarAction(e) {
     case 'cancelOffsetPick': cancelOffsetPick(); break;
     case 'removeAnnotation': removeAnnotation(parseInt(i)); break;
     case 'matchBasement': matchBasementToMain(e.currentTarget.dataset.b); break;
+    case 'help': e.preventDefault(); openHelp(); break;
     case 'clearAnnotations': clearAnnotations(); break;
     case 'applyGroupMove': applyGroupMove(); break;
     case 'clearFenceSelection': clearFenceSelection(); break;
@@ -4019,6 +4013,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.37.0', '2026-10-02', 'A Help button: the wall-typing reference (lengths, angles, batch entry, snapping, pen-jump) moves out of the Walk sidebar into a Help window, so the sidebar keeps to the drawing in hand - Current Shape appears once you have typed a wall, and Measurements and Areas move up into view.'],
   ['0.36.1', '2026-10-01', 'PDF import can use the main floor outline for the basement straight away (a checkbox in the import dialog), the import dialog fits without side-scrolling, and another floor’s faded area label steps aside instead of printing over the label of the floor you are on.'],
   ['0.36.0', '2026-10-01', 'Match basement to main floor: in the Basement panel, one click replaces the basement outline of a building with a copy of its main-floor outline - for when you have measured the walls above grade and the exposed foundation agrees with them, but a traced or walked basement outline (an iGUIDE scan taken from inside, say) does not. The panel shows the drawn basement against the main floor so the gap is visible first; Undo puts the old outline back.'],
   ['0.35.0', '2026-10-01', 'PDF import now finishes the job: rooms iGUIDE leaves out of floor area (garage, unheated sun room) come in as their own areas, sized to the excluded area iGUIDE states; decks, porches and patios are traced from the outline around their label; and each floor is turned and slid to sit over the main floor, with a check-position flag where that is a judgment call (a suite shorter than its garage).'],
@@ -4117,6 +4112,34 @@ function openWhatsNew() {
     <h3>What's new</h3>
     <ul>${WHATS_NEW.map(([v, d, t]) => `<li><span class="ver">${escapeHtml(v)}</span> <span style="color:#888; font-size:11px;">${escapeHtml(d)}</span><br>${escapeHtml(t)}</li>`).join('')}</ul>
     <p style="font-size:12px; color:#666; margin:10px 0 0;">Full history: <a href="https://github.com/CAA-EBV-CO-OP/CValRSketch/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG.md</a></p>
+    <div class="modal-buttons"><button class="primary" onclick="closeModal()">Close</button></div>`;
+  m.appendChild(div);
+}
+
+// Reference for typing walls and the drawing tools. It used to sit in the Walk
+// sidebar (the old Format card and the long hints), where it pushed the controls
+// for the drawing in hand off the screen.
+function openHelp() {
+  const m = createModal();
+  const div = document.createElement('div');
+  div.className = 'modal help-modal';
+  div.style.maxWidth = 'min(640px, calc(100vw - 32px))';
+  div.innerHTML = `
+    <h3>Help</h3>
+    <h4>Typing a wall</h4>
+    <p><code>&lt;length&gt; &lt;dir&gt; [angle]</code> — length <code>16'4</code>, <code>3'6"</code>, <code>8</code>, <code>0.5</code>; direction <code>r l u d</code>.</p>
+    <p><b>Angles:</b> after <code>r</code> / <code>l</code>, the angle is degrees turned from your previous heading — <code>r</code> turns right, <code>l</code> turns left. On the first wall, or with <code>u</code> / <code>d</code>, it is degrees clockwise from that direction.</p>
+    <p><b>Several walls at once:</b> <code>16'4 u, 26'9 r, 8 d</code>. <b>One diagonal wall from its parts:</b> <code>5'd 2'l</code> or <code>5'd, 2'l</code>.</p>
+    <h4>Compass</h4>
+    <p>Type a length, then click a direction on the compass (or pick it in the list) — the wall goes that way. Directions are absolute: up is the top of the drawing. Pick the direction first and Enter adds the wall the same way; <code>&#8592; &#8593; &#8594; &#8595;</code> still work for the four cardinals. The bracketed command in the list is what you would type or say. <i>Steps</i> switches between 8 and 16 directions.</p>
+    <h4>Start point</h4>
+    <p>Click a green vertex to start there, or a blank spot; Shift+Arrow then steps the start onto aligned vertices. <i>Offset</i> nudges the start along a wall (or any direction) by a typed distance — handy for starting partway along an existing wall.</p>
+    <h4>Snapping and jumping</h4>
+    <p><b>Snap-to-vertex:</b> type just <code>r</code> (no length) + Enter to <i>preview</i> the next aligned vertex; <code>r</code>+Enter again cycles. Enter on an empty box accepts — and lines up the next snap in that direction, so <code>r⏎ ⏎ ⏎</code> walks three alignments right, then <code>u⏎ ⏎</code> two up. Esc stops stepping.</p>
+    <p><b>Pen-jump (arrow keys):</b> with the box empty, <code>&#8592; &#8593; &#8594; &#8595;</code> <i>jumps</i> the pen to the next aligned vertex without drawing a wall; the same arrow again skips further. Enter accepts (and arms the next jump), Esc cancels.</p>
+    <p><b>Closing:</b> walk back to the start and the shape offers to close (Enter takes it). Land on an existing wall and the area you have fenced off is offered instead.</p>
+    <h4>Other tools</h4>
+    <p><b>📏 Measure</b> (or M): click any two points; corners and walls snap, Alt for a free point, Shift for level/plumb. <b>Edit</b>: click a wall, corner or area to change it. <b>Split</b>: cut an area in two. <b>Fence</b>: drag a box to move or delete what it catches. <b>Text</b>: click to place a note. <b>📐 Import PDF…</b>: an iGUIDE floor plan becomes the sketch.</p>
     <div class="modal-buttons"><button class="primary" onclick="closeModal()">Close</button></div>`;
   m.appendChild(div);
 }
