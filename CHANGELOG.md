@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.41.2] — 2026-10-02
+
+### Fixed
+- **Could not set a start point over a traced-over image.** In Walk mode a click drops the start point only when it reaches the bare canvas, and the image caught every click on it — so with a scan loaded there was nowhere to click. Outside Image mode the image now lets clicks through (start point, Text labels, the double-click floor menu); in Image mode it still catches them, so it can be dragged.
+
+---
+
 ## [0.41.1] — 2026-10-02
 
 ### Fixed

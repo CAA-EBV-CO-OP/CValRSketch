@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.41.1`
+**Current version:** `0.41.2`
 **Released:** 2026-10-02
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.41.2  | 2026-10-02 | patch  | Clicking on a traced-over image in Walk mode sets the start point again (the image no longer swallows clicks outside Image mode). |
 | 0.41.1  | 2026-10-02 | patch  | **Calibration shows it worked**: *Scale set* confirmation with the new width, the calibration line kept on screen in magenta with its length, *Calibrate again…*. |
 | 0.41.0  | 2026-10-02 | minor  | **Trace over a scan**: Image mode lays a scanned/photographed plan under the drawing, scaled from two known points; fade, lock, per floor, show on top; saved in the sketch file, never exported, kept out of undo, autosave and Recent. |
 | 0.40.0  | 2026-10-02 | minor  | **Help points at the real controls**: action links per section; hover outlines the actual button, click runs it and flashes it. Destructive commands are never run from Help. |
