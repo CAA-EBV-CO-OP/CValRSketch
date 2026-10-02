@@ -14,6 +14,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.42.0] — 2026-10-02
+
+### Added
+- **Trace a scan by clicking its corners.** With a scaled image on the floor, Walk mode offers **✎ Click corners on the image** (and the Image tab's *Scale set* box offers *✎ Trace it — click the corners*). The first click sets the start corner; each click after that adds a wall from the pen to the clicked corner, its length and direction worked out from the image's scale. Walls within 2° of square are squared up and lengths are rounded to the inch, unless the click lands exactly on an existing corner. Clicking the start corner closes the shape (the usual close offer appears).
+- A **magnifier** — the scan itself at 5×, with a crosshair — follows the cursor so a corner can be hit exactly, and a live magenta line shows the wall and its length before you click.
+- Clicks snap to existing corners; **Shift** keeps the wall level or plumb, **Alt** turns snapping off. Undo removes the last wall, and typing walls still works alongside.
+
+---
+
 ## [0.41.2] — 2026-10-02
 
 ### Fixed
