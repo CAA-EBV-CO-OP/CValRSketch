@@ -66,6 +66,9 @@ const MAX_PIXELS = 16e6;
 const SIMPLIFY_FT = 0.06;         // ~3/4": drawn window/door detail smaller than this is not a corner
 const MAX_WALL_FT = 0.8;          // an excluded room's own walls are never thicker than this
 const MAX_OUTDOOR_SQFT = 3000;    // a "deck" bigger than this leaked out of an open outline
+const JOIN_FT = 0.75;             // neighbouring shapes' corners closer than this are one corner
+const MIN_EDGE_FT = 0.25;         // no wall shorter than 3" survives the join
+const ZIGZAG_FT = 0.6;            // ...and corners of one shape this close, both at such a joint, collapse
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -410,7 +413,86 @@ function readFloorPage(paths, t, ftPerPt, head, profile) {
     if (reg.area < 10 * sqftPx) continue;
     parts.push({ kind: 'outdoor', label: titleCase(it.str), type: kind[1], points: trace(id, reg.start) });
   }
+  joinNeighbours(parts.filter(p => p.kind !== 'outdoor'));
+  joinNeighbours(parts);
+  if (excludedSplit) excludedTraced = parts.filter(p => p.kind === 'excluded').reduce((a, p) => a + Math.abs(signedArea(p.points)), 0);
   return { parts, notes, excludedSplit, excludedTraced };
+}
+
+// Neighbouring shapes (floor, garage, sun room, deck) are traced separately, so
+// where they meet their corners land a few inches apart and leave short zigzag
+// edges. Corners of different shapes within JOIN_FT of each other, chained, become
+// one shared corner, placed where the highest-ranking shape had it. Corners within one shape are never merged with each other
+// unless a neighbour ties them together, so real short jogs survive.
+function joinNeighbours(parts) {
+  const verts = [];
+  parts.forEach((p, pi) => p.points.forEach((q, vi) => verts.push({ pi, vi, q })));
+  const parent = verts.map((_, i) => i);
+  const find = i => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const near = (a, b) => Math.hypot(a.q.x - b.q.x, a.q.y - b.q.y) <= JOIN_FT;
+  const joint = new Set();
+  for (let i = 0; i < verts.length; i++) {
+    for (let j = i + 1; j < verts.length; j++) {
+      if (verts[i].pi !== verts[j].pi && near(verts[i], verts[j])) { parent[find(i)] = find(j); joint.add(i); joint.add(j); }
+    }
+  }
+  // Chain joint corners that sit close together (a 3-corner zigzag on one side
+  // meeting a 2-corner one on the other).
+  const js = [...joint];
+  const tight = (a, b) => Math.hypot(a.q.x - b.q.x, a.q.y - b.q.y) <= ZIGZAG_FT;
+  for (let a = 0; a < js.length; a++) for (let b = a + 1; b < js.length; b++) if (tight(verts[js[a]], verts[js[b]])) parent[find(js[a])] = find(js[b]);
+  const groups = new Map();
+  js.forEach(i => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(i); });
+  // The shared corner sits where the floor's own corner is (then an excluded
+  // room's); decks and porches move to the building, never the other way round.
+  const rank = { floor: 0, excluded: 1, outdoor: 2 };
+  const shared = new Set();
+  for (const g of groups.values()) {
+    const top = Math.min(...g.map(i => rank[parts[verts[i].pi].kind] ?? 3));
+    const c = centroidOf(g.filter(i => (rank[parts[verts[i].pi].kind] ?? 3) === top).map(i => verts[i].q));
+    const at = { x: c.x, y: c.y };
+    shared.add(at);
+    g.forEach(i => { parts[verts[i].pi].points[verts[i].vi] = at; });
+  }
+  parts.forEach(p => {
+    const out = [];
+    p.points.forEach(q => { const last = out[out.length - 1]; if (!last || Math.hypot(q.x - last.x, q.y - last.y) > 0.01) out.push(q); });
+    while (out.length > 3 && Math.hypot(out[0].x - out[out.length - 1].x, out[0].y - out[out.length - 1].y) <= 0.01) out.pop();
+    p.points = dropStraight(dropTiny(out, shared));
+  });
+}
+
+// Collapse edges shorter than MIN_EDGE_FT: a shared corner stays put and absorbs its
+// neighbour; otherwise the two corners meet halfway.
+function dropTiny(pts, shared) {
+  let c = pts.slice(), changed = true;
+  while (changed && c.length > 3) {
+    changed = false;
+    for (let i = 0; i < c.length; i++) {
+      const j = (i + 1) % c.length, a = c[i], b = c[j];
+      if (Math.hypot(b.x - a.x, b.y - a.y) >= MIN_EDGE_FT) continue;
+      const keep = shared.has(a) ? a : shared.has(b) ? b : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      c[i] = keep; c.splice(j, 1);
+      changed = true; break;
+    }
+  }
+  return c;
+}
+
+// Remove corners that no longer turn (merging can leave three corners in a line).
+function dropStraight(pts) {
+  let c = pts.slice(), changed = true;
+  while (changed && c.length > 3) {
+    changed = false;
+    for (let i = 0; i < c.length; i++) {
+      const a = c[(i + c.length - 1) % c.length], b = c[i], d = c[(i + 1) % c.length];
+      const e1x = b.x - a.x, e1y = b.y - a.y, e2x = d.x - b.x, e2y = d.y - b.y;
+      const l1 = Math.hypot(e1x, e1y), l2 = Math.hypot(e2x, e2y);
+      const sin = Math.abs(e1x * e2y - e1y * e2x) / (l1 * l2 || 1), dot = e1x * e2x + e1y * e2y;
+      if ((sin < 0.02 && dot > 0) || (sin < 0.05 && dot < 0)) { c.splice(i, 1); changed = true; break; }
+    }
+  }
+  return c;
 }
 
 // Label 4-connected components of pixels where pred(o) holds, ids from firstId.
