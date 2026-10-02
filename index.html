@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.41.2"></script>
-<script src="dictation.js?v=0.41.2"></script>
+<script src="core.js?v=0.42.0"></script>
+<script src="dictation.js?v=0.42.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -229,7 +229,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.41.2</span>
+  <span class="version-chip" id="app-version">v0.42.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -349,6 +349,9 @@ let state = {
   underlay: null,       // { src, w, h, x, y, ftPerPx, opacity, floor, locked, name } — scan to trace over
   underlayDrag: null,   // transient: { grabX, grabY } while dragging the underlay
   underlayCal: null,    // transient: { first } while picking the two calibration points
+  traceClick: false,    // transient: Walk "click corners" tracing over the image is on
+  traceStarted: false,  // transient: the first click (the start corner) has been placed
+  traceHover: null,     // transient: { p, kind } where the next click would land
   subject: '',          // project/property name shown as title on exports
   subtitle: '',         // optional secondary line under the title
   settings: { ...SETTINGS_DEFAULTS },
@@ -1122,6 +1125,7 @@ function render() {
   }
 
   renderUnderlay(W, 'above');
+  renderTraceHover(W);
 
   renderSidebar();
   scheduleAutosave();
@@ -2161,6 +2165,107 @@ function handleUnderlayCal(worldPoint) {
   render();
 }
 
+// ----- Click corners: trace the scan by clicking, not typing ------------------
+// In Walk mode with a scaled image showing, each click adds a wall from the pen to
+// the clicked corner; the first click sets the start. Clicks snap to existing
+// corners (click the start to close), Shift keeps a wall level or plumb, and a wall
+// within 2° of square is squared up. Lengths are rounded to the inch. A magnifier
+// shows the image around the cursor so a corner can be hit exactly.
+const TRACE_SQUARE_DEG = 2;
+function traceActive() { return state.mode === 'walk' && state.traceClick && !!visibleUnderlay() && !galleryActive(); }
+function tracePen() { const w = pathPointsHere(state.segments); return w[w.length - 1]; }
+function toggleTraceClick(on) {
+  state.traceClick = on === undefined ? !state.traceClick : on;
+  state.traceHover = null;
+  if (!state.traceClick) hideTraceLoupe();
+  render();
+}
+function traceSnap(raw, free, ortho) {
+  let best = { p: { x: raw.x, y: raw.y }, kind: 'free' };
+  if (!free && viewTransform) {
+    const reach = 10 / viewTransform.scale;
+    const corners = [];
+    shapesOnFloor(state.activeFloor).forEach(sh => corners.push(...sh.points));
+    if (state.segments.length || state.traceStarted) corners.push(...pathPointsHere(state.segments));
+    let bd = reach;
+    corners.forEach(c => { const d = Math.hypot(c.x - raw.x, c.y - raw.y); if (d < bd) { bd = d; best = { p: { x: c.x, y: c.y }, kind: 'vertex' }; } });
+  }
+  if (ortho && (state.segments.length || state.traceStarted)) {
+    const pen = tracePen();
+    if (Math.abs(best.p.x - pen.x) >= Math.abs(best.p.y - pen.y)) best.p.y = pen.y; else best.p.x = pen.x;
+  }
+  return best;
+}
+// The wall the next click would add: squared when nearly square, rounded to the
+// inch — unless it lands exactly on an existing corner.
+function traceWallTo(target, kind) {
+  const pen = tracePen();
+  let dx = target.x - pen.x, dy = target.y - pen.y;
+  if (kind !== 'vertex') {
+    const ang = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI);          // 0..180 from the +x axis
+    if (ang < TRACE_SQUARE_DEG || ang > 180 - TRACE_SQUARE_DEG) dy = 0;   // left or right
+    else if (Math.abs(ang - 90) < TRACE_SQUARE_DEG) dx = 0;               // up or down
+    dx = Math.round(dx * 12) / 12; dy = Math.round(dy * 12) / 12;
+  }
+  return { pen, dx, dy };
+}
+function traceClickAt(raw, free, ortho) {
+  const sn = traceSnap(raw, free, ortho);
+  if (state.segments.length === 0 && !state.traceStarted) {
+    setStartPoint(sn.p);
+    state.traceStarted = true;
+    render();
+    return;
+  }
+  const { pen, dx, dy } = traceWallTo(sn.p, sn.kind);
+  if (Math.hypot(dx, dy) < 0.05) return;
+  pushUndo();
+  state.preview = null;
+  const seg = segmentBetween(pen, { x: pen.x + dx, y: pen.y + dy });
+  state.segments.push(seg);
+  render();
+}
+function renderTraceHover(W) {
+  if (!traceActive() || !state.traceHover) return;
+  const h = state.traceHover, cue = { fill: 'none', stroke: '#e6007a', 'stroke-width': 2, class: 'ui-overlay', 'pointer-events': 'none' };
+  if (state.segments.length || state.traceStarted) {
+    const { pen, dx, dy } = traceWallTo(h.p, h.kind);
+    const a = W(pen), b = W({ x: pen.x + dx, y: pen.y + dy });
+    addEl('path', { d: `M${a.x} ${a.y} L${b.x} ${b.y}`, ...cue, 'stroke-dasharray': '5,4' });
+    addEl('text', { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 10, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 'bold', fill: '#e6007a',
+      stroke: 'white', 'stroke-width': 3.5, 'paint-order': 'stroke fill', class: 'ui-overlay', 'pointer-events': 'none' }, formatLength(Math.hypot(dx, dy)));
+  }
+  const c = W(h.p);
+  if (h.kind === 'vertex') addEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, ...cue });
+  else addEl('circle', { cx: c.x, cy: c.y, r: 4, ...cue });
+}
+// Magnifier: the scan itself, 5x, around the cursor, with a crosshair. It is drawn
+// from the stored image, outside the SVG, so render() never touches it.
+let traceLoupeImg = null;
+function hideTraceLoupe() { const l = document.getElementById('trace-loupe'); if (l) l.style.display = 'none'; }
+function drawTraceLoupe(clientX, clientY, world) {
+  const u = visibleUnderlay();
+  if (!u) return hideTraceLoupe();
+  let cv = document.getElementById('trace-loupe');
+  if (!cv) {
+    cv = document.createElement('canvas'); cv.id = 'trace-loupe'; cv.width = 160; cv.height = 160;
+    cv.style.cssText = 'position:fixed;z-index:950;pointer-events:none;border-radius:50%;border:2px solid #e6007a;box-shadow:0 4px 14px rgba(0,0,0,.3);background:#fff;';
+    document.body.appendChild(cv);
+  }
+  if (!traceLoupeImg || traceLoupeImg.dataset.src !== u.src.slice(0, 64) + u.src.length) {
+    traceLoupeImg = new Image(); traceLoupeImg.dataset.src = u.src.slice(0, 64) + u.src.length; traceLoupeImg.src = u.src;
+  }
+  const g = cv.getContext('2d');
+  const ix = (world.x - u.x) / u.ftPerPx, iy = (world.y - u.y) / u.ftPerPx, R = 16;   // image px each side
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 160, 160);
+  if (traceLoupeImg.complete) { g.imageSmoothingEnabled = false; g.drawImage(traceLoupeImg, ix - R, iy - R, 2 * R, 2 * R, 0, 0, 160, 160); }
+  g.strokeStyle = '#e6007a'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(80, 0); g.lineTo(80, 160); g.moveTo(0, 80); g.lineTo(160, 80); g.stroke();
+  const left = clientX + 28 + 160 > window.innerWidth ? clientX - 188 : clientX + 28;
+  const top = clientY + 28 + 160 > window.innerHeight ? clientY - 188 : clientY + 28;
+  cv.style.left = left + 'px'; cv.style.top = top + 'px'; cv.style.display = 'block';
+}
+
 function sidebarUnderlay() {
   const u = state.underlay;
   if (!u || !u.src) {
@@ -2192,7 +2297,7 @@ function sidebarUnderlay() {
         <b style="color:#1f7a45;">✓ Scale set</b> — ${formatLength(u.cal.len)} between your two points (the <span style="color:#e6007a;font-weight:bold;">magenta line</span>). The image is now <b>${formatLength(spanFt)}</b> wide.
         <div style="margin-top:4px;color:#555;">Check it: <a href="#" data-act="startOffsetPick">📏 Measure</a> a dimension printed on the plan — it should match within a few inches. Off? Calibrate again on something longer.</div></div>`
       : `<div class="help">Click two points on the image a known distance apart, then type that distance. The scale bar printed on most plans is the most reliable thing to use; the longer the distance, the more accurate the scale.</div>`}
-      <div class="row-buttons"><button data-act="startUnderlayCal" class="primary">${u.cal ? 'Calibrate again…' : 'Calibrate…'}</button></div>`}
+      <div class="row-buttons"><button data-act="startUnderlayCal" class="${u.cal ? '' : 'primary'}">${u.cal ? 'Calibrate again…' : 'Calibrate…'}</button>${u.cal ? '<button data-act="traceStart" class="primary">✎ Trace it — click the corners</button>' : ''}</div>`}
       <h2 style="margin-top:14px;">Other</h2>
       <div class="row-buttons"><button data-act="removeUnderlay" class="danger">Remove image</button></div>
       <div class="help" style="margin-top:6px;">Drag the image on the canvas to line it up with what you have already drawn. Lock it once it is right, so a stray drag cannot move it.</div>
@@ -2341,6 +2446,11 @@ function sidebarWalk() {
         </div>
       </div>
       <div class="help">e.g. <code>16'4 u</code> · <code>10 r 45</code> · <code>16'4 u, 26'9 r</code> — or a length plus a compass click. <a href="#" data-act="help" title="Typing walls, angles, snapping, pen-jump">Syntax &amp; shortcuts</a></div>
+      ${visibleUnderlay() ? `<div style="margin-top:8px;padding:6px 8px;border-radius:6px;background:${state.traceClick ? '#fdf0f7' : '#f6f7f9'};border:1px solid ${state.traceClick ? '#e6007a' : '#dde2e8'};">
+        <label class="inline" style="font-weight:bold;"><input type="checkbox" data-act="traceToggle" ${state.traceClick ? 'checked' : ''}> ✎ Click corners on the image</label>
+        <div class="help" style="margin-top:3px;">${state.traceClick
+          ? (state.segments.length || state.traceStarted ? 'Click the next corner. Click the start corner to close. <b>Shift</b> = level/plumb, <b>Alt</b> = no snapping. Undo removes the last wall; typing still works.' : 'Click the corner to start from — the magnifier helps you land on it.')
+          : 'Trace the image by clicking its corners instead of typing lengths.'}${visibleUnderlay().cal ? '' : ' <b>Set the scale first</b> (Image tab), or the lengths will be wrong.'}</div></div>` : ''}
       <div id="micStatus" style="font-size:11px;color:#666;margin-top:4px;min-height:14px;"></div>
       <pre id="micLog" style="font-size:10px;color:#777;background:#f4f7fa;border:1px solid #e0e6ec;border-radius:4px;margin-top:4px;padding:4px 6px;max-height:120px;overflow:auto;white-space:pre-wrap;line-height:1.35;"></pre>
       <div class="row-buttons">
@@ -2857,6 +2967,8 @@ function sidebarAction(e) {
     case 'cancelOffsetPick': cancelOffsetPick(); break;
     case 'removeAnnotation': removeAnnotation(parseInt(i)); break;
     case 'matchBasement': matchBasementToMain(e.currentTarget.dataset.b); break;
+    case 'traceToggle': toggleTraceClick(e.currentTarget.checked); break;
+    case 'traceStart': state.traceClick = true; state.traceStarted = false; document.querySelector('#mode-tabs button[data-mode="walk"]').click(); break;
     case 'help': e.preventDefault(); if (!document.getElementById('help-panel')) openHelp(); break;
     case 'clearAnnotations': clearAnnotations(); break;
     case 'applyGroupMove': applyGroupMove(); break;
@@ -3480,6 +3592,7 @@ function rewalkSelectedWall() {
 }
 
 function cancelShape() {
+  state.traceStarted = false;
   if (state.segments.length === 0 && !state.preview) return;
   if (state.rewalk) {
     if (!confirm('Cancel the re-walk and put the original shape back?')) return;
@@ -3559,6 +3672,7 @@ function assemblePolygonFromWalls(walls) {
 }
 
 function closeShape() {
+  state.traceStarted = false;
   const enc = currentEnclose();
   if (!enc && state.segments.length < 3) { alert('Need at least 3 segments.'); return; }
   const hasJumps = state.segments.some(s => s.jump);
@@ -3995,6 +4109,23 @@ svg.addEventListener('click', (e) => {
   render();
 });
 
+// Click corners: capture-phase, so a tracing click never also selects or snaps
+// through the ordinary Walk handlers.
+svg.addEventListener('click', (e) => {
+  if (!traceActive() || state.offsetPick) return;
+  e.stopImmediatePropagation(); e.preventDefault();
+  traceClickAt(screenToWorld(e.clientX, e.clientY), e.altKey, e.shiftKey);
+}, true);
+svg.addEventListener('mousemove', (e) => {
+  if (!traceActive() || state.offsetPick) { if (state.traceHover) { state.traceHover = null; hideTraceLoupe(); render(); } return; }
+  const w = screenToWorld(e.clientX, e.clientY);
+  drawTraceLoupe(e.clientX, e.clientY, w);
+  const h = traceSnap(w, e.altKey, e.shiftKey), o = state.traceHover;
+  if (o && o.kind === h.kind && Math.abs(o.p.x - h.p.x) < 1e-3 && Math.abs(o.p.y - h.p.y) < 1e-3) return;
+  state.traceHover = h;
+  render();
+});
+svg.addEventListener('mouseleave', () => { hideTraceLoupe(); if (state.traceHover) { state.traceHover = null; render(); } });
 // Measure tool: capture-phase, so a click picks a point and never also selects
 // or edits the wall/vertex/shape under it.
 svg.addEventListener('click', (e) => {
@@ -4257,6 +4388,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.42.0', '2026-10-02', 'Trace a scan by clicking its corners: once an image is scaled, click the start corner, then each corner in turn - the app works out every wall from the scale, squares walls that are nearly square and rounds to the inch. A magnifier shows the scan around the cursor so you land on the corner, a live line shows the length before you click, Shift keeps a wall level or plumb, and clicking the start closes the shape.'],
   ['0.41.2', '2026-10-02', 'Fixed: with a traced-over image loaded, clicking on it in Walk mode now sets the start point (the image used to swallow the click). Text labels and the floor menu work over it too.'],
   ['0.41.1', '2026-10-02', 'Calibrating a traced-over image now shows that it worked: a Scale set confirmation with the new width, and the line you calibrated on stays on screen in magenta with its length. Before, the picture looked unchanged because the view refits to it.'],
   ['0.41.0', '2026-10-02', 'Trace over a scan: the new Image tab lays a scanned or photographed floor plan under the drawing. Set it to scale by clicking two points a known distance apart (the printed scale bar is best), fade or lock it, keep it to one floor, then walk the perimeter straight over it. Show it on top to check a finished trace. The image is saved in the sketch file and never appears in an export.'],
@@ -4537,7 +4669,7 @@ function openHelp() {
     <section data-topic="underlay">
     <h4>Image — trace over a scan</h4>
     <div class="help-do-row"><a href="#" class="help-do" data-do="image">▶ Image</a></div>
-    <p>Load a scanned or photographed floor plan; it lies under the drawing. <b>Set the scale</b>: <i>Calibrate…</i>, click both ends of something whose real length you know — the plan's printed scale bar is most reliable — and type that length. Drag the image to line it up, then <i>Lock it in place</i>. <i>Fade</i> it, keep it to one floor, then switch to <b>Walk</b> and trace the perimeter over it. A finished area's fill hides the scan: tick <i>Show on top</i> to check a trace. The image is saved in the sketch file, never in an export, and not in Recent.</p>
+    <p>Load a scanned or photographed floor plan; it lies under the drawing. <b>Set the scale</b>: <i>Calibrate…</i>, click both ends of something whose real length you know — the plan's printed scale bar is most reliable — and type that length. Drag the image to line it up, then <i>Lock it in place</i>. <i>Fade</i> it and keep it to one floor. Then trace: <i>✎ Trace it — click the corners</i> (or the <i>Click corners</i> box in Walk) — click the start corner, then each corner in turn, with a magnifier to land exactly; click the start to close. Shift keeps a wall level or plumb. Or type the walls in Walk as usual. A finished area's fill hides the scan: tick <i>Show on top</i> to check a trace. The image is saved in the sketch file, never in an export, and not in Recent.</p>
     </section>
     <section data-topic="measure">
     <h4>📏 Measure</h4>
