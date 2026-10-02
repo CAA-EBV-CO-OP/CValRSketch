@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.37.0`
+**Current version:** `0.37.1`
 **Released:** 2026-10-02
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.37.1  | 2026-10-02 | patch  | **Help is a floating panel**: non-blocking, draggable, resizable, remembers position and size; 📌 pin reopens it with the app. |
 | 0.37.0  | 2026-10-02 | minor  | **Help window**: the Walk sidebar's Format card and long hints move to ❓ Help; the sidebar keeps a one-line example with a *Syntax & shortcuts* link, and Current Shape shows only once a wall is typed. |
 | 0.36.1  | 2026-10-01 | patch  | Import dialog: *Basement: use the main floor's outline* checkbox, and the table fits without side-scrolling. Other floors' faded area labels step aside from the active floor's labels. Basement-to-main match also in the Edit panel (basement tab / basement area selected). |
 | 0.36.0  | 2026-10-01 | minor  | **Match basement to main floor**: one click in the Basement panel copies the main-floor outline onto the basement (replacing the drawn basement outline; decks/patios stay), with drawn-vs-main areas shown first. |

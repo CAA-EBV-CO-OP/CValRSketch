@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.37.0"></script>
-<script src="dictation.js?v=0.37.0"></script>
+<script src="core.js?v=0.37.1"></script>
+<script src="dictation.js?v=0.37.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -38,10 +38,17 @@
   header .osasi-chip b { color: #FF7440; font-weight: 700; }
   header .osasi-chip:hover b { color: #FF8A5F; }
   .whatsnew-modal ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; }
-  .help-modal { max-height: 85vh; overflow-y: auto; }
-  .help-modal h4 { margin: 12px 0 4px; font-size: 13px; color: #2b3a4a; }
-  .help-modal p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
-  .help-modal code { background: #eef2f6; padding: 0 3px; border-radius: 3px; }
+  .help-panel { position: fixed; z-index: 900; display: flex; flex-direction: column; min-width: 260px; min-height: 140px;
+    background: #fff; border: 1px solid #b8c4d0; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.25); resize: both; overflow: hidden; }
+  .help-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: #2b3a4a; color: #fff; cursor: move; user-select: none; font-size: 13px; }
+  .help-bar button { background: #4a6377; color: #fff; border: none; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 12px; }
+  .help-bar button:hover { background: #5a7388; }
+  .help-bar .help-pin { opacity: .55; }
+  .help-bar .help-pin.on { opacity: 1; background: #d97706; }
+  .help-body { flex: 1; overflow-y: auto; padding: 4px 12px 10px; }
+  .help-body h4 { margin: 12px 0 4px; font-size: 13px; color: #2b3a4a; }
+  .help-body p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
+  .help-body code { background: #eef2f6; padding: 0 3px; border-radius: 3px; }
   .whatsnew-modal li { margin-bottom: 6px; }
   .whatsnew-modal .ver { font-family: ui-monospace, monospace; color: #2b6cb0; font-weight: 700; }
   .about-modal p { margin: 0 0 10px; font-size: 13px; line-height: 1.45; }
@@ -206,7 +213,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.37.0</span>
+  <span class="version-chip" id="app-version">v0.37.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="How to type walls, snap to corners, jump the pen, and the other tools">❓ Help</button>
@@ -2617,7 +2624,7 @@ function sidebarAction(e) {
     case 'cancelOffsetPick': cancelOffsetPick(); break;
     case 'removeAnnotation': removeAnnotation(parseInt(i)); break;
     case 'matchBasement': matchBasementToMain(e.currentTarget.dataset.b); break;
-    case 'help': e.preventDefault(); openHelp(); break;
+    case 'help': e.preventDefault(); if (!document.getElementById('help-panel')) openHelp(); break;
     case 'clearAnnotations': clearAnnotations(); break;
     case 'applyGroupMove': applyGroupMove(); break;
     case 'clearFenceSelection': clearFenceSelection(); break;
@@ -4013,6 +4020,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.37.1', '2026-10-02', 'Help is now a floating panel instead of a pop-up: it stays open while you draw, drags by its title bar, resizes from its corner and remembers where you left it; pin it and it opens with the app.'],
   ['0.37.0', '2026-10-02', 'A Help button: the wall-typing reference (lengths, angles, batch entry, snapping, pen-jump) moves out of the Walk sidebar into a Help window, so the sidebar keeps to the drawing in hand - Current Shape appears once you have typed a wall, and Measurements and Areas move up into view.'],
   ['0.36.1', '2026-10-01', 'PDF import can use the main floor outline for the basement straight away (a checkbox in the import dialog), the import dialog fits without side-scrolling, and another floor’s faded area label steps aside instead of printing over the label of the floor you are on.'],
   ['0.36.0', '2026-10-01', 'Match basement to main floor: in the Basement panel, one click replaces the basement outline of a building with a copy of its main-floor outline - for when you have measured the walls above grade and the exposed foundation agrees with them, but a traced or walked basement outline (an iGUIDE scan taken from inside, say) does not. The panel shows the drawn basement against the main floor so the gap is visible first; Undo puts the old outline back.'],
@@ -4118,14 +4126,32 @@ function openWhatsNew() {
 
 // Reference for typing walls and the drawing tools. It used to sit in the Walk
 // sidebar (the old Format card and the long hints), where it pushed the controls
-// for the drawing in hand off the screen.
+// for the drawing in hand off the screen. It is a floating panel, not a modal:
+// it stays open while you draw, drags by its title bar, resizes from its corner,
+// and remembers where it was. Pinned, it also reopens with the app. Position and
+// pin live in this browser only (a viewer preference, not part of the sketch).
+const HELP_KEY = 'cvalrsketch-help';
+function helpPrefs() { try { return JSON.parse(localStorage.getItem(HELP_KEY)) || {}; } catch (e) { return {}; } }
+function saveHelpPrefs(p) { try { localStorage.setItem(HELP_KEY, JSON.stringify({ ...helpPrefs(), ...p })); } catch (e) { /* private window: no memory, still works */ } }
 function openHelp() {
-  const m = createModal();
-  const div = document.createElement('div');
-  div.className = 'modal help-modal';
-  div.style.maxWidth = 'min(640px, calc(100vw - 32px))';
-  div.innerHTML = `
-    <h3>Help</h3>
+  const open = document.getElementById('help-panel');
+  if (open) { closeHelp(); return; }
+  const pr = helpPrefs();
+  const el = document.createElement('div');
+  el.id = 'help-panel';
+  el.className = 'help-panel';
+  const w = Math.min(pr.w || 460, window.innerWidth - 24), h = Math.min(pr.h || 420, window.innerHeight - 80);
+  el.style.width = w + 'px'; el.style.height = h + 'px';
+  el.style.left = Math.max(8, Math.min(pr.x ?? 16, window.innerWidth - w - 8)) + 'px';
+  el.style.top = Math.max(8, Math.min(pr.y ?? (window.innerHeight - h - 16), window.innerHeight - 60)) + 'px';
+  el.innerHTML = `
+    <div class="help-bar" title="Drag to move">
+      <b>❓ Help</b>
+      <span style="flex:1;"></span>
+      <button type="button" class="help-pin${pr.pinned ? ' on' : ''}" title="Pin: keep Help open, also the next time you open the app">📌</button>
+      <button type="button" class="help-x" title="Close (the ❓ Help button opens it again)">✕</button>
+    </div>
+    <div class="help-body">
     <h4>Typing a wall</h4>
     <p><code>&lt;length&gt; &lt;dir&gt; [angle]</code> — length <code>16'4</code>, <code>3'6"</code>, <code>8</code>, <code>0.5</code>; direction <code>r l u d</code>.</p>
     <p><b>Angles:</b> after <code>r</code> / <code>l</code>, the angle is degrees turned from your previous heading — <code>r</code> turns right, <code>l</code> turns left. On the first wall, or with <code>u</code> / <code>d</code>, it is degrees clockwise from that direction.</p>
@@ -4140,8 +4166,39 @@ function openHelp() {
     <p><b>Closing:</b> walk back to the start and the shape offers to close (Enter takes it). Land on an existing wall and the area you have fenced off is offered instead.</p>
     <h4>Other tools</h4>
     <p><b>📏 Measure</b> (or M): click any two points; corners and walls snap, Alt for a free point, Shift for level/plumb. <b>Edit</b>: click a wall, corner or area to change it. <b>Split</b>: cut an area in two. <b>Fence</b>: drag a box to move or delete what it catches. <b>Text</b>: click to place a note. <b>📐 Import PDF…</b>: an iGUIDE floor plan becomes the sketch.</p>
-    <div class="modal-buttons"><button class="primary" onclick="closeModal()">Close</button></div>`;
-  m.appendChild(div);
+    </div>`;
+  document.body.appendChild(el);
+  el.querySelector('.help-x').addEventListener('click', closeHelp);
+  el.querySelector('.help-pin').addEventListener('click', ev => {
+    const on = !helpPrefs().pinned;
+    saveHelpPrefs({ pinned: on });
+    ev.currentTarget.classList.toggle('on', on);
+  });
+  const bar = el.querySelector('.help-bar');
+  bar.addEventListener('mousedown', ev => {
+    if (ev.target.closest('button')) return;
+    ev.preventDefault();
+    const sx = ev.clientX - el.offsetLeft, sy = ev.clientY - el.offsetTop;
+    const move = e => {
+      el.style.left = Math.max(0, Math.min(e.clientX - sx, window.innerWidth - 60)) + 'px';
+      el.style.top = Math.max(0, Math.min(e.clientY - sy, window.innerHeight - 30)) + 'px';
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up);
+      saveHelpPrefs({ x: el.offsetLeft, y: el.offsetTop });
+    };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  });
+  if (window.ResizeObserver) {
+    let t = null;
+    new ResizeObserver(() => { clearTimeout(t); t = setTimeout(() => saveHelpPrefs({ w: el.offsetWidth, h: el.offsetHeight }), 250); }).observe(el);
+  }
+  saveHelpPrefs({ open: true });
+}
+function closeHelp() {
+  const el = document.getElementById('help-panel');
+  if (el) el.remove();
+  saveHelpPrefs({ open: false });
 }
 
 function openAbout() {
@@ -5309,6 +5366,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 autoRestoreSession();   // silently reopen the last session before the first paint
+if (helpPrefs().pinned && helpPrefs().open) openHelp();   // a pinned Help panel comes back with the app
 restoreFileHandle();    // pick the autosave file back up (or offer to resume it)
 render();
 setTimeout(focusWalkInput, 0);
