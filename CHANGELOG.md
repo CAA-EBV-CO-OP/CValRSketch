@@ -14,6 +14,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.38.0] — 2026-10-02
+
+### Added
+- **Help follows what you are doing.** It opens at the section for the current mode (Walk, Edit, Split, Fence, Text) or tool (Measure), marks it, and moves with you as you switch — so a pinned Help panel always shows the part that applies.
+- **Help covers the whole app**: sections for every mode, Measure, floors and buildings, the basement (including *Match to main floor outline*), PDF import, export and saving, and a keyboard-shortcut list taken from the shortcuts the app actually has. A row of topic chips at the top jumps between them.
+- **F1 or ? opens and closes Help** (when you are not typing in a box).
+
+---
+
 ## [0.37.1] — 2026-10-02
 
 ### Changed
