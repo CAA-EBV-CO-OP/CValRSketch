@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.40.0`
+**Current version:** `0.41.0`
 **Released:** 2026-10-02
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.41.0  | 2026-10-02 | minor  | **Trace over a scan**: Image mode lays a scanned/photographed plan under the drawing, scaled from two known points; fade, lock, per floor, show on top; saved in the sketch file, never exported, kept out of undo, autosave and Recent. |
 | 0.40.0  | 2026-10-02 | minor  | **Help points at the real controls**: action links per section; hover outlines the actual button, click runs it and flashes it. Destructive commands are never run from Help. |
 | 0.39.1  | 2026-10-02 | patch  | **Help pin made meaningful**: unpinned Help closes when you start working; pinned stays open while drawing (title says pinned) and opens with the app. |
 | 0.39.0  | 2026-10-02 | minor  | **Help topic filter**: chips toggle sections on/off, *Follow* adds the current mode/tool, *All* shows everything; picks remembered. |

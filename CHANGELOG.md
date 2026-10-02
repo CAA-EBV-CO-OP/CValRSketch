@@ -14,6 +14,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.41.0] — 2026-10-02
+
+### Added
+- **Trace over a scan.** A new **Image** mode puts a scanned or photographed floor plan under the sketch, so the perimeter can be walked straight over it instead of re-typed by eye. Load the image and drag it into place. Set the scale the way a plan is read: *Calibrate…*, click two points a known distance apart (a wall, a dimension line or the printed scale bar) and type that distance; the image scales about the first point. **Fade**, **Lock it in place**, a **per-floor** assignment for multi-storey jobs, and **Show on top of the drawing** for checking a finished trace (a completed area's fill hides the scan beneath it).
+- The image is stored in the sketch file as a downscaled JPEG (longest side 2,200 px), so a saved sketch travels with the plan it was traced from. It is tagged as a screen-only overlay and never reaches an export — a client deliverable must not carry someone else's drawing under it.
+- Help has an **Image** topic, with a link to the mode.
+
+### Notes
+- The image is kept out of undo history, the crash-recovery autosave and **Recent** (a few hundred KB each time would fill the browser's storage and stop the autosave). Reopening from Recent brings the sketch back without its image; the sketch file keeps it.
+- Built on the original *trace over a scanned plan* branch (PR #24, cut at 0.32.1), brought up to date with 0.33–0.40.
+
+---
+
 ## [0.40.0] — 2026-10-02
 
 ### Added

@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.40.0"></script>
-<script src="dictation.js?v=0.40.0"></script>
+<script src="core.js?v=0.41.0"></script>
+<script src="dictation.js?v=0.41.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -229,7 +229,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.40.0</span>
+  <span class="version-chip" id="app-version">v0.41.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -4238,6 +4238,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.41.0', '2026-10-02', 'Trace over a scan: the new Image tab lays a scanned or photographed floor plan under the drawing. Set it to scale by clicking two points a known distance apart (the printed scale bar is best), fade or lock it, keep it to one floor, then walk the perimeter straight over it. Show it on top to check a finished trace. The image is saved in the sketch file and never appears in an export.'],
   ['0.40.0', '2026-10-02', 'Help points at the real controls: each section has action links - hover one and the button it means is outlined wherever it sits (toolbar, floor bar or sidebar); click it and Help does what the button does and flashes it, so you learn where it lives. Nothing that discards work is run from Help.'],
   ['0.39.1', '2026-10-02', 'The Help pin now does something you can see: unpinned, Help closes as soon as you start working (a click in the drawing or any change); pinned, it stays open while you draw, says pinned in its title, and opens with the app.'],
   ['0.39.0', '2026-10-02', 'Help shows only what you pick: each topic chip switches its section on or off, Follow adds the section for what you are doing now, and All shows everything. Your picks are remembered.'],
@@ -4364,6 +4365,7 @@ const HELP_ACTIONS = {
   split: { find: () => document.querySelector('#mode-tabs button[data-mode="split"]'), run: true },
   fence: { find: () => document.querySelector('#mode-tabs button[data-mode="fence"]'), run: true },
   text: { find: () => document.querySelector('#mode-tabs button[data-mode="text"]'), run: true },
+  image: { find: () => document.querySelector('#mode-tabs button[data-mode="underlay"]'), run: true },
   measure: { find: () => document.getElementById('btn-measure'), run: true },
   cmd: { find: () => document.getElementById('cmd'), focus: true, mode: 'walk' },
   compass: { find: () => document.querySelector('#sidebar .rose-row'), mode: 'walk' },
@@ -4407,7 +4409,7 @@ function helpDo(key) {
     if (a.focus) t.focus();
   }, 0);
 }
-const HELP_TOPICS = [['walk', 'Walk'], ['edit', 'Edit'], ['split', 'Split'], ['fence', 'Fence'], ['text', 'Text'], ['measure', 'Measure'],
+const HELP_TOPICS = [['walk', 'Walk'], ['edit', 'Edit'], ['split', 'Split'], ['fence', 'Fence'], ['text', 'Text'], ['underlay', 'Image'], ['measure', 'Measure'],
   ['floors', 'Floors'], ['basement', 'Basement'], ['import', 'Import PDF'], ['export', 'Export & save'], ['keys', 'Keyboard']];
 // The section for what you are doing now: the measure tool, else the mode.
 function helpTopicNow() { return state.offsetPick ? 'measure' : state.mode; }
@@ -4510,6 +4512,11 @@ function openHelp() {
     <h4>Text</h4>
     <div class="help-do-row"><a href="#" class="help-do" data-do="text">▶ Text</a></div>
     <p>Click a blank spot to add a note. Click a note to select it, drag to move, double-click to edit; Delete removes it. Notes can run over several lines, and the first line can be a larger heading.</p>
+    </section>
+    <section data-topic="underlay">
+    <h4>Image — trace over a scan</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="image">▶ Image</a></div>
+    <p>Load a scanned or photographed floor plan; it lies under the drawing. <b>Set the scale</b>: <i>Calibrate…</i>, click both ends of something whose real length you know — the plan's printed scale bar is most reliable — and type that length. Drag the image to line it up, then <i>Lock it in place</i>. <i>Fade</i> it, keep it to one floor, then switch to <b>Walk</b> and trace the perimeter over it. A finished area's fill hides the scan: tick <i>Show on top</i> to check a trace. The image is saved in the sketch file, never in an export, and not in Recent.</p>
     </section>
     <section data-topic="measure">
     <h4>📏 Measure</h4>
@@ -5239,6 +5246,9 @@ function saveToRecents() {
   delete data.undoStack; delete data.redoStack; delete data.selection;
   delete data.fenceSelection; delete data.fenceDraw; delete data.offsetPick;
   delete data.preview; delete data.splitSelection; delete data.splitPreview;
+  // A traced-over scan is hundreds of KB; a few recents would fill the browser's
+  // storage and starve the crash-recovery autosave. The sketch file keeps it.
+  delete data.underlay; delete data.underlayDrag; delete data.underlayCal;
   try { localStorage.setItem(RECENT_PROJECT_PREFIX + key, JSON.stringify(data)); }
   catch (e) { /* may be quota */ }
   const recents = getRecents();
@@ -5754,6 +5764,7 @@ window.addEventListener('keydown', (e) => {
   if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undoHistory(); }
   else if (mod && !e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); saveJSON(); }
   else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoHistory(); }
+  else if (e.key === 'Escape' && state.underlayCal) { cancelUnderlayCal(); }
   else if (e.key === 'Escape' && state.offsetPick) { if (state.offsetPick.first) { state.offsetPick.first = null; render(); } else cancelOffsetPick(); }
   else if (e.key === 'Escape' && state.shapeMovePick) { cancelShapeMovePick(); }
   else if (e.key === 'Escape' && state.mode === 'edit' && state.selection) { state.selection = null; render(); }
