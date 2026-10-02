@@ -106,6 +106,7 @@ A wall may carry a circular arc: `shape.arcs = { [wallIdx]: rise }` (feet; posit
 - **World coords (feet)** — used for `state.startPoint`, `state.segments[i].dx/dy`, `shape.points[i].{x,y}`, `state.annotations[i].{a,b}`. Y grows downward.
 - **Screen coords (pixels)** — produced by `W(p)` inside `render()`, which closes over the current `fitView` output.
 - `viewTransform` is a module-level snapshot so mouse handlers can call `screenToWorld(clientX, clientY)` without access to the render closure.
+- **Zoom/pan:** `render()` uses `userView` (the reader's zoom/pan, same shape as `fitView()`'s result) when set, else `fitView()`. Anything that copies the live canvas for an export must see the automatic fit: `svgForExport`, `captureLivePanel`, `withFloorRendered` and `withBuildingRendered` re-enter themselves through `withFitView()`. Do the same for any new export path. Loading or starting a sketch clears `userView`; the gallery ignores it.
 
 ### 4.4 Cardinal Direction Conventions
 

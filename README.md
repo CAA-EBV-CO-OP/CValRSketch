@@ -6,7 +6,7 @@
 
 ![CValRSketch desktop app with the sample house open: main floor, garage, deck and porch, with wall lengths, areas and the basement panel](docs/screenshot.webp)
 
-**Version:** 0.42.1 (2026-10-02) · **License:** [AGPL-3.0](./LICENSE) · **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
+**Version:** 0.43.0 (2026-10-02) · **License:** [AGPL-3.0](./LICENSE) · **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
 
 Want a new feature? [Request it](https://github.com/CAA-EBV-CO-OP/CValRSketch/issues), or build it yourself — see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
@@ -129,6 +129,7 @@ Everything runs in the browser: plain HTML, CSS and vanilla JavaScript, nothing 
 - Action links in Help outline the real button and use it, so you learn where everything lives
 
 ### Other
+- **Zoom and pan** — mouse wheel or pinch zooms about the cursor, middle-drag (or ✋) pans, *Fit* resets; exports always print the whole plan
 - Undo / Redo (`Ctrl+Z` / `Ctrl+Y`)
 - Save / Load as JSON
 - Subject field persists with the sketch
