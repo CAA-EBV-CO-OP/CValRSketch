@@ -1,0 +1,395 @@
+{
+ "segments": [],
+ "shapes": [
+  {
+   "id": 1,
+   "label": "Main Floor",
+   "type": "living",
+   "floor": "main",
+   "building": "Dwelling 1",
+   "points": [
+    {
+     "x": 0,
+     "y": 0
+    },
+    {
+     "x": 40,
+     "y": 0
+    },
+    {
+     "x": 40,
+     "y": 12
+    },
+    {
+     "x": 46,
+     "y": 12
+    },
+    {
+     "x": 46,
+     "y": 28
+    },
+    {
+     "x": 0,
+     "y": 28
+    },
+    {
+     "x": 0,
+     "y": 0
+    }
+   ],
+   "segments": [
+    {
+     "length": 40,
+     "dir": "r",
+     "angle": 0,
+     "dx": 40,
+     "dy": 0,
+     "raw": "40'0\" r"
+    },
+    {
+     "length": 12,
+     "dir": "d",
+     "angle": 0,
+     "dx": 0,
+     "dy": 12,
+     "raw": "12'0\" d"
+    },
+    {
+     "length": 6,
+     "dir": "r",
+     "angle": 0,
+     "dx": 6,
+     "dy": 0,
+     "raw": "6'0\" r"
+    },
+    {
+     "length": 16,
+     "dir": "d",
+     "angle": 0,
+     "dx": 0,
+     "dy": 16,
+     "raw": "16'0\" d"
+    },
+    {
+     "length": 46,
+     "dir": "l",
+     "angle": 0,
+     "dx": -46,
+     "dy": 0,
+     "raw": "46'0\" l"
+    },
+    {
+     "length": 28,
+     "dir": "u",
+     "angle": 0,
+     "dx": 0,
+     "dy": -28,
+     "raw": "28'0\" u"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "label": "Garage",
+   "type": "garage",
+   "floor": "main",
+   "building": "Dwelling 1",
+   "points": [
+    {
+     "x": 46,
+     "y": 12
+    },
+    {
+     "x": 68,
+     "y": 12
+    },
+    {
+     "x": 68,
+     "y": 34
+    },
+    {
+     "x": 46,
+     "y": 34
+    },
+    {
+     "x": 46,
+     "y": 12
+    }
+   ],
+   "segments": [
+    {
+     "length": 22,
+     "dir": "r",
+     "angle": 0,
+     "dx": 22,
+     "dy": 0,
+     "raw": "22'0\" r"
+    },
+    {
+     "length": 22,
+     "dir": "d",
+     "angle": 0,
+     "dx": 0,
+     "dy": 22,
+     "raw": "22'0\" d"
+    },
+    {
+     "length": 22,
+     "dir": "l",
+     "angle": 0,
+     "dx": -22,
+     "dy": 0,
+     "raw": "22'0\" l"
+    },
+    {
+     "length": 22,
+     "dir": "u",
+     "angle": 0,
+     "dx": 0,
+     "dy": -22,
+     "raw": "22'0\" u"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "label": "Deck",
+   "type": "deck",
+   "floor": "main",
+   "building": "Dwelling 1",
+   "points": [
+    {
+     "x": 10,
+     "y": -12
+    },
+    {
+     "x": 30,
+     "y": -12
+    },
+    {
+     "x": 30,
+     "y": 0
+    },
+    {
+     "x": 10,
+     "y": 0
+    },
+    {
+     "x": 10,
+     "y": -12
+    }
+   ],
+   "segments": [
+    {
+     "length": 20,
+     "dir": "r",
+     "angle": 0,
+     "dx": 20,
+     "dy": 0,
+     "raw": "20'0\" r"
+    },
+    {
+     "length": 12,
+     "dir": "d",
+     "angle": 0,
+     "dx": 0,
+     "dy": 12,
+     "raw": "12'0\" d"
+    },
+    {
+     "length": 20,
+     "dir": "l",
+     "angle": 0,
+     "dx": -20,
+     "dy": 0,
+     "raw": "20'0\" l"
+    },
+    {
+     "length": 12,
+     "dir": "u",
+     "angle": 0,
+     "dx": 0,
+     "dy": -12,
+     "raw": "12'0\" u"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "label": "Porch",
+   "type": "porch",
+   "floor": "main",
+   "building": "Dwelling 1",
+   "points": [
+    {
+     "x": 16,
+     "y": 28
+    },
+    {
+     "x": 26,
+     "y": 28
+    },
+    {
+     "x": 26,
+     "y": 34
+    },
+    {
+     "x": 16,
+     "y": 34
+    },
+    {
+     "x": 16,
+     "y": 28
+    }
+   ],
+   "segments": [
+    {
+     "length": 10,
+     "dir": "r",
+     "angle": 0,
+     "dx": 10,
+     "dy": 0,
+     "raw": "10'0\" r"
+    },
+    {
+     "length": 6,
+     "dir": "d",
+     "angle": 0,
+     "dx": 0,
+     "dy": 6,
+     "raw": "6'0\" d"
+    },
+    {
+     "length": 10,
+     "dir": "l",
+     "angle": 0,
+     "dx": -10,
+     "dy": 0,
+     "raw": "10'0\" l"
+    },
+    {
+     "length": 6,
+     "dir": "u",
+     "angle": 0,
+     "dx": 0,
+     "dy": -6,
+     "raw": "6'0\" u"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "label": "Basement",
+   "type": "finished",
+   "floor": "basement",
+   "building": "Dwelling 1",
+   "points": [
+    {
+     "x": 0,
+     "y": 0
+    },
+    {
+     "x": 40,
+     "y": 0
+    },
+    {
+     "x": 40,
+     "y": 12
+    },
+    {
+     "x": 46,
+     "y": 12
+    },
+    {
+     "x": 46,
+     "y": 28
+    },
+    {
+     "x": 0,
+     "y": 28
+    },
+    {
+     "x": 0,
+     "y": 0
+    }
+   ],
+   "segments": [
+    {
+     "length": 40,
+     "dir": "r",
+     "angle": 0,
+     "dx": 40,
+     "dy": 0,
+     "raw": "40'0\" r"
+    },
+    {
+     "length": 12,
+     "dir": "d",
+     "angle": 0,
+     "dx": 0,
+     "dy": 12,
+     "raw": "12'0\" d"
+    },
+    {
+     "length": 6,
+     "dir": "r",
+     "angle": 0,
+     "dx": 6,
+     "dy": 0,
+     "raw": "6'0\" r"
+    },
+    {
+     "length": 16,
+     "dir": "d",
+     "angle": 0,
+     "dx": 0,
+     "dy": 16,
+     "raw": "16'0\" d"
+    },
+    {
+     "length": 46,
+     "dir": "l",
+     "angle": 0,
+     "dx": -46,
+     "dy": 0,
+     "raw": "46'0\" l"
+    },
+    {
+     "length": 28,
+     "dir": "u",
+     "angle": 0,
+     "dx": 0,
+     "dy": -28,
+     "raw": "28'0\" u"
+    }
+   ]
+  }
+ ],
+ "floors": [
+  "basement",
+  "main",
+  "upper",
+  "other"
+ ],
+ "buildings": [
+  "Dwelling 1",
+  "Dwelling 2",
+  "Dwelling 3",
+  "Outbuildings",
+  "Other"
+ ],
+ "activeFloor": "main",
+ "nextShapeId": 6,
+ "startPoint": null,
+ "annotations": [],
+ "basements": {
+  "Dwelling 1": {
+   "areaOverride": null,
+   "pctFinished": 80
+  }
+ },
+ "labels": [],
+ "nextLabelId": 1,
+ "subject": "123 Sample Rd, Anytown",
+ "subtitle": "Sample sketch (made-up house)"
+}
