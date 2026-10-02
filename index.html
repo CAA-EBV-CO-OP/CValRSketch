@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.39.1"></script>
-<script src="dictation.js?v=0.39.1"></script>
+<script src="core.js?v=0.40.0"></script>
+<script src="dictation.js?v=0.40.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -54,6 +54,13 @@
   .help-nav a.now { border: 1px dashed #2b6cb0; color: #2b6cb0; }
   .help-nav a[data-follow].on { background: #2f855a; border-color: #2f855a; }
   .help-nav a[data-all] { margin-left: auto; }
+  .help-do-row { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
+  .help-do { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #fff7e6; border: 1px solid #f0b45a; color: #8a4b00; text-decoration: none; }
+  .help-do:hover { background: #ffe9c2; }
+  .help-do.help-missing { background: #f3f4f6; border-color: #c7ccd3; color: #6b7280; }
+  .help-spot { outline: 3px solid #f59e0b !important; outline-offset: 2px; position: relative; z-index: 5; }
+  .help-flash { animation: helpFlash 0.8s ease-in-out 3; outline-offset: 2px; position: relative; z-index: 5; }
+  @keyframes helpFlash { 0%, 100% { outline: 3px solid rgba(245,158,11,0); box-shadow: 0 0 0 0 rgba(245,158,11,0); } 50% { outline: 3px solid #f59e0b; box-shadow: 0 0 0 6px rgba(245,158,11,.35); } }
   .help-body section { border-left: 3px solid transparent; padding-left: 7px; margin-left: -10px; }
   .help-body section.here { border-left-color: #2b6cb0; background: #f5f9fd; }
   .help-body p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; }
@@ -222,7 +229,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.39.1</span>
+  <span class="version-chip" id="app-version">v0.40.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -4032,6 +4039,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.40.0', '2026-10-02', 'Help points at the real controls: each section has action links - hover one and the button it means is outlined wherever it sits (toolbar, floor bar or sidebar); click it and Help does what the button does and flashes it, so you learn where it lives. Nothing that discards work is run from Help.'],
   ['0.39.1', '2026-10-02', 'The Help pin now does something you can see: unpinned, Help closes as soon as you start working (a click in the drawing or any change); pinned, it stays open while you draw, says pinned in its title, and opens with the app.'],
   ['0.39.0', '2026-10-02', 'Help shows only what you pick: each topic chip switches its section on or off, Follow adds the section for what you are doing now, and All shows everything. Your picks are remembered.'],
   ['0.38.0', '2026-10-02', 'Help follows what you are doing: it opens at the section for your current mode or tool and moves with you as you switch, with sections for every tool, floors and buildings, the basement, PDF import, export and saving, and a keyboard list; topic chips jump between them, and F1 or ? opens and closes it.'],
@@ -4146,6 +4154,60 @@ function openWhatsNew() {
 // and remembers where it was. Pinned, it also reopens with the app. Position and
 // pin live in this browser only (a viewer preference, not part of the sketch).
 const HELP_KEY = 'cvalrsketch-help';
+// Help's action links: hovering one outlines the real control wherever it is;
+// clicking does what that control does and flashes it, so the reader learns where
+// it lives. 'run' is false for controls that are only pointed at (a box to type
+// in, a list, a panel). Nothing that discards work (New, Delete floor) is here.
+const sidebarSection = title => [...document.querySelectorAll('#sidebar .section')].find(x => (x.querySelector('h2') || {}).textContent?.trim().toLowerCase().startsWith(title));
+const HELP_ACTIONS = {
+  walk: { find: () => document.querySelector('#mode-tabs button[data-mode="walk"]'), run: true },
+  edit: { find: () => document.querySelector('#mode-tabs button[data-mode="edit"]'), run: true },
+  split: { find: () => document.querySelector('#mode-tabs button[data-mode="split"]'), run: true },
+  fence: { find: () => document.querySelector('#mode-tabs button[data-mode="fence"]'), run: true },
+  text: { find: () => document.querySelector('#mode-tabs button[data-mode="text"]'), run: true },
+  measure: { find: () => document.getElementById('btn-measure'), run: true },
+  cmd: { find: () => document.getElementById('cmd'), focus: true, mode: 'walk' },
+  compass: { find: () => document.querySelector('#sidebar .rose-row'), mode: 'walk' },
+  dictate: { find: () => document.getElementById('btnMic'), mode: 'walk' },
+  offset: { find: () => document.getElementById('start-offset'), focus: true, mode: 'walk' },
+  measurelist: { find: () => sidebarSection('measurements') },
+  floors: { find: () => document.getElementById('floor-tabs') },
+  addfloor: { find: () => document.querySelector('#floor-bar button[onclick="addFloor()"]'), run: true },
+  building: { find: () => document.getElementById('building-select'), focus: true },
+  addfiles: { find: () => document.querySelector('header button[onclick*="add-json"]'), run: true },
+  basement: { find: () => sidebarSection('basement') },
+  import: { find: () => document.querySelector('header button[onclick*="import-pdf"]'), run: true },
+  export: { find: () => document.querySelector('header button[onclick="openExportPreview()"]'), run: true },
+  save: { find: () => document.querySelector('header button[onclick="saveJSON()"]'), run: true },
+  saveas: { find: () => document.querySelector('header button[onclick="saveJSONAs()"]'), run: true },
+  recent: { find: () => document.querySelector('header button[onclick="openRecentsModal()"]'), run: true },
+  appcopy: { find: () => document.querySelector('header button[onclick="confirmSaveAppCopy()"]'), run: true },
+  undo: { find: () => document.getElementById('btn-undo') },
+};
+function helpSpot(key, on) {
+  const a = HELP_ACTIONS[key]; const t = a && a.find();
+  if (!t) return null;
+  t.classList.toggle('help-spot', on);
+  if (on && t.closest('#sidebar')) t.scrollIntoView({ block: 'nearest' });
+  return t;
+}
+function helpDo(key) {
+  const a = HELP_ACTIONS[key];
+  if (!a) return;
+  if (a.mode && state.mode !== a.mode) document.querySelector(`#mode-tabs button[data-mode="${a.mode}"]`).click();   // the control only exists in that mode's sidebar
+  const before = a.find();
+  if (before) before.classList.remove('help-spot');
+  if (a.run && before) before.click();
+  // The click may have re-rendered the sidebar; find the control again to flash it.
+  setTimeout(() => {
+    const t = a.find();
+    if (!t) return;
+    if (t.closest('#sidebar')) t.scrollIntoView({ block: 'nearest' });
+    t.classList.remove('help-flash'); void t.offsetWidth; t.classList.add('help-flash');
+    setTimeout(() => t.classList.remove('help-flash'), 2400);
+    if (a.focus) t.focus();
+  }, 0);
+}
 const HELP_TOPICS = [['walk', 'Walk'], ['edit', 'Edit'], ['split', 'Split'], ['fence', 'Fence'], ['text', 'Text'], ['measure', 'Measure'],
   ['floors', 'Floors'], ['basement', 'Basement'], ['import', 'Import PDF'], ['export', 'Export & save'], ['keys', 'Keyboard']];
 // The section for what you are doing now: the measure tool, else the mode.
@@ -4220,6 +4282,7 @@ function openHelp() {
     <p class="help-empty" hidden>Pick one or more topics above, or turn on <b>Follow</b> to see help for what you are doing.</p>
     <section data-topic="walk">
     <h4>Walk — typing walls</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="walk">▶ Walk</a><a href="#" class="help-do" data-do="cmd">⌨ Segment box</a><a href="#" class="help-do" data-do="compass">🧭 Compass</a><a href="#" class="help-do" data-do="dictate">🎤 Dictate</a><a href="#" class="help-do" data-do="offset">↔ Start offset</a></div>
     <p><code>&lt;length&gt; &lt;dir&gt; [angle]</code> — length <code>16'4</code>, <code>3'6"</code>, <code>8</code>, <code>0.5</code>; direction <code>r l u d</code>.</p>
     <p><b>Angles:</b> after <code>r</code> / <code>l</code>, the angle is degrees turned from your previous heading — <code>r</code> turns right, <code>l</code> turns left. On the first wall, or with <code>u</code> / <code>d</code>, it is degrees clockwise from that direction.</p>
     <p><b>Several walls at once:</b> <code>16'4 u, 26'9 r, 8 d</code>. <b>One diagonal wall from its parts:</b> <code>5'd 2'l</code> or <code>5'd, 2'l</code>.</p>
@@ -4231,48 +4294,75 @@ function openHelp() {
     </section>
     <section data-topic="edit">
     <h4>Edit</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="edit">▶ Edit</a></div>
     <p>Click a <b>wall</b> to change its length, move it, bow it into a curve, or re-walk it (the shape reopens at that wall so you can type replacement legs). Click a <b>corner</b> to move or delete it. Click inside an <b>area</b> to change its label, type, floor, building or fill, copy it to a typed offset, or move it. Dimension and area labels drag to tidy spots.</p>
     </section>
     <section data-topic="split">
     <h4>Split</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="split">▶ Split</a></div>
     <p>Click a first corner, then a second corner of the same area, and it is divided in two; both halves keep the label, type and floor. Or, after the first corner, type a direction (<code>r l u d</code>) to project from it to the first wall it hits, then confirm.</p>
     </section>
     <section data-topic="fence">
     <h4>Fence</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="fence">▶ Fence</a></div>
     <p>Drag a rectangle on the canvas: corners inside it are captured. Type an offset and <i>Move</i> — walls with both ends captured move, walls crossing the fence stretch. <i>Delete fenced</i> (or Delete) removes whatever was captured whole: shapes, an unfinished walk, measurements.</p>
     </section>
     <section data-topic="text">
     <h4>Text</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="text">▶ Text</a></div>
     <p>Click a blank spot to add a note. Click a note to select it, drag to move, double-click to edit; Delete removes it. Notes can run over several lines, and the first line can be a larger heading.</p>
     </section>
     <section data-topic="measure">
     <h4>📏 Measure</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="measure">📏 Measure</a><a href="#" class="help-do" data-do="measurelist">Measurements list</a></div>
     <p>Click <b>📏 Measure</b> (or press M), then any two points. Clicks snap to corners, then walls; Alt places a free point, Shift keeps the line level or plumb. It stays on for the next one; Esc drops a half-made measurement, Esc again (or <i>Done measuring</i>) turns it off. Measurements belong to their floor; × in the sidebar list removes one.</p>
     </section>
     <section data-topic="floors">
     <h4>Floors and buildings</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="floors">Floor tabs</a><a href="#" class="help-do" data-do="addfloor">+ Floor</a><a href="#" class="help-do" data-do="building">Building list</a><a href="#" class="help-do" data-do="addfiles">➕ Add files…</a></div>
     <p>The floor tabs switch floors (PageUp / PageDown cycle them; double-click a blank spot for a floor menu). Other floors show faded under the one you are on (Settings). The <i>Building</i> list shows one building or <i>All</i>, a gallery of every building; <i>Add files…</i> merges other sketches in as buildings.</p>
     </section>
     <section data-topic="basement">
     <h4>Basement</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="basement">Basement panel</a></div>
     <p>The Basement panel declares a building's below-grade area and % finished. Its area follows the main floor unless you type one. When the basement you drew (or imported) differs from the main floor but the foundation you measured agrees with the walls above, <i>Match to main floor outline</i> — on the basement tab in Edit, or in the Basement panel — replaces the basement shape with a copy of the main floor's outline.</p>
     </section>
     <section data-topic="import">
     <h4>📐 Import PDF</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="import">📐 Import PDF…</a></div>
     <p>An iGUIDE floor-plan PDF becomes the sketch: every floor traced from the drawing, the garage and other excluded rooms split off, decks and porches traced, floors stacked over the main floor. The dialog checks each floor against iGUIDE's stated area and flags placements to check. The PDF is read on your computer, never uploaded; it needs the hosted app or a local web server.</p>
     </section>
     <section data-topic="export">
     <h4>Export and saving</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="export">🖨 Export / Preview</a><a href="#" class="help-do" data-do="save">Save</a><a href="#" class="help-do" data-do="saveas">Save As…</a><a href="#" class="help-do" data-do="recent">📂 Recent</a><a href="#" class="help-do" data-do="appcopy">💾 Save app copy</a></div>
     <p><i>Export / Preview</i> shows the printable sheet — page size, title, legend, floors side by side or one per building — and saves PNG or SVG. <i>Save</i> (Ctrl+S) / <i>Save As…</i> write the sketch file; in Chrome or Edge the file you saved or loaded is then autosaved after every change. <i>Recent</i> reopens sketches kept in this browser. <i>Save app copy</i> keeps a frozen copy of this version of the app beside a job.</p>
     </section>
     <section data-topic="keys">
     <h4>Keyboard</h4>
+    <div class="help-do-row"><a href="#" class="help-do" data-do="undo">↶ Undo</a><a href="#" class="help-do" data-do="measure">📏 Measure</a></div>
     <p><code>Ctrl+Z</code> undo · <code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code> redo · <code>Ctrl+S</code> save · <code>M</code> measure · <code>F1</code> or <code>?</code> help · <code>PageUp</code> / <code>PageDown</code> floors · <code>Esc</code> cancel / deselect · <code>Delete</code> removes what the fence captured, or the selected note · Walk, box empty: arrows jump the pen; Shift+arrows step the start point.</p>
     </section>
     </div>`;
   document.body.appendChild(el);
   el.querySelector('.help-x').addEventListener('click', closeHelp);
   el.querySelectorAll('.help-nav a').forEach(a => a.addEventListener('click', ev => { ev.preventDefault(); toggleHelpChip(a); }));
+  el.querySelectorAll('.help-do').forEach(a => {
+    const k = a.dataset.do;
+    a.title = HELP_ACTIONS[k] && HELP_ACTIONS[k].run ? 'Hover to see where it is; click to use it' : 'Hover or click to see where it is';
+    a.addEventListener('mouseenter', () => helpSpot(k, true));
+    a.addEventListener('mouseleave', () => helpSpot(k, false));
+    a.addEventListener('click', ev => {
+      ev.preventDefault(); helpSpot(k, false); helpDo(k);
+      // A control that only appears when it applies (the Basement panel needs a building):
+      // say so instead of doing nothing.
+      setTimeout(() => {
+        if (HELP_ACTIONS[k].find()) return;
+        a.classList.add('help-missing'); a.dataset.was = a.dataset.was || a.textContent;
+        a.textContent = a.dataset.was + ' — not on screen yet';
+        setTimeout(() => { a.classList.remove('help-missing'); a.textContent = a.dataset.was; }, 2500);
+      }, 30);
+    });
+  });
   applyHelpFilter();
   el.querySelector('.help-pin').addEventListener('click', ev => {
     const on = !helpPrefs().pinned;

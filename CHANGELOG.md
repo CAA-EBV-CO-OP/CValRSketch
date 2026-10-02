@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.40.0] — 2026-10-02
+
+### Added
+- **Help points at the real controls.** Each Help section starts with a row of action links — *▶ Fence*, *📏 Measure*, *⌨ Segment box*, *🧭 Compass*, *📐 Import PDF…*, *🖨 Export / Preview*, *Basement panel* and so on (24 in all). Hovering one outlines the actual control wherever it sits — toolbar, floor bar or sidebar, scrolling the sidebar to it if needed. Clicking one does what that control does (switch mode, start Measure, open Import, put the cursor in the segment box) and flashes it, so the reader learns where it lives and may not need Help next time. Controls that are only pointed at — a list, a panel, the compass — are outlined and scrolled to. A control that is not on screen yet (the Basement panel before there is a building) says so on the link.
+- Nothing that discards work — New, Delete floor — is run from Help.
+
+---
+
 ## [0.39.1] — 2026-10-02
 
 ### Changed
