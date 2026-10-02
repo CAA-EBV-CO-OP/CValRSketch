@@ -19,7 +19,7 @@ const TYPES = {
   finished:   { name: 'Finished basement',  fill: '#eaf4ea', dashed: false },
   unfinished: { name: 'Unfinished (mech)',  fill: 'url(#unfinishedHatch)', dashed: false },
   porch:      { name: 'Open covered porch', fill: 'url(#porchHatch)', dashed: true },
-  garage:     { name: 'Garage',             fill: '#efe6dc', dashed: false },
+  garage:     { name: 'Garage',             fill: '#e3e4e6', dashed: false },
   deck:       { name: 'Open deck',          fill: '#e8dcc8', dashed: true },
   upper:      { name: 'Upper floor area',   fill: '#f0e6f4', dashed: false },
   outbuilding:{ name: 'Outbuilding',        fill: '#e6e0d4', dashed: false },

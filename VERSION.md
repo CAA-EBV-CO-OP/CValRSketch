@@ -12,7 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
-| 0.43.1  | 2026-10-02 | patch  | Flagged **START** pin for the walk start; reads *CLICK TO CLOSE* when tracing and the cursor is on it. |
+| 0.43.1  | 2026-10-02 | patch  | Flagged **START** pin for the walk start; reads *CLICK TO CLOSE* when tracing and the cursor is on it. Garage fill is now light grey. |
 | 0.43.0  | 2026-10-02 | minor  | **Zoom and pan**: wheel/pinch zoom about the cursor, middle-drag or ✋ pan, −/＋/Fit controls with the zoom %, exports always use the full-plan fit. |
 | 0.42.1  | 2026-10-02 | patch  | Image tab with no image opens the file picker straight away. |
 | 0.42.0  | 2026-10-02 | minor  | **Click corners to trace a scan**: click start + each corner; walls from the image scale, squared within 2°, rounded to the inch; magnifier, live length, Shift level/plumb, click start to close. |
