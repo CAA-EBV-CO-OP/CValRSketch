@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.43.1`
+**Current version:** `0.44.0`
 **Released:** 2026-10-02
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.44.0  | 2026-10-02 | minor  | **Drag corners** in Edit (snap to corners and the inch; shared corners move in both areas); **Ctrl** squares the corner up with its neighbours. |
 | 0.43.1  | 2026-10-02 | patch  | Flagged **START** pin for the walk start; reads *CLICK TO CLOSE* when tracing and the cursor is on it. Garage fill is now light grey. **Remove this wall** offers previewed options (merge with the neighbouring area, extend neighbours, join across either corner). |
 | 0.43.0  | 2026-10-02 | minor  | **Zoom and pan**: wheel/pinch zoom about the cursor, middle-drag or ✋ pan, −/＋/Fit controls with the zoom %, exports always use the full-plan fit. |
 | 0.42.1  | 2026-10-02 | patch  | Image tab with no image opens the file picker straight away. |
