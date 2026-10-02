@@ -3,7 +3,7 @@
 **Floor plan sketching for residential appraisal that runs entirely in the browser.** Use it offline from a local download or host it yourself; your sketches never leave your machine.
 Walk a path by entering wall segments (e.g. `40'3 l`, `34 d`, `13'4 r`), and the app draws the polygon, calculates square footage, and exports a labeled sketch as SVG or PNG.
 
-**Version:** 0.34.1 (2026-10-01)
+**Version:** 0.35.0 (2026-10-01)
 **License:** [AGPL-3.0](./LICENSE)
 **Repo:** https://github.com/CAA-EBV-CO-OP/CValRSketch
 **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
@@ -104,7 +104,8 @@ The file is fully self-contained: HTML + inline CSS + vanilla JavaScript. No ext
 ### Import a floor-plan PDF
 - **📐 Import PDF…** reads an **iGUIDE** floor-plan PDF and creates one shape per floor, traced from the PDF's vector drawing (not a picture), so corners land within about half an inch
 - A check table compares each traced floor with the area iGUIDE states; floors go to the matching tab, multi-building plans arrive as separate buildings
-- Rooms iGUIDE excludes (garage, unheated rooms) are inside the traced outline — split them off; decks and porches are drawn as usual
+- Rooms iGUIDE excludes (garage, unheated sun room) come in as their own areas, sized to the excluded area it states; decks, porches and patios are traced from the outline around their label
+- Each floor is turned and slid to sit over the main floor (wall directions, the page compass, then walls landing on walls); placements that are a judgment call are flagged *check position*
 - Runs on your computer: the PDF is never uploaded. Needs the hosted app (or any local web server); a page opened straight from disk cannot load the PDF reader
 - New formats are added as *format profiles* in `pdf-import.mjs`
 
