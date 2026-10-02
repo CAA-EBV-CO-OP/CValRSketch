@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.44.0] — 2026-10-02
+
+### Added
+- **Drag corners with the mouse** in Edit. Press on a corner and drag: it follows the pointer, snapping to other corners and rounding to the inch, and the wall lengths update as you go. A corner shared with another area (the end of a split line, say) moves in both, so the areas stay joined. A plain click still selects the corner; one undo reverses a drag.
+- **Hold Ctrl while dragging to square a corner up.** Each wall to a neighbouring corner that is nearer plumb than level becomes exactly plumb (and the other way round), with a magenta guide to the corner it lines up with. Handy for a corner traced or imported a few inches off.
+
+---
+
 ## [0.43.1] — 2026-10-02
 
 ### Changed

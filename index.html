@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.43.1"></script>
-<script src="dictation.js?v=0.43.1"></script>
+<script src="core.js?v=0.44.0"></script>
+<script src="dictation.js?v=0.44.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -236,7 +236,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.43.1</span>
+  <span class="version-chip" id="app-version">v0.44.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -417,6 +417,7 @@ function restoreState(snap) {
   state.fenceDraw = null;
   state.splitSelection = null;
   state.wallRemoval = null;
+  state.vertexDrag = null;
 }
 
 // ----- Session autosave / crash recovery (localStorage-backed) --------------
@@ -1090,6 +1091,7 @@ function render() {
   // Fence rectangle + selection highlight
   renderFence(W);
   renderWallRemoval(W);
+  renderVertexDrag(W);
 
   // Current in-progress segments
   if (state.segments.length) renderInProgress(W);
@@ -1338,8 +1340,13 @@ function renderShape(sh, W, isGhost) {
       }
       if (addHits) {
         const hit = addEl('circle', { cx: p.x, cy: p.y, r: 12, class: 'hit-vertex' });
+        if (!isGhost && state.mode === 'edit' && !state.shapeMovePick) {
+          hit.style.cursor = 'move';
+          hit.addEventListener('mousedown', (ev) => startVertexDrag(ev, sh.id, i));
+        }
         hit.addEventListener('click', (ev) => {
           ev.stopPropagation();
+          if (vertexDragJustEnded()) return;
           if (state.shapeMovePick) { handleShapeMovePick(sh, i); return; }
           if (canPickStart) setStartPoint(sh.points[i]);
           else if (canSnapTo) snapWalkToPoint(sh.points[i]);
@@ -1998,6 +2005,94 @@ function shapeLabelDragMove(e) {
   sh.labelOffset = { dx: (w.x - state.shapeLabelDrag.grabX) - base.x, dy: (w.y - state.shapeLabelDrag.grabY) - base.y };
   render();
 }
+// ----- Drag a corner with the mouse (Edit mode) ---------------------------------
+// The corner follows the pointer, snapping to other corners and rounding to the
+// inch; a corner shared with another area (a split line's end) moves in both.
+// Hold Ctrl to square it up: each wall to a neighbouring corner that is nearer
+// plumb than level becomes plumb (and vice versa), so a corner that was nudged
+// off by a few inches snaps back into line.
+let vertexDragEnded = 0;
+function vertexDragJustEnded() { return Date.now() - vertexDragEnded < 250; }
+function startVertexDrag(ev, shapeId, idx) {
+  if (ev.button !== 0 || galleryActive()) return;
+  ev.stopPropagation(); ev.preventDefault();
+  const sh = state.shapes.find(s => s.id === shapeId);
+  if (!sh) return;
+  const p0 = { ...sh.points[idx] };
+  const linked = [];
+  shapesOnFloor(state.activeFloor).forEach(o => o.points.forEach((q, k) => {
+    if (k < o.points.length - 1 && Math.hypot(q.x - p0.x, q.y - p0.y) < 1e-6) linked.push({ id: o.id, k });
+  }));
+  state.vertexDrag = { shapeId, idx, p0, linked, x: ev.clientX, y: ev.clientY, moved: false, guides: [] };
+}
+function vertexDragTarget(raw, ctrl) {
+  const vd = state.vertexDrag, sh = state.shapes.find(s => s.id === vd.shapeId);
+  const n = sh.points.length - 1;
+  const nbrs = [sh.points[(vd.idx - 1 + n) % n], sh.points[(vd.idx + 1) % n]];
+  vd.guides = [];
+  if (ctrl) {
+    const t = { x: raw.x, y: raw.y };
+    let fx = null, fy = null;   // the neighbour whose x (plumb wall) / y (level wall) we take
+    nbrs.forEach(q => {
+      const dx = Math.abs(raw.x - q.x), dy = Math.abs(raw.y - q.y);
+      if (dx <= dy) { if (!fx || dx < Math.abs(raw.x - fx.x)) fx = q; }
+      else if (!fy || dy < Math.abs(raw.y - fy.y)) fy = q;
+    });
+    if (fx) { t.x = fx.x; vd.guides.push(fx); }
+    if (fy) { t.y = fy.y; vd.guides.push(fy); }
+    return t;
+  }
+  const reach = 10 / viewTransform.scale, own = new Set(vd.linked.map(l => l.id + ':' + l.k));
+  let best = null, bd = reach;
+  shapesOnFloor(state.activeFloor).forEach(o => o.points.forEach((q, k) => {
+    if (own.has(o.id + ':' + k) || (k === o.points.length - 1)) return;
+    const d = Math.hypot(q.x - raw.x, q.y - raw.y);
+    if (d < bd) { bd = d; best = q; }
+  }));
+  if (best) return { x: best.x, y: best.y };
+  return { x: Math.round(raw.x * 12) / 12, y: Math.round(raw.y * 12) / 12 };
+}
+function vertexDragMove(e) {
+  const vd = state.vertexDrag;
+  if (!vd) return;
+  if (!vd.moved) {
+    if (Math.abs(e.clientX - vd.x) + Math.abs(e.clientY - vd.y) < 4) return;
+    pushUndo(); vd.moved = true;
+    state.selection = { kind: 'vertex', shapeId: vd.shapeId, idx: vd.idx };
+  }
+  const t = vertexDragTarget(screenToWorld(e.clientX, e.clientY), e.ctrlKey || e.metaKey);
+  vd.linked.forEach(l => {
+    const o = state.shapes.find(s => s.id === l.id);
+    if (!o) return;
+    o.points[l.k] = { x: t.x, y: t.y };
+    syncClosure(o, l.k);
+    rebuildSegments(o);
+  });
+  render();
+}
+function vertexDragUp() {
+  const vd = state.vertexDrag;
+  if (!vd) return;
+  state.vertexDrag = null;
+  if (vd.moved) { vertexDragEnded = Date.now(); render(); }
+}
+function renderVertexDrag(W) {
+  const vd = state.vertexDrag;
+  if (!vd || !vd.moved || !vd.guides.length) return;
+  const sh = state.shapes.find(s => s.id === vd.shapeId);
+  if (!sh) return;
+  const c = W(sh.points[vd.idx]);
+  vd.guides.forEach(q => {
+    const g = W(q);
+    addEl('line', { x1: g.x, y1: g.y, x2: c.x, y2: c.y, stroke: '#e6007a', 'stroke-width': 1.5, 'stroke-dasharray': '6,4', class: 'ui-overlay', 'pointer-events': 'none' });
+  });
+  addEl('rect', { x: c.x - 6, y: c.y - 6, width: 12, height: 12, fill: 'none', stroke: '#e6007a', 'stroke-width': 2, class: 'ui-overlay', 'pointer-events': 'none' });
+}
+window.addEventListener('mousemove', vertexDragMove);
+window.addEventListener('mouseup', vertexDragUp);
+// The click that ends a drag lands on whatever is under the pointer; it must not also select or deselect.
+svg.addEventListener('click', (e) => { if (vertexDragJustEnded()) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+
 function shapeLabelDragUp() {
   if (!state.shapeLabelDrag) return;
   state.shapeLabelDrag = null; state.dimLabelDrag = null; state.shapeMovePick = null;
@@ -4499,6 +4594,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.44.0', '2026-10-02', 'Drag corners with the mouse in Edit: a corner follows the pointer, snapping to other corners and to the inch, and a corner shared with another area moves in both. Hold Ctrl while dragging to square it up with its neighbours, so walls that are nearly plumb or level become exactly plumb or level.'],
   ['0.43.1', '2026-10-02', 'The start of a walk is now a flagged START pin, easy to find when it is time to close. While clicking corners on an image, it grows and reads CLICK TO CLOSE when the cursor is on it. Garages are now a light grey, so they no longer look like living area. Remove this wall (Edit) now lets you choose how the outline closes, with a preview: merge with the area on the other side (undo a split), run the neighbouring walls on until they meet, or join across either corner. Tab cycles, Enter applies.'],
   ['0.43.0', '2026-10-02', 'Zoom and pan the drawing: the mouse wheel or a trackpad pinch zooms about the cursor, drag with the middle button (or turn on the hand) to pan, and the controls at the bottom-left of the drawing zoom in, out or back to Fit. Exports always print the whole plan whatever the zoom.'],
   ['0.42.1', '2026-10-02', 'Clicking Image with no image loaded opens the file picker straight away - no extra Load image click.'],
@@ -4763,7 +4859,7 @@ function openHelp() {
     <section data-topic="edit">
     <h4>Edit</h4>
     <div class="help-do-row"><a href="#" class="help-do" data-do="edit">▶ Edit</a></div>
-    <p>Click a <b>wall</b> to change its length, move it, bow it into a curve, or re-walk it (the shape reopens at that wall so you can type replacement legs). Click a <b>corner</b> to move or delete it. Click inside an <b>area</b> to change its label, type, floor, building or fill, copy it to a typed offset, or move it. Dimension and area labels drag to tidy spots.</p>
+    <p>Click a <b>wall</b> to change its length, move it, bow it into a curve, or re-walk it (the shape reopens at that wall so you can type replacement legs). Click a <b>corner</b> to move or delete it, or <b>drag</b> it with the mouse: it snaps to other corners and to the inch, and hold <b>Ctrl</b> while dragging to square it up so its walls run exactly plumb or level. Click inside an <b>area</b> to change its label, type, floor, building or fill, copy it to a typed offset, or move it. Dimension and area labels drag to tidy spots.</p>
     </section>
     <section data-topic="split">
     <h4>Split</h4>
