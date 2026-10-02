@@ -6,7 +6,7 @@
 
 ![CValRSketch desktop app with the sample house open: main floor, garage, deck and porch, with wall lengths, areas and the basement panel](docs/screenshot.webp)
 
-**Version:** 0.40.0 (2026-10-02) · **License:** [AGPL-3.0](./LICENSE) · **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
+**Version:** 0.41.0 (2026-10-02) · **License:** [AGPL-3.0](./LICENSE) · **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
 
 Want a new feature? [Request it](https://github.com/CAA-EBV-CO-OP/CValRSketch/issues), or build it yourself — see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
@@ -89,6 +89,7 @@ Everything runs in the browser: plain HTML, CSS and vanilla JavaScript, nothing 
 
 ### Editing
 - **Edit mode** — select any wall or vertex to modify length, move, insert, delete, or curve a wall into an arc by its rise
+- **Image mode** — load a scanned plan, set it to scale from two known points, and trace over it
 - **Length-edit modes** — stretch end, symmetric, maintain rectangle
 - **Split mode** — divide a shape with a projected wall
 - **Fence (group stretch)** — drag a selection rectangle; enclosed vertices translate, crossing walls stretch

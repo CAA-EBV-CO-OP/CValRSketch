@@ -97,6 +97,10 @@ These are distinct and should not be mixed.
 
 A wall may carry a circular arc: `shape.arcs = { [wallIdx]: rise }` (feet; positive bows outward from the interior, negative inward). The vertices stay the chord endpoints, so every point-based edit keeps working; `wallArc()` re-derives radius, apex, SVG flags and the circular-segment area on demand. Use `shapeArea(shape)` (not `polygonArea(points)`) for anything user-facing, `shapePathD()` / `wallPathD()` for outlines, and `shapeExtentPoints()` when fitting or cropping. Like `dimOffsets`, `arcs` is keyed by wall index — any operation that inserts, removes or reorders vertices must re-key it (`remapByWall`).
 
+### 4.2b Underlay (traced-over scan)
+
+`state.underlay` is `{ src, w, h, x, y, ftPerPx, opacity, floor, locked, onTop, name }`. `src` is a downscaled JPEG data URL; `x`/`y` are the world position of the image's top-left corner in feet and `ftPerPx` its scale, so image pixel `(px, py)` is world `(x + px*ftPerPx, y + py*ftPerPx)`. `renderUnderlay(W, layer)` is called twice per render — once as `'below'` and once as `'above'` — and returns early unless the layer matches `onTop`. It is tagged `ui-overlay` so exports strip it. Keep it OUT of `snapshotState()` (undo must not carry hundreds of KB) and out of the localStorage autosave (quota); `serializeProject()` includes it, so project files carry it. `underlayDrag` and `underlayCal` are transient and stripped on save.
+
 ### 4.3 Coordinate Systems
 
 - **World coords (feet)** — used for `state.startPoint`, `state.segments[i].dx/dy`, `shape.points[i].{x,y}`, `state.annotations[i].{a,b}`. Y grows downward.
