@@ -4,7 +4,7 @@
 
 **▶ Use it now:** [Desktop](https://caa-ebv-co-op.github.io/CValRSketch/) · [Phone](https://caa-ebv-co-op.github.io/CValRSketch/m/) · [Download the latest release](https://github.com/CAA-EBV-CO-OP/CValRSketch/releases/latest)
 
-<!-- Screenshot: docs/screenshot.png — the sample house (docs/sample-house.json) open in the desktop app. -->
+![CValRSketch desktop app with the sample house open: main floor, garage, deck and porch, with wall lengths, areas and the basement panel](docs/screenshot.webp)
 
 **Version:** 0.40.0 (2026-10-02) · **License:** [AGPL-3.0](./LICENSE) · **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
 
