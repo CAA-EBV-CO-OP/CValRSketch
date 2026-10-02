@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.43.0"></script>
-<script src="dictation.js?v=0.43.0"></script>
+<script src="core.js?v=0.43.1"></script>
+<script src="dictation.js?v=0.43.1"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -236,7 +236,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.43.0</span>
+  <span class="version-chip" id="app-version">v0.43.1</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -416,6 +416,7 @@ function restoreState(snap) {
   state.fenceSelection = null;
   state.fenceDraw = null;
   state.splitSelection = null;
+  state.wallRemoval = null;
 }
 
 // ----- Session autosave / crash recovery (localStorage-backed) --------------
@@ -1088,6 +1089,7 @@ function render() {
 
   // Fence rectangle + selection highlight
   renderFence(W);
+  renderWallRemoval(W);
 
   // Current in-progress segments
   if (state.segments.length) renderInProgress(W);
@@ -1105,9 +1107,7 @@ function render() {
       if (verts.some(p => Math.abs(p.y - start.y) < tol))
         addEl('line', { x1: 0, y1: startScreen.y, x2: svg.clientWidth, y2: startScreen.y, stroke: '#2e8b57', 'stroke-width': 1, 'stroke-dasharray': '4,4', opacity: 0.45, class: 'ui-overlay' });
     }
-    addEl('circle', { cx: startScreen.x, cy: startScreen.y, r: 6, fill: '#2e8b57', stroke: '#fff', 'stroke-width': 2, class: 'ui-overlay' });
-    const lbl = state.startPoint ? 'start (picked)' : 'start';
-    addEl('text', { x: startScreen.x+10, y: startScreen.y+4, 'font-size': 12, fill: '#666', class: 'ui-overlay' }, lbl);
+    drawStartPin(startScreen, state.startPoint ? 'START (picked)' : 'START', false);
   }
 
   // Walk preview (auto-extend or pen-jump candidate)
@@ -1379,6 +1379,18 @@ function renderShape(sh, W, isGhost) {
   }
 }
 
+// The start of a walk, drawn as a flagged pin so it can be found at a glance when
+// it is time to close. `closing` = the cursor is on it and a click would close.
+function drawStartPin(c, label, closing) {
+  const g = '#2e8b57', o = { class: 'ui-overlay', 'pointer-events': 'none' };
+  addEl('circle', { cx: c.x, cy: c.y, r: closing ? 16 : 11, fill: g, 'fill-opacity': closing ? 0.25 : 0.12, stroke: g, 'stroke-width': closing ? 3 : 2, ...o });
+  addEl('circle', { cx: c.x, cy: c.y, r: 5.5, fill: g, stroke: '#fff', 'stroke-width': 2, ...o });
+  addEl('line', { x1: c.x, y1: c.y - 11, x2: c.x, y2: c.y - 30, stroke: g, 'stroke-width': 2, ...o });
+  const w = label.length * 7 + 12;
+  addEl('rect', { x: c.x, y: c.y - 40, width: w, height: 16, rx: 3, fill: g, ...o });
+  addEl('text', { x: c.x + 6, y: c.y - 28, 'font-size': 11, 'font-weight': 'bold', fill: '#fff', ...o }, label);
+}
+
 function renderInProgress(W) {
   const pts = pathPointsHere(state.segments).map(W);
   // Use M (move) instead of L (line) for jump segments so the wall path doesn't draw across them
@@ -1392,10 +1404,11 @@ function renderInProgress(W) {
     ? `M${pts[i].x} ${pts[i].y} L${pts[i+1].x} ${pts[i+1].y}` : null
   ).filter(Boolean).join(' ');
   if (jumpD) addEl('path', { d: jumpD, fill: 'none', stroke: '#aaa', 'stroke-width': 1.2, 'stroke-dasharray': '2,4' });
-  const start = pts[0];
-  addEl('circle', { cx: start.x, cy: start.y, r: 5, fill: '#2e8b57' });
+  const start = pts[0], startW = pathPointsHere(state.segments)[0], h = state.traceHover;
+  const closing = traceActive() && h && h.kind === 'vertex' && state.segments.length >= 2 && Math.hypot(h.p.x - startW.x, h.p.y - startW.y) < 1e-6;
   const pen = pts[pts.length-1];
-  addEl('circle', { cx: pen.x, cy: pen.y, r: 6, fill: '#c44' });
+  addEl('circle', { cx: pen.x, cy: pen.y, r: 6, fill: '#c44', stroke: '#fff', 'stroke-width': 1.5 });
+  drawStartPin(start, closing ? 'CLICK TO CLOSE' : 'START', closing);
   if (state.settings.showSegmentLabels) {
     state.segments.forEach((seg,i) => {
       if (seg.jump) return;
@@ -2559,6 +2572,7 @@ function sidebarEdit() {
     return `
       <div class="section">
         <h2>Wall ${sel.idx+1} of "${escapeHtml(sh.label)}"${arc ? ' (curved)' : ''}</h2>
+        ${wallRemovalBlock()}
         <div class="field"><label>Length</label><input id="edit-len" value="${formatLength(len)}"></div>
         <div class="field"><label>Mode</label><select id="edit-mode">
           <option value="stretch-end"${state.settings.defaultLengthEditMode==='stretch-end'?' selected':''}>Move end vertex (adjacent walls change)</option>
@@ -2590,9 +2604,9 @@ function sidebarEdit() {
         <div class="row-buttons">
           <button data-act="insertVertex">Insert vertex (midpoint)</button>
           <button data-act="rewalkWall" title="Remove this wall and reopen the shape as a walk ending at its start — type the replacement legs, then Close Shape">Re-walk this wall</button>
-          <button data-act="deleteWall" class="danger">Merge (delete this wall)</button>
+          <button data-act="deleteWall" class="danger" title="Choose how the outline closes up without this wall, including merging with the area on the other side">Remove this wall…</button>
         </div>
-        <div class="help" style="margin-top:6px;"><b>Re-walk</b> drops the wall and reopens the shape as a walk in progress ending at this wall's start, keeping its label, type and floor; type the replacement legs (as many as you like) and press Close Shape. <b>Merge</b> joins the two neighbours with one straight wall.</div>
+        <div class="help" style="margin-top:6px;"><b>Re-walk</b> drops the wall and reopens the shape as a walk in progress ending at this wall's start, keeping its label, type and floor; type the replacement legs (as many as you like) and press Close Shape. <b>Remove</b> offers the ways the outline can close up without it, previewed on the drawing: merge with the area on the other side (e.g. undo a split), run the walls on each side on until they meet, or join straight across one of its corners. Tab cycles, Enter applies.</div>
       </div>`;
   }
 
@@ -2962,6 +2976,10 @@ function sidebarAction(e) {
     case 'moveWall': moveSelectedWall(); break;
     case 'insertVertex': insertVertexAction(); break;
     case 'deleteWall': deleteWallAction(); break;
+    case 'wallRmPick': if (state.wallRemoval) { state.wallRemoval.idx = parseInt(id); render(); } break;
+    case 'wallRmNext': nextWallRemoval(); break;
+    case 'wallRmApply': applyWallRemoval(); break;
+    case 'wallRmCancel': cancelWallRemoval(); break;
     case 'rewalkWall': rewalkSelectedWall(); break;
     case 'moveVertex': moveSelectedVertex(); break;
     case 'deleteVertex': deleteSelectedVertex(); break;
@@ -3112,18 +3130,90 @@ function insertVertexAction() {
   render();
 }
 
+// ----- Remove a wall: choose how the outline closes up -------------------------
+// Removing a wall has several sensible results, so they are offered as options
+// with a preview, cycled with Tab and applied with Enter: merge with the area on
+// the other side (the cut a Split leaves; keep either area's type), run the
+// neighbouring walls on until they meet, or join them straight across either corner.
+function wallRemovalOptions(sh, wi) {
+  const opts = [], bld = sh.building || DEFAULT_BUILDING, clone = o => JSON.parse(JSON.stringify(o));
+  const typeName = t => (TYPES[t] && TYPES[t].name) || t;
+  state.shapes.forEach(o => {
+    if (o === sh || o.floor !== sh.floor || (o.building || DEFAULT_BUILDING) !== bld) return;
+    const m = mergeAcrossWall(sh, wi, o);
+    if (!m) return;
+    (shapeArea(o) >= shapeArea(sh) ? [o, sh] : [sh, o]).forEach(keep => {
+      const res = { ...clone(keep), points: m.points, arcs: m.arcs, dimOffsets: undefined };
+      rebuildSegments(res);
+      opts.push({ res, dropId: (keep === sh ? o : sh).id, text: `Merge with “${o.label}” into one ${typeName(keep.type)} area` });
+    });
+  });
+  const ext = extendNeighboursAcross(sh, wi);
+  if (ext) {
+    const res = { ...clone(sh), points: ext, dimOffsets: undefined };
+    res.arcs = carryArcs(ext, [sh]);
+    rebuildSegments(res);
+    opts.push({ res, text: 'Run the walls on each side on until they meet' });
+  }
+  [[wi + 1, 'end'], [wi, 'start']].forEach(([v, which]) => {
+    const res = clone(sh);
+    if (deleteVertex(res, v)) opts.push({ res, corner: sh.points[v], text: `Join straight across, dropping the corner at its ${which}` });
+  });
+  return opts;
+}
+function wallRemovalBlock() {
+  const cw = currentWallRemoval();
+  if (!cw) return '';
+  return `<div style="margin:6px 0 10px;padding:8px;border:2px solid #e6007a;border-radius:6px;background:#fdf0f7;">
+    <div style="font-weight:bold;margin-bottom:4px;">Remove this wall — how should the outline close?</div>
+    ${cw.opts.map((o, i) => `<button data-act="wallRmPick" data-id="${i}" style="display:block;width:100%;text-align:left;margin:3px 0;white-space:normal;${i === cw.idx ? 'background:#e6007a;border-color:#e6007a;color:#fff;font-weight:bold;' : ''}">${i + 1}. ${escapeHtml(o.text)} <span style="opacity:.75">— ${Math.round(shapeArea(o.res))} sq ft</span></button>`).join('')}
+    <div class="row-buttons" style="margin-top:6px;"><button data-act="wallRmApply" class="primary">Apply (Enter)</button>${cw.opts.length > 1 ? '<button data-act="wallRmNext">Next (Tab)</button>' : ''}<button data-act="wallRmCancel">Cancel (Esc)</button></div>
+  </div>`;
+}
+function currentWallRemoval() {
+  const wr = state.wallRemoval, sel = state.selection;
+  if (!wr || state.mode !== 'edit' || !sel || sel.kind !== 'wall' || sel.shapeId !== wr.shapeId || sel.idx !== wr.wi) return null;
+  const sh = state.shapes.find(s => s.id === wr.shapeId);
+  const opts = sh ? wallRemovalOptions(sh, wr.wi) : [];
+  if (!opts.length) return null;
+  return { opts, idx: Math.min(wr.idx, opts.length - 1) };
+}
 function deleteWallAction() {
   const sel = state.selection;
   if (!sel || sel.kind !== 'wall') return;
-  if (state.settings.confirmDelete && !confirm('Delete this wall (merge adjacent walls)?')) return;
   const sh = state.shapes.find(s => s.id === sel.shapeId);
+  if (!sh || !wallRemovalOptions(sh, sel.idx).length) { alert('This wall cannot be removed: the area needs at least 3 walls.'); return; }
+  state.wallRemoval = { shapeId: sel.shapeId, wi: sel.idx, idx: 0 };
+  render();
+}
+function nextWallRemoval(step = 1) {
+  const cw = currentWallRemoval();
+  if (!cw) return;
+  state.wallRemoval.idx = (cw.idx + step + cw.opts.length) % cw.opts.length;
+  render();
+}
+function cancelWallRemoval() { state.wallRemoval = null; render(); }
+function applyWallRemoval() {
+  const cw = currentWallRemoval();
+  if (!cw) return;
+  const o = cw.opts[cw.idx];
   pushUndo();
-  if (deleteVertexWithPrompt(sh, sel.idx+1)) {
-    state.selection = null;
-    render();
-  } else {
-    state.undoStack.pop(); // revert the push if deleteVertex bailed
-  }
+  state.shapes = state.shapes.filter(x => x.id !== o.dropId).map(x => x.id === o.res.id ? o.res : x);
+  state.wallRemoval = null;
+  state.selection = { kind: 'shape', shapeId: o.res.id };
+  render();
+}
+function renderWallRemoval(W) {
+  const cw = currentWallRemoval();
+  if (!cw) return;
+  const o = cw.opts[cw.idx], ov = { class: 'ui-overlay', 'pointer-events': 'none' };
+  addEl('path', { d: shapePathD(o.res, W), fill: '#e6007a', 'fill-opacity': 0.12, stroke: '#e6007a', 'stroke-width': 3, 'stroke-dasharray': '8,4', ...ov });
+  if (o.corner) { const c = W(o.corner); addEl('circle', { cx: c.x, cy: c.y, r: 9, fill: 'none', stroke: '#e6007a', 'stroke-width': 2.5, ...ov }); }
+  const ctr = W(polygonCentroid(o.res.points));
+  const halo = { stroke: 'white', 'stroke-width': 4, 'paint-order': 'stroke fill' };
+  addEl('text', { x: ctr.x, y: ctr.y + 30, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 'bold', fill: '#b0005d', ...halo, ...ov }, `${Math.round(shapeArea(o.res))} sq ft after`);
+  addEl('text', { x: ctr.x, y: ctr.y + 46, 'text-anchor': 'middle', 'font-size': 11, fill: '#b0005d', ...halo, ...ov },
+    `Enter applies${cw.opts.length > 1 ? ` · Tab next (${cw.idx + 1}/${cw.opts.length})` : ''} · Esc cancels`);
 }
 
 function moveSelectedVertex() {
@@ -4409,6 +4499,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.43.1', '2026-10-02', 'The start of a walk is now a flagged START pin, easy to find when it is time to close. While clicking corners on an image, it grows and reads CLICK TO CLOSE when the cursor is on it. Garages are now a light grey, so they no longer look like living area. Remove this wall (Edit) now lets you choose how the outline closes, with a preview: merge with the area on the other side (undo a split), run the neighbouring walls on until they meet, or join across either corner. Tab cycles, Enter applies.'],
   ['0.43.0', '2026-10-02', 'Zoom and pan the drawing: the mouse wheel or a trackpad pinch zooms about the cursor, drag with the middle button (or turn on the hand) to pan, and the controls at the bottom-left of the drawing zoom in, out or back to Fit. Exports always print the whole plan whatever the zoom.'],
   ['0.42.1', '2026-10-02', 'Clicking Image with no image loaded opens the file picker straight away - no extra Load image click.'],
   ['0.42.0', '2026-10-02', 'Trace a scan by clicking its corners: once an image is scaled, click the start corner, then each corner in turn - the app works out every wall from the scale, squares walls that are nearly square and rounds to the inch. A magnifier shows the scan around the cursor so you land on the corner, a live line shows the length before you click, Shift keeps a wall level or plumb, and clicking the start closes the shape.'],
@@ -6014,6 +6105,9 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'Escape' && state.underlayCal) { cancelUnderlayCal(); }
   else if (e.key === 'Escape' && state.offsetPick) { if (state.offsetPick.first) { state.offsetPick.first = null; render(); } else cancelOffsetPick(); }
   else if (e.key === 'Escape' && state.shapeMovePick) { cancelShapeMovePick(); }
+  else if (currentWallRemoval() && (e.key === 'Tab' || e.key === 'n' || e.key === 'N')) { e.preventDefault(); nextWallRemoval(e.shiftKey ? -1 : 1); }
+  else if (currentWallRemoval() && e.key === 'Enter') { e.preventDefault(); applyWallRemoval(); }
+  else if (e.key === 'Escape' && currentWallRemoval()) { cancelWallRemoval(); }
   else if (e.key === 'Escape' && state.mode === 'edit' && state.selection) { state.selection = null; render(); }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && state.mode === 'fence' && state.fenceSelection) { e.preventDefault(); deleteFenced(); }
   else if (e.key === 'Escape' && state.mode === 'fence' && (state.fenceSelection || state.fenceDraw)) { state.fenceDraw = null; state.fenceSelection = null; render(); }

@@ -19,7 +19,7 @@ const TYPES = {
   finished:   { name: 'Finished basement',  fill: '#eaf4ea', dashed: false },
   unfinished: { name: 'Unfinished (mech)',  fill: 'url(#unfinishedHatch)', dashed: false },
   porch:      { name: 'Open covered porch', fill: 'url(#porchHatch)', dashed: true },
-  garage:     { name: 'Garage',             fill: '#efe6dc', dashed: false },
+  garage:     { name: 'Garage',             fill: '#e3e4e6', dashed: false },
   deck:       { name: 'Open deck',          fill: '#e8dcc8', dashed: true },
   upper:      { name: 'Upper floor area',   fill: '#f0e6f4', dashed: false },
   outbuilding:{ name: 'Outbuilding',        fill: '#e6e0d4', dashed: false },
@@ -498,6 +498,124 @@ function deleteVertex(shape, vIdx) {
     : (i => i < vIdx - 1 ? i : i > vIdx ? i - 1 : null));
   rebuildSegments(shape);
   return true;
+}
+
+// ----- Removing a wall: the ways an outline can close up without it ----------
+// A wall shared with a neighbouring area (the cut a Split leaves) is best removed
+// by merging the two areas back into one; otherwise its neighbours either meet
+// where their lines cross, or are joined straight across one of its corners.
+const WALL_TOL = 0.05;   // ft: points this close are the same point / on the line
+
+function samePt(a, b) { return Math.hypot(a.x - b.x, a.y - b.y) < WALL_TOL; }
+// Where p projects onto line a→b (t: 0 at a, 1 at b) and how far off the line it is.
+function projectOnto(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1e-12;
+  const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2;
+  return { t, off: Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t)) };
+}
+function ringOf(shape) { return shape.points.slice(0, -1).map(p => ({ x: p.x, y: p.y })); }
+// Make p a vertex of the ring (inserting it into the wall it lies on); its index.
+function ringVertex(ring, p) {
+  const i = ring.findIndex(q => samePt(q, p));
+  if (i >= 0) return i;
+  for (let k = 0; k < ring.length; k++) {
+    const a = ring[k], b = ring[(k + 1) % ring.length], pr = projectOnto(p, a, b);
+    if (pr.off < WALL_TOL && pr.t > 0 && pr.t < 1) { ring.splice(k + 1, 0, { x: p.x, y: p.y }); return k + 1; }
+  }
+  return -1;
+}
+// Drop the vertex at ring[i] if it is now just a point on a straight wall.
+function dropIfStraight(ring, p) {
+  const i = ring.findIndex(q => samePt(q, p));
+  if (i < 0 || ring.length <= 3) return;
+  const a = ring[(i - 1 + ring.length) % ring.length], b = ring[(i + 1) % ring.length];
+  const pr = projectOnto(ring[i], a, b);
+  if (pr.off < WALL_TOL && pr.t > 0 && pr.t < 1) ring.splice(i, 1);
+}
+// Curved walls survive a merge when the same wall (either direction) is in the result.
+function carryArcs(points, sources) {
+  const o = {};
+  for (let i = 0; i < points.length - 1; i++) {
+    const u = points[i], v = points[i + 1];
+    for (const sh of sources) {
+      if (!sh.arcs) continue;
+      for (const k in sh.arcs) {
+        const a = sh.points[+k], b = sh.points[+k + 1];
+        if ((samePt(a, u) && samePt(b, v)) || (samePt(a, v) && samePt(b, u))) o[i] = sh.arcs[k];
+      }
+    }
+  }
+  return Object.keys(o).length ? o : undefined;
+}
+
+// The part of wall `wi` of `a` that also bounds `b` (collinear and overlapping by
+// more than half a foot), as parameters along the wall, or null.
+function sharedWallSpan(a, wi, b) {
+  const p = a.points[wi], q = a.points[wi + 1], L = Math.hypot(q.x - p.x, q.y - p.y);
+  if (L < WALL_TOL) return null;
+  for (let j = 0; j < b.points.length - 1; j++) {
+    const u = projectOnto(b.points[j], p, q), v = projectOnto(b.points[j + 1], p, q);
+    if (u.off > WALL_TOL || v.off > WALL_TOL) continue;
+    const t0 = Math.max(0, Math.min(u.t, v.t)), t1 = Math.min(1, Math.max(u.t, v.t));
+    if ((t1 - t0) * L > 0.5) return { t0, t1 };
+  }
+  return null;
+}
+
+// One outline for `a` and `b` joined across wall `wi` of `a`, or null when they
+// do not share it cleanly (the merged area must equal the two areas added up).
+function mergeAcrossWall(a, wi, b) {
+  const span = sharedWallSpan(a, wi, b);
+  if (!span) return null;
+  const p = a.points[wi], q = a.points[wi + 1];
+  const at = t => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
+  const s = at(span.t0), t = at(span.t1);
+  const A = ringOf(a), B = ringOf(b);
+  const as = ringVertex(A, s), atI = ringVertex(A, t);
+  if (as < 0 || atI < 0) return null;
+  const bs = ringVertex(B, s), bt = ringVertex(B, t);
+  if (bs < 0 || bt < 0) return null;
+  // Orient so A has the shared wall as head→tail; walk A from tail round to head,
+  // then B (run the other way along the shared wall) from head round to tail.
+  const n = A.length, m = B.length, idx = (R, p) => R.findIndex(r => samePt(r, p));
+  let head = s, tail = t;
+  if (!samePt(A[(idx(A, s) + 1) % n], t)) { if (!samePt(A[(idx(A, t) + 1) % n], s)) return null; head = t; tail = s; }
+  let Bw = B;
+  if (!samePt(Bw[(idx(Bw, tail) + 1) % m], head)) {
+    Bw = B.slice().reverse();
+    if (!samePt(Bw[(idx(Bw, tail) + 1) % m], head)) return null;
+  }
+  const out = [];
+  for (let k = idx(A, tail); ; k = (k + 1) % n) { out.push(A[k]); if (samePt(A[k], head)) break; }
+  for (let k = (idx(Bw, head) + 1) % m; !samePt(Bw[k], tail); k = (k + 1) % m) out.push(Bw[k]);
+  dropIfStraight(out, s); dropIfStraight(out, t);
+  for (let k = out.length - 1; k > 0; k--) if (samePt(out[k], out[k - 1])) out.splice(k, 1);
+  if (out.length < 3) return null;
+  const points = [...out, { ...out[0] }];
+  const merged = { points, arcs: carryArcs(points, [a, b]) };
+  if (Math.abs(shapeArea(merged) - shapeArea(a) - shapeArea(b)) > 1) return null;
+  return merged;
+}
+
+// Wall `wi` removed by running its two neighbours on until their lines cross.
+// Null when they are parallel or would meet unreasonably far away.
+function extendNeighboursAcross(shape, wi) {
+  const ring = ringOf(shape), n = ring.length;
+  if (n < 4) return null;
+  const p0 = ring[(wi - 1 + n) % n], p = ring[wi], q = ring[(wi + 1) % n], q1 = ring[(wi + 2) % n];
+  const d1 = { x: p.x - p0.x, y: p.y - p0.y }, d2 = { x: q1.x - q.x, y: q1.y - q.y };
+  const den = d1.x * d2.y - d1.y * d2.x;
+  if (Math.abs(den) < 1e-9) return null;
+  const k = ((q.x - p0.x) * d2.y - (q.y - p0.y) * d2.x) / den;
+  const X = { x: p0.x + d1.x * k, y: p0.y + d1.y * k };
+  const wl = Math.hypot(q.x - p.x, q.y - p.y);
+  if (Math.hypot(X.x - p.x, X.y - p.y) > 3 * wl + 10 || Math.hypot(X.x - q.x, X.y - q.y) > 3 * wl + 10) return null;
+  if (samePt(X, p) || samePt(X, q)) return null;   // that is just dropping a corner
+  const out = ring.slice();
+  out[wi] = X;
+  out.splice((wi + 1) % n, 1);
+  if (out.length < 3) return null;
+  return [...out, { ...out[0] }];
 }
 
 // ----- Auto-extend (snap to next aligned vertex) -----
