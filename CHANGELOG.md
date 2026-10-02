@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 - **Basement from the main floor at import.** When a PDF has both a main floor and a basement, the import dialog offers *Basement: use the main floor's outline* — the same as *Match basement to main floor* afterwards, applied only to the buildings coming in from that PDF.
+- **The basement match where you work on the basement.** On the basement floor tab in Edit mode, and whenever a basement area is selected, the Edit panel shows the basement outline against the main floor ("basement outline 1648 sf · main floor 1716 sf (−68 sf)") with a *Match to main floor outline* button. It edits the drawing — the basement shape becomes a copy of the main-floor outline — not just the total; Undo restores it. Previously it lived only in the Basement panel at the bottom of the sidebar.
 
 ### Fixed
 - **Overlapping area labels.** Another floor's faded label (a basement under the main floor, a suite over the garage) printed on top of the active floor's label when their centres coincided. It now steps down until it clears.

@@ -2174,9 +2174,24 @@ function sidebarWalk() {
   `;
 }
 
+// Basement vs main-floor outline, with the one-click match, where the basement is
+// being worked on (basement tab, or a basement area selected) rather than only in
+// the Basement panel further down.
+function basementMatchBlock(b) {
+  const drawn = basementFoundationShapes(b), main = mainLivingShapes(b);
+  if (!drawn.length || !main.length) return '';
+  const da = Math.round(drawn.reduce((a, sh) => a + shapeArea(sh), 0)), ma = Math.round(main.reduce((a, sh) => a + shapeArea(sh), 0));
+  const diff = da - ma;
+  return `<div class="help" style="margin:6px 0 4px;">${buildingsPresent().length > 1 ? `<b>${escapeHtml(b)}:</b> ` : ''}basement outline <b>${da} sf</b> · main floor <b>${ma} sf</b>${diff ? ` (${diff > 0 ? '+' : ''}${diff} sf)` : ' (same)'}</div>
+    ${diff ? `<div class="row-buttons"><button data-act="matchBasement" data-b="${escapeHtml(b)}" title="Replace this basement outline with a copy of the main floor's enclosed-living outline (Undo puts it back)">Match to main floor outline</button></div>` : ''}`;
+}
+
 function sidebarEdit() {
   const sel = state.selection;
-  if (!sel) return `<div class="section"><h2>Edit</h2><div class="help">Click a <b>wall</b> or <b>vertex</b> in a completed area to edit. Click the polygon body to select the whole shape.</div></div>`;
+  if (!sel) {
+    const bm = state.activeFloor === 'basement' ? buildingsPresent().map(basementMatchBlock).join('') : '';
+    return `<div class="section"><h2>Edit</h2><div class="help">Click a <b>wall</b> or <b>vertex</b> in a completed area to edit. Click the polygon body to select the whole shape.</div>${bm}</div>`;
+  }
 
   const sh = state.shapes.find(s => s.id === sel.shapeId);
   if (!sh) return '';
@@ -2245,6 +2260,7 @@ function sidebarEdit() {
     return `
       <div class="section">
         <h2>Shape "${escapeHtml(sh.label)}"</h2>
+        ${sh.floor === 'basement' && FOUNDATION_TYPES.includes(sh.type) ? basementMatchBlock(sh.building || DEFAULT_BUILDING) : ''}
         <div class="field"><label>Label</label><input id="sh-label" value="${escapeHtml(sh.label)}"></div>
         <div class="field"><label>Type</label><select id="sh-type">
           ${Object.entries(TYPES).map(([k,v])=>`<option value="${k}"${k===sh.type?' selected':''}>${v.name}</option>`).join('')}
