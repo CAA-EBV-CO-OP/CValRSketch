@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 - **The walk start is a flagged START pin** instead of a small green dot, so it is easy to find when it is time to close — the dot was easily mistaken for a corner or lost against a traced image. While clicking corners on an image, the pin grows and reads **CLICK TO CLOSE** when the cursor is on it. The pen (where the next wall starts) stays the red dot. Screen-only; never exported.
 - **Garage fill is now a light grey** (`#e3e4e6`). It was a cream almost identical to Enclosed living, so a garage split off the house read as more living area. Applies to existing sketches too, since fills come from the area type.
+- **Removing a wall lets you choose how the outline closes.** *Merge (delete this wall)* always dropped the wall's end corner and joined its neighbours with a straight line, so removing the cut left by a Split (to put a garage back into the house, say) collapsed one area into a wedge instead. *Remove this wall…* now lists every sensible result with a magenta preview and the area after: **merge with the area on the other side** into one (keeping either area's type), **run the walls on each side on until they meet**, or **join straight across** dropping the corner at either end. Tab (or *Next*) cycles, Enter applies, Esc cancels; one undo reverses it.
 
 ---
 
