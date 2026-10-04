@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
 <link rel="apple-touch-icon" href="../icon-192.png">
 <title>CValRSketch — Mobile</title>
-<script src="../core.js?v=0.44.1"></script>
-<script src="../dictation.js?v=0.44.1"></script>
+<script src="../core.js?v=0.44.2"></script>
+<script src="../dictation.js?v=0.44.2"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -450,7 +450,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.44.1'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.44.2'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -1489,6 +1489,13 @@ function renderInProgress(W) {
   const start = pts[0], pen = pts[pts.length-1];
   addEl('circle', { cx: start.x, cy: start.y, r: 5, fill: '#2e8b57' });
   addEl('circle', { cx: pen.x, cy: pen.y, r: 6, fill: '#c44' });
+  // Tapping the start carries on from there, the other way round, for when the
+  // walk can't get back to the start (a fence, shrubs).
+  const startHit = addEl('circle', { cx: start.x, cy: start.y, r: 22, fill: 'transparent' });
+  startHit.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    if (!fenceMode && confirm('Continue from the start?\n\nThe pen moves to the green start and new walls go the other way round. Tap the start again to switch back.')) reverseWalk();
+  });
   // Length labels on in-progress
   if (state.settings.showSegmentLabels) {
     state.segments.forEach((seg, i) => {
@@ -1511,6 +1518,23 @@ function renderInProgress(W) {
       fill: 'none', stroke: '#e57c00', 'stroke-width': 1.5, 'stroke-dasharray': '4,4'
     });
   }
+}
+
+// Walks the same walls from the other end: the pen goes to the start and the
+// old pen position becomes the start. dx/dy carry the shape; headings follow.
+function reverseWalk() {
+  if (!state.segments.length) return;
+  pushUndo();
+  const wpts = pathPoints(state.segments, getStart());
+  const flip = { r: 'l', l: 'r', u: 'd', d: 'u' };
+  state.startPoint = { ...wpts[wpts.length - 1] };
+  state.segments = state.segments.slice().reverse().map(seg => {
+    const dir = flip[seg.dir] || seg.dir;
+    return { ...seg, dx: -seg.dx, dy: -seg.dy, dir, angle: 0, raw: `${formatLength(seg.length)} ${dir}` };
+  });
+  chainPreview = null;
+  toast('Pen at the start. Walls now go the other way round.');
+  render();
 }
 
 // ----- "Walk is closed" offer (mirrors the desktop sidebar box) -----
