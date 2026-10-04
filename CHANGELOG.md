@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.44.2] — 2026-10-04
+
+### Added
+- **Phone: continue a walk from its start.** Tap the green start of an open walk and the pen moves there; new walls go the other way round. For when the walk can't get back to the start (a fence, shrubs), so the unreachable stretch is the one the app closes. Tap the start again to switch back.
+
+---
+
 ## [0.44.1] — 2026-10-02
 
 ### Changed
