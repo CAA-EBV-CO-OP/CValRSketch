@@ -12,7 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
-| 0.45.1  | 2026-10-13 | patch  | Phone autosave (open walk included, restored on start-up); "new version ready" offer on both pages. |
+| 0.45.1  | 2026-10-13 | patch  | Phone autosave (open walk included, restored on start-up); "new version ready" offer on both pages; phone header shows the full version. |
 | 0.45.0  | 2026-10-07 | minor  | Labels drag in Walk mode too; Fence can set the floor of the captured shapes. |
 | 0.44.2  | 2026-10-04 | patch  | Phone: tap the walk's start to continue from it the other way round. |
 | 0.44.1  | 2026-10-02 | patch  | Crosshair pointer for corner dragging; the magnifier follows the corner over a traced image. |
