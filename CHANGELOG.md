@@ -14,6 +14,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.45.0] — 2026-10-07
+
+### Added
+- **Set the floor of fenced shapes in one go.** In Fence mode, once the fence captures shapes whole, the panel shows a floor picker and **Set floor (N shapes)**. It moves them all to that floor (handy when a storey was drawn on the wrong level) and switches to it. Undo-able; offsets are left where they are.
+
+### Changed
+- **Labels can be dragged in Walk mode.** Area labels and dimension labels were draggable only in Edit mode; they now also drag in Walk mode whenever no walk is in progress, so a label that lands in the wrong place (e.g. a wraparound deck whose label sits inside the house) can be moved right after closing the area. Not active mid-walk, while tracing, measuring, or picking a move. The click that ends a drag no longer drops a start point.
+
+### Fixed
+- **Phone: reversed walls keep a true description.** After *continue from the start* (0.44.2), each wall's text was rewritten as just its length and a direction letter, so a 45° wall read like a straight one. A diagonal wall is now written as its two components (e.g. `7'1" u, 7'1" l`), which reads correctly in the wall list and re-enters as the same wall.
+
+---
+
 ## [0.44.2] — 2026-10-04
 
 ### Added

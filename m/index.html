@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
 <link rel="apple-touch-icon" href="../icon-192.png">
 <title>CValRSketch — Mobile</title>
-<script src="../core.js?v=0.44.2"></script>
-<script src="../dictation.js?v=0.44.2"></script>
+<script src="../core.js?v=0.45.0"></script>
+<script src="../dictation.js?v=0.45.0"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -450,7 +450,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.44.2'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.45.0'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -1526,11 +1526,17 @@ function reverseWalk() {
   if (!state.segments.length) return;
   pushUndo();
   const wpts = pathPoints(state.segments, getStart());
-  const flip = { r: 'l', l: 'r', u: 'd', d: 'u' };
   state.startPoint = { ...wpts[wpts.length - 1] };
   state.segments = state.segments.slice().reverse().map(seg => {
-    const dir = flip[seg.dir] || seg.dir;
-    return { ...seg, dx: -seg.dx, dy: -seg.dy, dir, angle: 0, raw: `${formatLength(seg.length)} ${dir}` };
+    const dx = -seg.dx, dy = -seg.dy;
+    const h = dx >= 0 ? 'r' : 'l', v = dy >= 0 ? 'd' : 'u';
+    const dir = Math.abs(dx) >= Math.abs(dy) ? h : v;
+    // A diagonal's angle was relative to the wall before it, which is now the
+    // wall after it, so it can't be kept; spell it as its run and rise instead
+    // ("8'0 u, 6'0 l" re-parses to the same wall).
+    const diag = Math.abs(dx) > 1e-6 && Math.abs(dy) > 1e-6;
+    const raw = diag ? `${formatLength(Math.abs(dy))} ${v}, ${formatLength(Math.abs(dx))} ${h}` : `${formatLength(seg.length)} ${dir}`;
+    return { ...seg, dx, dy, dir, angle: 0, raw };
   });
   chainPreview = null;
   toast('Pen at the start. Walls now go the other way round.');
