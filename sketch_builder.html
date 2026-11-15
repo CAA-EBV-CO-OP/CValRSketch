@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Appraisal Sketch Builder</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
+  header { background: #2b3a4a; color: #fff; padding: 10px 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; }
+  header button, header label.btn { background: #4a6377; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  header button:hover, header label.btn:hover { background: #5a7388; }
+  header input[type=file] { display: none; }
+  header .sep { width: 1px; background: #4a6377; height: 24px; margin: 0 4px; }
+  header .scale-ctrl { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  header .scale-ctrl input { width: 50px; padding: 3px; border-radius: 3px; border: 1px solid #4a6377; background: #1e2934; color: #fff; }
+  main { display: flex; height: calc(100vh - 50px); }
+  #canvas-wrap { flex: 1; position: relative; overflow: auto; background: #fff; }
+  #canvas { display: block; }
+  #bg-image { position: absolute; top: 0; left: 0; pointer-events: none; transform-origin: top left; }
+  aside { width: 320px; background: #fafafa; border-left: 1px solid #ccc; padding: 14px; overflow-y: auto; }
+  aside h2 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; color: #555; }
+  aside h2:not(:first-child) { margin-top: 18px; }
+  .field { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+  .field label { flex: 0 0 70px; color: #444; }
+  .field input, .field select { flex: 1; padding: 5px 7px; border: 1px solid #bbb; border-radius: 4px; font-size: 13px; }
+  .field .dim-pair { display: flex; gap: 4px; flex: 1; }
+  .field .dim-pair input { width: 50%; }
+  .dim-pair span { align-self: center; font-size: 11px; color: #777; }
+  #rect-list { font-size: 12px; }
+  #rect-list .item { padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 4px; cursor: pointer; background: #fff; display: flex; justify-content: space-between; align-items: center; }
+  #rect-list .item.selected { border-color: #2b6cb0; background: #ebf3fb; }
+  #rect-list .item .name { font-weight: 500; }
+  #rect-list .item .sf { color: #666; font-size: 11px; }
+  #totals { font-size: 12px; background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+  #totals .row { display: flex; justify-content: space-between; padding: 2px 0; }
+  #totals .row.total { font-weight: bold; border-top: 1px solid #ddd; margin-top: 4px; padding-top: 4px; }
+  .danger { background: #c44 !important; }
+  .danger:hover { background: #d55 !important; }
+  .help { font-size: 11px; color: #777; line-height: 1.4; }
+  .opacity-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .opacity-row input[type=range] { flex: 1; }
+  /* SVG handle styles */
+  .rect-svg { cursor: move; }
+  .handle { fill: #fff; stroke: #2b6cb0; stroke-width: 1.5; cursor: nwse-resize; }
+  .label-text { pointer-events: none; user-select: none; }
+  .dim-text { pointer-events: none; user-select: none; font-size: 12px; fill: #0066cc; font-weight: bold; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sketch Builder</h1>
+  <label class="btn">Load Sketch
+    <input type="file" id="bg-upload" accept="image/*">
+  </label>
+  <button onclick="clearBackground()">Clear BG</button>
+  <div class="sep"></div>
+  <button onclick="addRect()">+ Rectangle</button>
+  <button onclick="deleteSelected()" class="danger">Delete</button>
+  <div class="sep"></div>
+  <div class="scale-ctrl">
+    <span>Scale (px/ft):</span>
+    <input type="number" id="scale" value="18" min="2" max="100" onchange="updateScale()">
+  </div>
+  <div class="sep"></div>
+  <button onclick="exportSVG()">Export SVG</button>
+  <button onclick="exportPNG()">Export PNG</button>
+  <button onclick="saveJSON()">Save</button>
+  <label class="btn">Load
+    <input type="file" id="load-json" accept=".json">
+  </label>
+</header>
+
+<main>
+  <div id="canvas-wrap">
+    <img id="bg-image" style="display:none">
+    <svg id="canvas" width="1400" height="900" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="porchHatch" patternUnits="userSpaceOnUse" width="10" height="10" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="10" stroke="#9bb3cc" stroke-width="1"/>
+        </pattern>
+        <pattern id="unfinishedHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="8" stroke="#888" stroke-width="1"/>
+        </pattern>
+      </defs>
+    </svg>
+  </div>
+
+  <aside>
+    <h2>Background</h2>
+    <div class="opacity-row">
+      <span>Opacity</span>
+      <input type="range" id="bg-opacity" min="0" max="100" value="40" oninput="document.getElementById('bg-image').style.opacity = this.value/100">
+    </div>
+    <div class="opacity-row">
+      <span>Scale</span>
+      <input type="range" id="bg-scale" min="20" max="200" value="100" oninput="updateBgScale(this.value)">
+      <span id="bg-scale-val">100%</span>
+    </div>
+
+    <h2>Selected Rectangle</h2>
+    <div id="props">
+      <p class="help">Click a rectangle to edit its properties. Click + drag the body to move, corner squares to resize.</p>
+    </div>
+
+    <h2>Rectangles</h2>
+    <div id="rect-list"></div>
+
+    <h2>Totals</h2>
+    <div id="totals"></div>
+
+    <h2>Tips</h2>
+    <p class="help">
+      1. Load your hand sketch as background.<br>
+      2. Adjust BG opacity/scale so it's visible.<br>
+      3. Add rectangles, set type + dimensions.<br>
+      4. Drag to position over the sketch.<br>
+      5. Export SVG (vector) or PNG (image).<br>
+      6. Save creates a .json you can re-load.
+    </p>
+  </aside>
+</main>
+
+<script>
+// ===== State =====
+const RECT_TYPES = {
+  living:      { name: 'Enclosed living',     fill: '#f4f0e6', stroke: 'solid', countInArea: 'living' },
+  finished:    { name: 'Finished basement',    fill: '#eaf4ea', stroke: 'solid', countInArea: 'finished' },
+  unfinished:  { name: 'Unfinished (mech)',    fill: 'url(#unfinishedHatch)', stroke: 'solid', countInArea: 'unfinished' },
+  porch:       { name: 'Open covered porch',   fill: 'url(#porchHatch)', stroke: 'dashed', countInArea: 'porch' },
+  garage:      { name: 'Garage',               fill: '#efe6dc', stroke: 'solid', countInArea: 'garage' },
+  deck:        { name: 'Open deck',            fill: '#e8dcc8', stroke: 'dashed', countInArea: 'deck' },
+};
+let rects = [];
+let selectedId = null;
+let nextId = 1;
+let scale = 18; // px per foot
+const svg = document.getElementById('canvas');
+
+// ===== Drag state =====
+let drag = null; // {id, mode: 'move'|'resize', startX, startY, origX, origY, origW, origH}
+
+// ===== Helpers =====
+function ftInToPx(ft, inches) { return (ft + (inches||0)/12) * scale; }
+function pxToFtIn(px) {
+  const ft = px / scale;
+  const wholeFt = Math.floor(ft);
+  const inches = Math.round((ft - wholeFt) * 12);
+  if (inches === 12) return { ft: wholeFt + 1, in: 0 };
+  return { ft: wholeFt, in: inches };
+}
+function ftInLabel(ft, inches) { return `${ft}'${inches}"`; }
+function sqFt(r) { return ((r.wFt + r.wIn/12) * (r.hFt + r.hIn/12)); }
+
+// ===== Rectangle ops =====
+function addRect() {
+  const id = 'r' + (nextId++);
+  rects.push({
+    id, type: 'living', label: 'Room ' + (rects.length+1),
+    x: 100, y: 100,
+    wFt: 12, wIn: 0, hFt: 10, hIn: 0,
+  });
+  selectedId = id;
+  render();
+}
+function deleteSelected() {
+  if (!selectedId) return;
+  rects = rects.filter(r => r.id !== selectedId);
+  selectedId = null;
+  render();
+}
+function updateScale() {
+  scale = parseFloat(document.getElementById('scale').value) || 18;
+  render();
+}
+
+// ===== Render =====
+function render() {
+  // Clear all rect groups (preserve defs)
+  [...svg.querySelectorAll('g.rect-group')].forEach(n => n.remove());
+
+  rects.forEach(r => {
+    const t = RECT_TYPES[r.type];
+    const w = ftInToPx(r.wFt, r.wIn);
+    const h = ftInToPx(r.hFt, r.hIn);
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'rect-group');
+    g.setAttribute('data-id', r.id);
+    g.setAttribute('transform', `translate(${r.x},${r.y})`);
+
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', 0); rect.setAttribute('y', 0);
+    rect.setAttribute('width', w); rect.setAttribute('height', h);
+    rect.setAttribute('fill', t.fill);
+    rect.setAttribute('stroke', 'black');
+    rect.setAttribute('stroke-width', '2.5');
+    rect.setAttribute('class', 'rect-svg');
+    if (t.stroke === 'dashed') rect.setAttribute('stroke-dasharray', '8,5');
+    g.appendChild(rect);
+
+    // Label inside rect
+    const labelLine = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    labelLine.setAttribute('x', w/2); labelLine.setAttribute('y', h/2 - 6);
+    labelLine.setAttribute('text-anchor', 'middle');
+    labelLine.setAttribute('font-size', '13'); labelLine.setAttribute('font-weight', 'bold');
+    labelLine.setAttribute('class', 'label-text');
+    labelLine.textContent = r.label;
+    g.appendChild(labelLine);
+
+    const sfLine = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    sfLine.setAttribute('x', w/2); sfLine.setAttribute('y', h/2 + 12);
+    sfLine.setAttribute('text-anchor', 'middle');
+    sfLine.setAttribute('font-size', '11'); sfLine.setAttribute('fill', '#555');
+    sfLine.setAttribute('class', 'label-text');
+    sfLine.textContent = `${ftInLabel(r.wFt, r.wIn)} × ${ftInLabel(r.hFt, r.hIn)} = ${sqFt(r).toFixed(1)} sf`;
+    g.appendChild(sfLine);
+
+    // Selected: handles + dimension lines
+    if (r.id === selectedId) {
+      rect.setAttribute('stroke', '#2b6cb0');
+      rect.setAttribute('stroke-width', '3');
+      // 4 corner handles
+      const handlePositions = [[0,0],[w,0],[0,h],[w,h]];
+      handlePositions.forEach(([hx,hy], i) => {
+        const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        handle.setAttribute('x', hx-5); handle.setAttribute('y', hy-5);
+        handle.setAttribute('width', 10); handle.setAttribute('height', 10);
+        handle.setAttribute('class', 'handle');
+        handle.setAttribute('data-handle', i);
+        g.appendChild(handle);
+      });
+    }
+    svg.appendChild(g);
+  });
+
+  renderSidebar();
+  renderRectList();
+  renderTotals();
+}
+
+function renderSidebar() {
+  const r = rects.find(x => x.id === selectedId);
+  const props = document.getElementById('props');
+  if (!r) {
+    props.innerHTML = '<p class="help">Click a rectangle to edit its properties.</p>';
+    return;
+  }
+  props.innerHTML = `
+    <div class="field">
+      <label>Label</label>
+      <input id="p-label" value="${escapeHtml(r.label)}">
+    </div>
+    <div class="field">
+      <label>Type</label>
+      <select id="p-type">
+        ${Object.entries(RECT_TYPES).map(([k,v]) => `<option value="${k}" ${k===r.type?'selected':''}>${v.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field">
+      <label>Width</label>
+      <div class="dim-pair">
+        <input id="p-wft" type="number" min="0" value="${r.wFt}"><span>ft</span>
+        <input id="p-win" type="number" min="0" max="11" value="${r.wIn}"><span>in</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Height</label>
+      <div class="dim-pair">
+        <input id="p-hft" type="number" min="0" value="${r.hFt}"><span>ft</span>
+        <input id="p-hin" type="number" min="0" max="11" value="${r.hIn}"><span>in</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>X / Y (px)</label>
+      <div class="dim-pair">
+        <input id="p-x" type="number" value="${Math.round(r.x)}">
+        <input id="p-y" type="number" value="${Math.round(r.y)}">
+      </div>
+    </div>
+  `;
+  ['p-label','p-type','p-wft','p-win','p-hft','p-hin','p-x','p-y'].forEach(id => {
+    document.getElementById(id).addEventListener('input', commitProps);
+    document.getElementById(id).addEventListener('change', commitProps);
+  });
+}
+
+function commitProps() {
+  const r = rects.find(x => x.id === selectedId);
+  if (!r) return;
+  r.label = document.getElementById('p-label').value;
+  r.type = document.getElementById('p-type').value;
+  r.wFt = parseInt(document.getElementById('p-wft').value) || 0;
+  r.wIn = parseInt(document.getElementById('p-win').value) || 0;
+  r.hFt = parseInt(document.getElementById('p-hft').value) || 0;
+  r.hIn = parseInt(document.getElementById('p-hin').value) || 0;
+  r.x = parseFloat(document.getElementById('p-x').value) || 0;
+  r.y = parseFloat(document.getElementById('p-y').value) || 0;
+  render();
+}
+
+function renderRectList() {
+  const list = document.getElementById('rect-list');
+  if (rects.length === 0) { list.innerHTML = '<p class="help">No rectangles yet. Click "+ Rectangle" to add one.</p>'; return; }
+  list.innerHTML = rects.map(r => `
+    <div class="item ${r.id===selectedId?'selected':''}" onclick="selectedId='${r.id}'; render();">
+      <span class="name">${escapeHtml(r.label)}</span>
+      <span class="sf">${sqFt(r).toFixed(1)} sf</span>
+    </div>
+  `).join('');
+}
+
+function renderTotals() {
+  const totals = {};
+  rects.forEach(r => {
+    const key = RECT_TYPES[r.type].countInArea;
+    totals[key] = (totals[key] || 0) + sqFt(r);
+  });
+  const totalDiv = document.getElementById('totals');
+  const names = { living: 'Enclosed living', finished: 'Finished basement', unfinished: 'Unfinished', porch: 'Open porch', garage: 'Garage', deck: 'Open deck' };
+  let html = '';
+  Object.entries(totals).forEach(([k,v]) => {
+    html += `<div class="row"><span>${names[k]||k}</span><span>${v.toFixed(1)} sf</span></div>`;
+  });
+  const grand = Object.values(totals).reduce((a,b)=>a+b,0);
+  if (rects.length) html += `<div class="row total"><span>Total</span><span>${grand.toFixed(1)} sf</span></div>`;
+  totalDiv.innerHTML = html || '<p class="help">No areas yet.</p>';
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ===== Mouse interaction (drag/resize) =====
+svg.addEventListener('mousedown', (e) => {
+  const target = e.target;
+  const group = target.closest('g.rect-group');
+  if (!group) { selectedId = null; render(); return; }
+  const id = group.getAttribute('data-id');
+  selectedId = id;
+  const r = rects.find(x => x.id === id);
+  if (!r) return;
+  const pt = svgPoint(e);
+  if (target.classList.contains('handle')) {
+    const handleIdx = parseInt(target.getAttribute('data-handle'));
+    drag = { id, mode: 'resize', handleIdx, startX: pt.x, startY: pt.y, origX: r.x, origY: r.y, origW: ftInToPx(r.wFt, r.wIn), origH: ftInToPx(r.hFt, r.hIn) };
+  } else {
+    drag = { id, mode: 'move', startX: pt.x, startY: pt.y, origX: r.x, origY: r.y };
+  }
+  render();
+});
+window.addEventListener('mousemove', (e) => {
+  if (!drag) return;
+  const r = rects.find(x => x.id === drag.id);
+  if (!r) return;
+  const pt = svgPoint(e);
+  const dx = pt.x - drag.startX, dy = pt.y - drag.startY;
+  if (drag.mode === 'move') {
+    r.x = drag.origX + dx; r.y = drag.origY + dy;
+  } else if (drag.mode === 'resize') {
+    let newX = drag.origX, newY = drag.origY, newW = drag.origW, newH = drag.origH;
+    // handles: 0=TL, 1=TR, 2=BL, 3=BR
+    if (drag.handleIdx === 0) { newX = drag.origX + dx; newY = drag.origY + dy; newW = drag.origW - dx; newH = drag.origH - dy; }
+    if (drag.handleIdx === 1) { newY = drag.origY + dy; newW = drag.origW + dx; newH = drag.origH - dy; }
+    if (drag.handleIdx === 2) { newX = drag.origX + dx; newW = drag.origW - dx; newH = drag.origH + dy; }
+    if (drag.handleIdx === 3) { newW = drag.origW + dx; newH = drag.origH + dy; }
+    if (newW < 10) newW = 10;
+    if (newH < 10) newH = 10;
+    r.x = newX; r.y = newY;
+    const wDim = pxToFtIn(newW); r.wFt = wDim.ft; r.wIn = wDim.in;
+    const hDim = pxToFtIn(newH); r.hFt = hDim.ft; r.hIn = hDim.in;
+  }
+  render();
+});
+window.addEventListener('mouseup', () => { drag = null; });
+
+function svgPoint(e) {
+  const rect = svg.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+// ===== Background image =====
+document.getElementById('bg-upload').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = document.getElementById('bg-image');
+  img.src = url;
+  img.style.display = 'block';
+  img.onload = () => {
+    img.style.width = img.naturalWidth + 'px';
+    updateBgScale(document.getElementById('bg-scale').value);
+  };
+});
+function clearBackground() {
+  const img = document.getElementById('bg-image');
+  img.src = '';
+  img.style.display = 'none';
+}
+function updateBgScale(v) {
+  document.getElementById('bg-scale-val').textContent = v + '%';
+  document.getElementById('bg-image').style.transform = `scale(${v/100})`;
+}
+
+// ===== Export =====
+function exportSVG() {
+  // Clone svg, strip handles + selection styling
+  const clone = svg.cloneNode(true);
+  [...clone.querySelectorAll('.handle')].forEach(n => n.remove());
+  [...clone.querySelectorAll('.rect-svg')].forEach(n => {
+    n.setAttribute('stroke', 'black'); n.setAttribute('stroke-width', '2.5');
+  });
+  const xml = new XMLSerializer().serializeToString(clone);
+  const blob = new Blob(['<?xml version="1.0"?>\n', xml], { type: 'image/svg+xml' });
+  triggerDownload(blob, 'sketch.svg');
+}
+
+function exportPNG() {
+  const clone = svg.cloneNode(true);
+  [...clone.querySelectorAll('.handle')].forEach(n => n.remove());
+  [...clone.querySelectorAll('.rect-svg')].forEach(n => {
+    n.setAttribute('stroke', 'black'); n.setAttribute('stroke-width', '2.5');
+  });
+  const xml = new XMLSerializer().serializeToString(clone);
+  const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = svg.getAttribute('width') * 2;
+    canvas.height = svg.getAttribute('height') * 2;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(b => triggerDownload(b, 'sketch.png'));
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+}
+
+function saveJSON() {
+  const data = { scale, rects };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  triggerDownload(blob, 'sketch.json');
+}
+
+document.getElementById('load-json').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      scale = data.scale || 18;
+      rects = data.rects || [];
+      nextId = rects.reduce((m,r) => Math.max(m, parseInt(r.id.slice(1))+1), 1);
+      document.getElementById('scale').value = scale;
+      selectedId = null;
+      render();
+    } catch (err) { alert('Could not load file: ' + err.message); }
+  };
+  reader.readAsText(file);
+});
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Initial render
+render();
+</script>
+</body>
+</html>
