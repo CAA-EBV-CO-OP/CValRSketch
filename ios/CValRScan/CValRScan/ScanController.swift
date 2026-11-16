@@ -191,6 +191,7 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
     private var stamp = ""
     private var savedRooms: [CapturedRoom] = []
     private var previous: CapturedStructure?   // the plan before a rebuild, for edits to follow
+    private var builtFrom = 0                  // how many of `rooms` the plan was last built from
     private var relocalizeStarted = Date.distantPast
 
     override init() {
@@ -210,9 +211,8 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
         if loadedFromFile { newScan() }
         discardNext = false
         picksForRoom = nil
-        exportURLs = []
-        if let s = structure { previous = s }
-        structure = nil
+        // The plan stays built until a room is actually added: a scan
+        // cancelled (or cut short by the app closing) leaves it as it was.
         isScanning = true
         captureView.captureSession.run(configuration: RoomCaptureSession.Configuration())
     }
@@ -252,6 +252,10 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
             message = "Scan failed: \(error.localizedDescription)"
             return
         }
+        // A new room: the plan needs building again.
+        exportURLs = []
+        if let s = structure { previous = s }
+        structure = nil
         rooms.append(processedResult)
         if let picks {
             let m = Self.middle(of: processedResult)
@@ -268,6 +272,15 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
 
     func removeLastRoom() {
         if let gone = rooms.popLast() { scannedPicks.removeAll { $0.room == gone.identifier } }
+        // Back to the rooms the plan was built from (a room added by mistake,
+        // taken off again): the plan stands as built, with nothing to recover.
+        if structure == nil, let built = previous, rooms.count == builtFrom, !recoveredNeedsResume {
+            structure = built
+            previous = nil
+            finishRecovery(moveMapTo: nil)
+            writeFiles()
+            return
+        }
         exportURLs = []
         structure = nil
         refreshChecks()
@@ -412,17 +425,27 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
         var labels = roomLabels
         var used: Set<Int> = []
         for p in scannedPicks {
-            let story = Self.story(at: p.center, elevation: p.elevation, in: s)
+            // The rooms as scanned aren't in the plan's space: building moves
+            // each one (a lower floor drops into place, rooms shift to meet).
+            // The plan keeps them in the order given, so the room's own copy
+            // in the plan says where it ended up; the scanned position only
+            // when that copy can't be told.
+            let index = rooms.firstIndex { $0.identifier == p.room }
+            let placed = index.flatMap { i in
+                s.rooms.count == rooms.count && !s.rooms[i].walls.isEmpty ? s.rooms[i] : nil
+            }
+            let mid = placed.map(Self.middle) ?? (center: p.center, elevation: p.elevation)
+            let story = placed?.story ?? Self.story(at: mid.center, elevation: mid.elevation, in: s)
             func dist(_ i: Int) -> Double {
                 let c = s.sections[i].center
-                return simd_distance(SIMD2(Double(c.x), Double(c.z)), p.center)
+                return simd_distance(SIMD2(Double(c.x), Double(c.z)), mid.center)
             }
             let picked = (p.picks.name ?? "").isEmpty ? nil : p.picks.name
             // The scan's own name for this room is one whose centre lies inside
             // the room scanned (a big living room's can sit well off its
             // middle), else one within 1.5 m. Of those, one already called what
             // was picked, then the nearest.
-            let box = rooms.first { $0.identifier == p.room }.flatMap(Self.footprint)
+            let box = (placed ?? rooms.first { $0.identifier == p.room }).flatMap(Self.footprint)
             func inside(_ i: Int) -> Bool {
                 guard let box else { return false }
                 let c = s.sections[i].center
@@ -436,7 +459,7 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
                 .filter { s.sections[$0].story == story && !used.contains($0) && (inside($0) || dist($0) < 1.5) }
                 .min { (sameName($0) ? 0 : 1, dist($0)) < (sameName($1) ? 0 : 1, dist($1)) }
             guard let i = near else {
-                labels.append(RoomLabel(story: story, point: p.center, name: picked ?? "Room", replaces: nil, finishes: p.picks.finishes))
+                labels.append(RoomLabel(story: story, point: mid.center, name: picked ?? "Room", replaces: nil, finishes: p.picks.finishes))
                 continue
             }
             used.insert(i)
@@ -1015,6 +1038,7 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
             }
             previous = nil
             structure = built
+            builtFrom = rooms.count
             applyScannedPicks(built)
             // A resumed scan keeps its name; a new one is named by the time.
             // Stored files are named by the time only; the scan's name (often
@@ -1183,6 +1207,8 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
         resumed = true
         loadedFromFile = false
         rooms = savedRooms
+        // A recovered scan has rooms its last plan wasn't built from.
+        builtFrom = structure != nil ? rooms.count : -1
         if let s = structure { previous = s }
         // Fold an earlier walk's drift correction into its points, so a new
         // walk can measure its own drift from a fresh start spot.
@@ -1383,6 +1409,8 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
         stamp = s.stamp
         resumed = s.resumed
         scanName = s.name
+        // A name given while it was unbuilt reached only the recovery file.
+        if !s.name.isEmpty, (savedNames[s.stamp] ?? "").isEmpty { renameSaved(s.stamp, to: s.name) }
         photoFolder = s.photoFolder
         photos = s.photos.map(\.scanPhoto)
         photoZip = nil
@@ -1466,10 +1494,26 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
         return "\(name) · \(date)"
     }
 
+    // Sets the name in a saved plan file and leaves the rest as it is.
+    private func renameSaved(_ stamp: String, to name: String) {
+        guard !stamp.isEmpty else { return }
+        let url = Self.docs.appendingPathComponent("scan-\(stamp).cvalrscan.json")
+        guard let data = try? Data(contentsOf: url),
+              var plan = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return }
+        plan["name"] = name.isEmpty ? nil : name
+        guard let out = try? JSONSerialization.data(withJSONObject: plan, options: [.prettyPrinted, .sortedKeys]) else { return }
+        try? out.write(to: url, options: .atomic)
+        refreshSaved()
+    }
+
     func setName(_ name: String) {
         scanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         photoZip = nil
         writeFiles()
+        // Unbuilt again (rooms added to a saved scan, or recovered): writeFiles
+        // kept the name only for recovery, so the saved plan, which the list
+        // and its shared copies are named from, gets it now too.
+        if structure == nil { renameSaved(stamp, to: scanName) }
         shareURLs = namedCopies(of: exportURLs)
     }
 
@@ -1525,6 +1569,7 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
         canResume = false
         savedRooms = []
         previous = nil
+        builtFrom = 0
         stamp = ""
         scanName = ""
         photos = []
@@ -1557,6 +1602,17 @@ final class ScanController: NSObject, ObservableObject, @preconcurrency RoomCapt
         do {
             let loaded = try JSONDecoder().decode(CapturedStructure.self, from: Data(contentsOf: rawURL))
             let saved = (try? JSONDecoder().decode(SavedPlan.self, from: Data(contentsOf: planURL)))
+            // Leaving a recovered or unbuilt scan: it keeps its bundle and is
+            // offered again, and its recovery state mustn't carry over to this
+            // one (greyed-out buttons; this scan's saves going into its bundle).
+            recoveryId = nil
+            roomsSavedFor = nil
+            recoveredNeedsResume = false
+            recoveryMap = nil
+            mapWanted = false
+            previous = nil
+            builtFrom = 0
+            recoveryIO.afterPending { Task { @MainActor in self.refreshRecovery() } }
             rooms = []
             corners = (saved?.corners ?? []).map {
                 SIMD3(Float($0.point[0]), Float($0.elevation), Float($0.point[1]))

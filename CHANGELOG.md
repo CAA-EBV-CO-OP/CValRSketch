@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+- **Phone: floor chip** at the top of the sketch shows the floor new walls go on; tap it for the floor list (areas and square feet on each), **+ Add floor** and **Copy a floor**. Switching floors says what happens to an open walk (it closes onto the floor in view) and points out the faded floors underneath an empty one.
+- **Phone: Copy a floor** puts every area of one floor onto another, on top in the same spot or beside it, as a starting point to adjust. Living area takes the new floor's type (finished basement, upper floor area); garages, decks and the rest keep theirs. One Undo takes the copy back.
+
+### Changed
+- **Phone: floor names** that differ from an existing floor only by capitals ("Basement" beside "basement") are refused when adding or renaming a floor.
+
 ### Planned
 - Touch gestures (pinch-zoom, two-finger pan) for tablet/phone use
 - "Snap-to-close" one-click button when gap is small but non-zero

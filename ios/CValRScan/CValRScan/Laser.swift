@@ -17,6 +17,13 @@ import SwiftUI
 //   C0 55 10 06 00 <n> 00 | float32 metres, little-endian | 8 × 00 | CRC
 // The CRC is CRC-8, polynomial 0xA6, initial 0xAA, over every byte before it.
 // Checked on a GLM165-27C.
+//
+// Leica DISTO (D-, X- and S-series with Bluetooth Smart; advertises "DISTO…"):
+// Leica's published service 3AB10100…, the distance an indication on 3AB10101,
+// a little-endian float32 in metres. Not yet checked on a DISTO.
+//
+// Any other laser can be taught (LaserProfiles.swift, LaserTeach.swift): the
+// profile saved names the device, the characteristic and how to read it.
 @MainActor
 final class Laser: NSObject, ObservableObject, @preconcurrency CBCentralManagerDelegate, @preconcurrency CBPeripheralDelegate {
     static let shared = Laser()
@@ -36,7 +43,51 @@ final class Laser: NSObject, ObservableObject, @preconcurrency CBCentralManagerD
     private static let boschService = CBUUID(string: "02A6C0D0-0451-4000-B000-FB3210111989")
     private static let boschData = CBUUID(string: "02A6C0D1-0451-4000-B000-FB3210111989")
     private static let boschSendReadings = Data([0xC0, 0x55, 0x02, 0x01, 0x00, 0x1A])
+    private static let leicaService = CBUUID(string: "3AB10100-F831-4395-B29D-570977D5BF94")
+    private static let leicaData = CBUUID(string: "3AB10101-F831-4395-B29D-570977D5BF94")
     private static let rememberKey = "laserConnect"
+    private static let profilesKey = "laserProfiles"
+
+    // Lasers taught on this phone.
+    @Published private(set) var profiles: [LaserProfile] = Laser.loadProfiles()
+    private var profile: LaserProfile?          // the taught laser connected now
+
+    private static func loadProfiles() -> [LaserProfile] {
+        guard let d = UserDefaults.standard.data(forKey: profilesKey) else { return [] }
+        return (try? JSONDecoder().decode([LaserProfile].self, from: d)) ?? []
+    }
+
+    // Keeps a taught laser (replacing one taught before on the same device) and
+    // connects to it.
+    func save(_ p: LaserProfile) {
+        profiles.removeAll { $0.id == p.id }
+        profiles.append(p)
+        storeProfiles()
+        disconnect()
+        connect()
+    }
+
+    func forget(_ p: LaserProfile) {
+        profiles.removeAll { $0.id == p.id }
+        storeProfiles()
+        if profile?.id == p.id { disconnect() }
+    }
+
+    private func storeProfiles() {
+        UserDefaults.standard.set(try? JSONEncoder().encode(profiles), forKey: Self.profilesKey)
+    }
+
+    // Back from the teach screen: look for the laser again if it was wanted.
+    func resumeAfterTeaching() { if wanted, laser == nil { connect() } }
+
+    // The teach screen runs its own Bluetooth session; this one lets go first.
+    func pauseForTeaching() {
+        central?.stopScan()
+        if let laser { central?.cancelPeripheralConnection(laser) }
+        laser = nil
+        profile = nil
+        status = .off
+    }
 
     private var central: CBCentralManager?
     private var laser: CBPeripheral?
@@ -79,6 +130,8 @@ final class Laser: NSObject, ObservableObject, @preconcurrency CBCentralManagerD
         return Double(raw) / 100
     }
 
+    private static let leica = LaserFormat(kind: .float32LE, offset: 0, size: 4, mmPerUnit: 1000)
+
     private static func crc8(_ bytes: ArraySlice<UInt8>) -> UInt8 {
         var c: UInt8 = 0xAA
         for byte in bytes {
@@ -108,8 +161,11 @@ final class Laser: NSObject, ObservableObject, @preconcurrency CBCentralManagerD
     func centralManager(_ c: CBCentralManager, didDiscover p: CBPeripheral, advertisementData ad: [String: Any], rssi: NSNumber) {
         let name = p.name ?? ad[CBAdvertisementDataLocalNameKey] as? String ?? ""
         let services = ad[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
-        guard name.hasPrefix("LDM") || services.contains(Self.boschService), laser == nil else { return }
+        let taught = profiles.first { $0.id == p.identifier.uuidString }
+        guard taught != nil || name.hasPrefix("LDM") || name.hasPrefix("DISTO") || services.contains(Self.boschService)
+                || services.contains(Self.leicaService), laser == nil else { return }
         laser = p
+        profile = taught
         c.stopScan()
         c.connect(p)
         // CoreBluetooth never gives up on a connection; a laser that switched off
@@ -125,7 +181,7 @@ final class Laser: NSObject, ObservableObject, @preconcurrency CBCentralManagerD
 
     func centralManager(_ c: CBCentralManager, didConnect p: CBPeripheral) {
         p.delegate = self
-        p.discoverServices([Self.service, Self.boschService])
+        p.discoverServices(profile != nil ? nil : [Self.service, Self.boschService, Self.leicaService])
     }
 
     func centralManager(_ c: CBCentralManager, didFailToConnect p: CBPeripheral, error: Error?) {
@@ -143,22 +199,32 @@ final class Laser: NSObject, ObservableObject, @preconcurrency CBCentralManagerD
     }
 
     func peripheral(_ p: CBPeripheral, didDiscoverServices error: Error?) {
-        for s in p.services ?? [] { p.discoverCharacteristics([Self.data, Self.boschData], for: s) }
+        for s in p.services ?? [] {
+            p.discoverCharacteristics(profile.map { [CBUUID(string: $0.characteristic)] } ?? [Self.data, Self.boschData, Self.leicaData], for: s)
+        }
     }
 
     func peripheral(_ p: CBPeripheral, didDiscoverCharacteristicsFor s: CBService, error: Error?) {
-        for ch in s.characteristics ?? [] where ch.uuid == Self.data || ch.uuid == Self.boschData {
+        let wanted: Set<CBUUID> = profile.map { [CBUUID(string: $0.characteristic)] } ?? [Self.data, Self.boschData, Self.leicaData]
+        for ch in s.characteristics ?? [] where wanted.contains(ch.uuid) {
             p.setNotifyValue(true, for: ch)
             if ch.uuid == Self.boschData { p.writeValue(Self.boschSendReadings, for: ch, type: .withResponse) }
         }
     }
 
     func peripheral(_ p: CBPeripheral, didUpdateNotificationStateFor ch: CBCharacteristic, error: Error?) {
-        if ch.isNotifying { status = .connected(p.name ?? (ch.uuid == Self.boschData ? "Bosch" : "Laser")) }
+        if ch.isNotifying {
+            status = .connected(profile?.name ?? p.name ?? (ch.uuid == Self.boschData ? "Bosch" : ch.uuid == Self.leicaData ? "DISTO" : "Laser"))
+        }
     }
 
     func peripheral(_ p: CBPeripheral, didUpdateValueFor ch: CBCharacteristic, error: Error?) {
-        guard let v = ch.value, let mm = Self.millimeters(from: v) else { return }
+        guard let v = ch.value else { return }
+        let mm: Double?
+        if let profile, ch.uuid == CBUUID(string: profile.characteristic) { mm = profile.format.millimeters([UInt8](v)) }
+        else if ch.uuid == Self.leicaData { mm = Self.leica.millimeters([UInt8](v)) }
+        else { mm = Self.millimeters(from: v) }
+        guard let mm else { return }
         reading = Reading(millimeters: mm)
     }
 }
@@ -166,16 +232,28 @@ final class Laser: NSObject, ObservableObject, @preconcurrency CBCentralManagerD
 // A row for a reading field: connects the laser, or says it's ready.
 struct LaserRow: View {
     @ObservedObject private var laser = Laser.shared
+    @State private var teaching = false
 
     var body: some View {
+        // On the row as a whole: the teach screen stops this session, which
+        // changes the row and would close a sheet hung on one of its states.
+        Group { row }.sheet(isPresented: $teaching) { LaserTeachView() }
+    }
+
+    @ViewBuilder private var row: some View {
         switch laser.status {
         case .off:
-            Button("Connect laser", systemImage: "dot.radiowaves.left.and.right") { laser.connect() }
+            HStack {
+                Button("Connect laser", systemImage: "dot.radiowaves.left.and.right") { laser.connect() }
+                Spacer()
+                Button("Other laser…") { teaching = true }.buttonStyle(.borderless).font(.footnote)
+            }
         case .searching:
             HStack {
                 ProgressView()
                 Text("Looking for the laser. Turn it on.").foregroundStyle(.secondary)
                 Spacer()
+                Button("Not found?") { teaching = true }.buttonStyle(.borderless).font(.footnote)
                 Button("Stop") { laser.disconnect() }.buttonStyle(.borderless)
             }
         case .connected:

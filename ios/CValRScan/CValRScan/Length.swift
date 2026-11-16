@@ -83,6 +83,9 @@ enum LengthParser {
         }.joined()
     }
 
+    // One length to the fraction, not rounded: for checking a laser's own reading.
+    static func exactInches(of raw: String) -> Double? { exactInches(raw) }
+
     private static func exactInches(_ raw: String) -> Double? {
         var s = raw
         for (from, to) in [("’", "'"), ("′", "'"), ("”", "\""), ("″", "\""), ("“", "\"")] {

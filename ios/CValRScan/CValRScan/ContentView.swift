@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var measuring = false
     @State private var askReading = false
     @State private var model3D: URL?
+    @State private var savingFolder: URL?
     @State private var naming = false
     @State private var nameDraft = ""
     @State private var discarding: RecoveryOffer?
@@ -235,6 +236,16 @@ struct ContentView: View {
                         ShareLink(items: scan.shareURLs) {
                             Label("Share scan files", systemImage: "square.and.arrow.up")
                         }
+                        Button {
+                            savingFolder = scan.folderToSave()
+                        } label: {
+                            VStack(alignment: .leading) {
+                                Label("Save to folder…", systemImage: "folder.badge.plus")
+                                Text("The scan files and photos as one folder, into a folder you pick: OneDrive, iCloud Drive or On My iPhone.")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                        .disabled(scan.isBusy)
                     }
                 }
                 if let message = scan.message {
@@ -265,6 +276,13 @@ struct ContentView: View {
             }
             .navigationTitle("CValRScan")
             .sheet(item: $model3D) { ModelView(url: $0) }
+            .sheet(item: $savingFolder) { folder in
+                FolderSaver(folder: folder) { saved in
+                    savingFolder = nil
+                    if let saved { scan.message = "Saved “\(saved.lastPathComponent)” to \(saved.deletingLastPathComponent().lastPathComponent)" }
+                }
+                .ignoresSafeArea()
+            }
             .alert("Name this scan", isPresented: $naming) {
                 TextField("e.g. 123 Main St", text: $nameDraft)
                     .textInputAutocapitalization(.words)
