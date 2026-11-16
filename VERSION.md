@@ -1,6 +1,6 @@
 # Version
 
-**Current version:** `0.45.2`
+**Current version:** `0.46.0`
 **Released:** 2026-11-16
 
 CValRSketch follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
@@ -12,6 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
+| 0.46.0  | 2026-11-16 | minor  | Right-click menu on areas, walls and corners: move, copy, rename, change floor, delete. |
 | 0.45.2  | 2026-11-16 | patch  | Measure snaps to corners and walls in Fence mode too. |
 | 0.45.1  | 2026-10-13 | patch  | Phone autosave (open walk included, restored on start-up); "new version ready" offer on both pages; phone header shows the full version. |
 | 0.45.0  | 2026-10-07 | minor  | Labels drag in Walk mode too; Fence can set the floor of the captured shapes. |

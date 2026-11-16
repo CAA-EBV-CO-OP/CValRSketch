@@ -6,7 +6,7 @@
 
 ![CValRSketch desktop app with the sample house open: main floor, garage, deck and porch, with wall lengths, areas and the basement panel](docs/screenshot.webp)
 
-**Version:** 0.45.2 (2026-11-16) · **License:** [AGPL-3.0](./LICENSE) · **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
+**Version:** 0.46.0 (2026-11-16) · **License:** [AGPL-3.0](./LICENSE) · **Part of:** [OSASI — the Open Source Appraisal Software Initiative](https://osasi.org)
 
 Want a new feature? [Request it](https://github.com/CAA-EBV-CO-OP/CValRSketch/issues), or build it yourself — see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
@@ -94,6 +94,7 @@ Everything runs in the browser: plain HTML, CSS and vanilla JavaScript, nothing 
 - **Split mode** — divide a shape with a projected wall
 - **Fence (group stretch)** — drag a selection rectangle; enclosed vertices translate, crossing walls stretch
 - **Copy shape with offset** — duplicate a selected shape at a typed offset (e.g. `10' r`)
+- **Right-click menu** — on an area, wall or corner: move or copy by offset or by drag, rename, change floor, insert or delete corners
 
 ### Measurement Annotations
 - **Measure tool** — 📏 Measure (or M), then click any two points: corners and walls snap, Alt for a free point, Shift for level/plumb; labeled measurements belong to their floor and persist across save/load
