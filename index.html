@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.45.1"></script>
-<script src="dictation.js?v=0.45.1"></script>
+<script src="core.js?v=0.45.2"></script>
+<script src="dictation.js?v=0.45.2"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -237,7 +237,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.45.1</span>
+  <span class="version-chip" id="app-version">v0.45.2</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -4395,6 +4395,14 @@ svg.addEventListener('mouseleave', () => {
   if (state.offsetPick && state.offsetPick.hover) { state.offsetPick.hover = null; render(); }
 });
 svg.addEventListener('pointerdown', closeUnpinnedHelp, true);
+// Measure and click-tracing take their point from the click event. A press that
+// reaches a drag handler (fence, corner, label) re-renders on release, which
+// removes the pressed element, and the browser then never sends the click.
+svg.addEventListener('mousedown', (e) => {
+  if (e.button !== 0 || panMode || galleryActive()) return;
+  if (!state.offsetPick && !traceActive()) return;
+  e.stopImmediatePropagation(); e.preventDefault();
+}, true);
 svg.addEventListener('mousedown', fenceMouseDown);
 window.addEventListener('mousemove', fenceMouseMove);
 window.addEventListener('mouseup', fenceMouseUp);
@@ -4637,6 +4645,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.45.2', '2026-11-16', 'Measure now works in Fence mode: clicking a corner or wall takes the point instead of doing nothing.'],
   ['0.45.1', '2026-10-13', 'The phone now keeps your sketch as you draw, open walk included, and brings it back after a reload or an update. When a newer version arrives while an older copy is showing (a slow connection), both pages offer to reload, and your sketch is kept.'],
   ['0.45.0', '2026-10-07', 'Area and dimension labels can now be dragged in Walk mode too (between walks), not only in Edit mode — so a label that lands in the wrong spot after closing an area can be moved straight away. In Fence mode, Set floor moves every shape the fence captured whole to another floor. On the phone, a walk continued from its start now describes its diagonal walls correctly.'],
   ['0.44.2', '2026-10-04', 'On the phone, tap the green start of an open walk to carry on from there, the other way round, when you can\'t walk back to the start. Tap it again to switch back.'],

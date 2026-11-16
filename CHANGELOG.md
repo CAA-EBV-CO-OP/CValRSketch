@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.45.2] — 2026-11-16
+
+### Fixed
+- **Measure works in Fence mode.** With Measure on, clicking a corner or wall in Fence mode recorded nothing: only blank canvas took a point, so corners and walls never snapped. The press started a fence drag whose release redrew the drawing before the click arrived. While Measure (or tracing by clicking corners) is on, the press now goes to that tool alone.
+
+---
+
 ## [0.45.1] — 2026-10-13
 
 ### Fixed
