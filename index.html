@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.45.3"></script>
-<script src="dictation.js?v=0.45.3"></script>
+<script src="core.js?v=0.46.0"></script>
+<script src="dictation.js?v=0.46.0"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -221,6 +221,14 @@
   .floor-menu button.active { background: #2b6cb0; color: #fff; }
   .floor-menu button span.area { color: #888; font-family: ui-monospace, monospace; }
   .floor-menu button.active span.area { color: #dbe7f3; }
+  .floor-menu { color-scheme: light; color: #222; }
+  .floor-menu .elmenu-step { padding: 2px 8px 4px; }
+  .floor-menu .elmenu-step label { display: block; font-size: 11px; color: #555; margin-bottom: 3px; }
+  .floor-menu .elmenu-step input { width: 100%; box-sizing: border-box; background: #fff; color: #222; border: 1px solid #c0c8d0; border-radius: 4px; padding: 4px 6px; font: 12px ui-monospace, monospace; }
+  .floor-menu .elmenu-step .hint { padding: 4px 0 0; max-width: 220px; }
+  .floor-menu .elmenu-err { color: #c53030; font-size: 11px; max-width: 220px; }
+  .floor-menu .elmenu-err:empty { display: none; }
+  @media print { .floor-menu { display: none; } }
   .floor-menu .hint { padding: 4px 8px 0; font-size: 10px; color: #888; }
   .gallery-frame { fill: #fff; stroke: #c0c8d0; stroke-width: 1.5; cursor: pointer; }
   .gallery-panel:hover .gallery-frame { stroke: #2b6cb0; stroke-width: 2.5; }
@@ -240,7 +248,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.45.3</span>
+  <span class="version-chip" id="app-version">v0.46.0</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -360,6 +368,7 @@ let state = {
   shapeLabelDrag: null, // transient: while dragging a shape's area/centroid label
   dimLabelDrag: null,   // transient: while dragging a wall's dimension label
   shapeMovePick: null,  // transient: { shapeId, anchor } while moving a shape by picking anchor -> destination
+  shapeDrag: null,      // transient: { shapeId, grab, orig, guides, d } while dragging a whole shape from the element menu
   rewalk: null,         // { original } while a shape is reopened as a walk (Re-walk this wall); closeShape re-applies its attributes
   selectedAnnotation: null,   // index into state.annotations clicked on the drawing (screen-only)
   offsetPick: null,     // null | { first: {x,y}|null, hover: {p,kind}|null } — Measure tool armed; stays armed until Esc/Done
@@ -423,6 +432,7 @@ function restoreState(snap) {
   state.splitSelection = null;
   state.wallRemoval = null;
   state.vertexDrag = null;
+  state.shapeDrag = null;
 }
 
 // ----- Session autosave / crash recovery (localStorage-backed) --------------
@@ -433,7 +443,7 @@ function restoreState(snap) {
 const AUTOSAVE_KEY = 'cvalrsketch:autosave';
 let _autosaveTimer = null;
 function writeAutosave() {
-  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ at: Date.now(), snap: snapshotState(), subject: state.subject, subtitle: state.subtitle })); }
+  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ at: Date.now(), snap: withPreDragShapes(snapshotState), subject: state.subject, subtitle: state.subtitle })); }
   catch (e) { /* quota / private mode — non-fatal */ }
 }
 function scheduleAutosave() {
@@ -469,9 +479,9 @@ const fileAutosave = { handle: null, name: '', status: 'off', lastAt: null, last
 // What Save writes and what autosave keeps current. Undo history and transient UI
 // state are per-session and deliberately left out of the file.
 function serializeProject() {
-  const data = { ...state };
+  const data = { ...state, shapes: preDragShapes() };
   ['undoStack', 'redoStack', 'selection', 'splitSelection', 'preview', 'splitPreview', 'underlayDrag', 'underlayCal',
-   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'dimLabelDrag', 'shapeMovePick', 'rewalk', 'offsetPick', 'fenceDraw', 'fenceSelection', 'selectedAnnotation']
+   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'dimLabelDrag', 'shapeMovePick', 'shapeDrag', 'rewalk', 'offsetPick', 'fenceDraw', 'fenceSelection', 'selectedAnnotation']
     .forEach(k => delete data[k]);
   return JSON.stringify(data, null, 2);
 }
@@ -1069,7 +1079,7 @@ function render() {
       <line x1="0" y1="0" x2="0" y2="8" stroke="#888" stroke-width="1"/>
     </pattern>
   </defs>`;
-  const v = userView || fitView();
+  const v = userView || (state.shapeDrag && state.shapeDrag.view) || fitView();   // a shape on the move must not re-fit the view under the pointer
   viewTransform = v;
   updateZoomBar();
   document.documentElement.style.setProperty('--ghost-opacity', state.settings.ghostOpacity);
@@ -1097,6 +1107,7 @@ function render() {
   renderFence(W);
   renderWallRemoval(W);
   renderVertexDrag(W);
+  renderShapeDrag(W);
 
   // Current in-progress segments
   if (state.segments.length) renderInProgress(W);
@@ -1256,6 +1267,7 @@ function renderShape(sh, W, isGhost) {
       }
       state.selection = { kind:'shape', shapeId: sh.id }; render();
     });
+    poly.addEventListener('contextmenu', (ev) => openElementMenu(ev, 'shape', sh));
   }
 
   const canPickStart = state.mode === 'walk' && state.segments.length === 0;
@@ -1287,6 +1299,7 @@ function renderShape(sh, W, isGhost) {
           state.selection = { kind:'wall', shapeId: sh.id, idx: i };
           render();
         });
+        hit.addEventListener('contextmenu', (ev) => openElementMenu(ev, 'wall', sh, i));
       }
     }
     if (showDims) {
@@ -1322,6 +1335,7 @@ function renderShape(sh, W, isGhost) {
           hit.style.cursor = 'move';
           hit.addEventListener('mousedown', (ev) => startDimLabelDrag(ev, sh.id, i, { x: autoX, y: autoY }));
           hit.addEventListener('dblclick', (ev) => { ev.stopPropagation(); resetDimLabel(sh.id, i); });
+          hit.addEventListener('contextmenu', (ev) => openElementMenu(ev, 'wall', sh, i));
         }
       }
     }
@@ -1348,6 +1362,10 @@ function renderShape(sh, W, isGhost) {
         if (!isGhost && state.mode === 'edit' && !state.shapeMovePick) {
           hit.style.cursor = 'crosshair';
           hit.addEventListener('mousedown', (ev) => startVertexDrag(ev, sh.id, i));
+          hit.addEventListener('contextmenu', (ev) => openElementMenu(ev, 'vertex', sh, i));
+        } else if (!isGhost && canPickStart) {
+          // Idle Walk mode: the corner's start-point target sits over the fill, so it opens the shape menu.
+          hit.addEventListener('contextmenu', (ev) => openElementMenu(ev, 'shape', sh));
         }
         hit.addEventListener('click', (ev) => {
           ev.stopPropagation();
@@ -1380,14 +1398,19 @@ function renderShape(sh, W, isGhost) {
     const areaSize = isGhost ? skFont(9.5)  : skFont(11);
     const nameFill = isGhost ? '#5a6b80' : '#222';
     const areaFill = isGhost ? '#7c8a9c' : '#555';
-    addEl('text', { x: c.x, y: c.y - skFont(7), 'text-anchor':'middle', 'font-size':nameSize, 'font-weight':'bold', fill:nameFill, ...halo, class: cls, 'data-area': sh.id }, sh.label);
-    addEl('text', { x: c.x, y: c.y + skFont(9), 'text-anchor':'middle', 'font-size':areaSize, fill:areaFill, ...halo, class: cls, 'data-area': sh.id }, `${Math.round(area)} sq ft`);
+    const labelEls = [
+      addEl('text', { x: c.x, y: c.y - skFont(7), 'text-anchor':'middle', 'font-size':nameSize, 'font-weight':'bold', fill:nameFill, ...halo, class: cls, 'data-area': sh.id }, sh.label),
+      addEl('text', { x: c.x, y: c.y + skFont(9), 'text-anchor':'middle', 'font-size':areaSize, fill:areaFill, ...halo, class: cls, 'data-area': sh.id }, `${Math.round(area)} sq ft`),
+    ];
     if (!isGhost && labelsDraggable()) {
       const hw = Math.max(44, sh.label.length * 8);
       const hit = addEl('rect', { x: c.x - hw/2, y: c.y - skFont(20), width: hw, height: skFont(34), fill: 'rgba(0,0,0,0)', class: 'ui-overlay' });
       hit.style.cursor = 'move';
       hit.addEventListener('mousedown', (ev) => startShapeLabelDrag(ev, sh.id));
+      labelEls.push(hit);
     }
+    // The label sits over the fill, so right-clicking it opens the same shape menu.
+    if (!isGhost) labelEls.forEach(el => el.addEventListener('contextmenu', (ev) => openElementMenu(ev, 'shape', sh)));
   }
 }
 
@@ -3534,6 +3557,7 @@ function moveSelectedShapeByOffset() {
 function startShapeMovePick() {
   const sel = state.selection;
   if (!sel || sel.kind !== 'shape') return;
+  state.offsetPick = null;   // Measure's capture handler would swallow the move's clicks
   state.shapeMovePick = { shapeId: sel.shapeId, anchor: null };
   render();
 }
@@ -3558,6 +3582,20 @@ function finishShapeMove(dest) {
   render();
 }
 
+// A copy of a shape shifted by (dx, dy), added to the drawing and selected.
+function duplicateShape(sh, dx, dy) {
+  const newShape = {
+    ...JSON.parse(JSON.stringify(sh)),   // keeps style, labelOffset, dimOffsets and any other customisation
+    id: state.nextShapeId++,
+    label: `${sh.label} (copy)`,
+    building: sh.building || DEFAULT_BUILDING,
+    points: sh.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
+  };
+  state.shapes.push(newShape);
+  state.selection = { kind: 'shape', shapeId: newShape.id };
+  return newShape;
+}
+
 function copySelectedShape() {
   const sel = state.selection;
   if (!sel || sel.kind !== 'shape') return;
@@ -3571,19 +3609,7 @@ function copySelectedShape() {
   try { seg = parseSegment(raw); } catch (err) { alert(err.message); return; }
   if (seg.autoExtend) { alert('Provide a length and direction (e.g. 10\' r).'); return; }
   pushUndo();
-  const newId = state.nextShapeId++;
-  const newShape = {
-    id: newId,
-    label: `${sh.label} (copy)`,
-    type: sh.type,
-    floor: sh.floor,
-    building: sh.building || DEFAULT_BUILDING,
-    points: sh.points.map(p => ({ x: p.x + seg.dx, y: p.y + seg.dy })),
-    segments: sh.segments.map(s => ({ ...s })),
-    ...(sh.arcs ? { arcs: { ...sh.arcs } } : {}),
-  };
-  state.shapes.push(newShape);
-  state.selection = { kind: 'shape', shapeId: newId };
+  duplicateShape(sh, seg.dx, seg.dy);
   input.value = '';
   render();
 }
@@ -4402,6 +4428,227 @@ function openFloorMenu(clientX, clientY) {
   const away = ev => { if (!menu.contains(ev.target)) { closeFloorMenu(); window.removeEventListener('mousedown', away, true); } };
   setTimeout(() => window.addEventListener('mousedown', away, true), 0);
 }
+// Right-click menu on a shape, wall or vertex: selects it and lists the common actions.
+// Reuses the floor menu's box so Escape and click-away close it the same way. Items that
+// need input (move by offset, rename, floor) open a step inside the menu; Enter applies.
+// The rest are actions the sidebar already handles.
+function elementMenuItems(kind) {
+  if (kind === 'shape') return [['moveOffset', 'Move by offset…'], ['dragShape', 'Move by drag (aligns)'], ['startShapeMovePick', 'Move by picking points'],
+    ['copyOffset', 'Copy by offset…'], ['copyDrag', 'Copy by drag (aligns)'],
+    ['rename', 'Rename…'], ['floor', 'Change floor…'], ['selectShape', 'Edit shape'], ['deleteShape', 'Delete shape']];
+  if (kind === 'wall') return [['moveOffset', 'Move wall by offset…'], ['insertVertex', 'Insert vertex'], ['deleteWall', 'Remove wall']];
+  return [['moveOffset', 'Move vertex by offset…'], ['deleteVertex', 'Delete vertex']];
+}
+// "10 6 r" is 10'6" right: a bare feet-and-inches pair becomes 10'6 before parsing.
+function menuOffsetSegment(raw) {
+  const text = raw.trim().replace(/(^|[\s,])(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)(?=\s*[rlud]\b)/gi, "$1$2'$3");
+  const seg = parseSegment(text);
+  if (seg.autoExtend) throw new Error("Give a length and direction, e.g. 10 6 r or 3' d 2' l");
+  return seg;
+}
+function openElementMenu(ev, kind, sh, idx) {
+  if (galleryActive() || state.shapeMovePick || state.shapeDrag) return;
+  if (state.mode !== 'edit' && !(kind === 'shape' && state.mode === 'walk' && state.segments.length === 0 && !state.traceStarted)) return;
+  ev.preventDefault(); ev.stopPropagation();
+  state.selection = kind === 'shape' ? { kind, shapeId: sh.id } : { kind, shapeId: sh.id, idx };
+  render();
+  closeFloorMenu();
+  const menu = document.createElement('div');
+  menu.id = 'floor-menu';
+  menu.className = 'floor-menu';
+  const title = '<h4>' + escapeHtml(kind === 'shape' ? (sh.label || 'Shape') : kind === 'wall' ? 'Wall' : 'Vertex') + '</h4>';
+  const place = () => {
+    const r = menu.getBoundingClientRect();
+    menu.style.left = Math.max(4, Math.min(ev.clientX, window.innerWidth - r.width - 4)) + 'px';
+    menu.style.top = Math.max(4, Math.min(ev.clientY, window.innerHeight - r.height - 4)) + 'px';
+  };
+  // One input step: Enter runs apply(value); a returned string is shown as the error and the menu stays open.
+  const ask = (label, value, placeholder, hint, apply) => {
+    menu.innerHTML = title + '<div class="elmenu-step"><label>' + escapeHtml(label) + '</label>' +
+      '<input type="text" autocomplete="off" spellcheck="false" placeholder="' + escapeHtml(placeholder) + '">' +
+      '<div class="hint">' + escapeHtml(hint) + '</div><div class="elmenu-err"></div></div>';
+    const input = menu.querySelector('input');
+    input.value = value;
+    place();
+    input.focus(); input.select();
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const err = apply(input.value);
+      if (err) menu.querySelector('.elmenu-err').textContent = err;
+      else closeFloorMenu();
+    });
+  };
+  const offsetStep = (label, move) => ask(label, '', "10 6 r", "Feet inches direction (r l u d); combine like 3' d 2' l. Enter moves, Esc closes.", v => {
+    let seg;
+    try { seg = menuOffsetSegment(v); } catch (err) { return err.message; }
+    move(seg); render();
+  });
+  const run = act => {
+    switch (act) {
+      case 'moveOffset':
+        if (kind === 'shape') return offsetStep('Move shape by', seg => translateShape(sh, seg.dx, seg.dy));
+        if (kind === 'wall') return offsetStep('Move wall by', seg => { pushUndo(); moveWallByVector(sh, idx, seg.dx, seg.dy); });
+        return offsetStep('Move vertex by', seg => { pushUndo(); moveVertexByVector(sh, idx, seg.dx, seg.dy); });
+      case 'copyOffset':
+        return offsetStep('Copy shape by', seg => { pushUndo(); duplicateShape(sh, seg.dx, seg.dy); });
+      case 'rename':
+        return ask('Rename area', sh.label || '', 'e.g. Living', 'Enter renames, Esc closes.', v => {
+          const name = v.trim();
+          if (!name) return 'Enter a name.';
+          if (name !== sh.label) { pushUndo(); sh.label = name; render(); }
+        });
+      case 'floor':
+        menu.innerHTML = title + state.floors.map(f => '<button data-elfloor="' + escapeHtml(f) + '" class="' + (f === sh.floor ? 'active' : '') + '"><span>' +
+          escapeHtml(floorCaption(f)) + '</span></button>').join('') + '<div class="hint">The view follows the area to its new floor.</div>';
+        place();
+        menu.querySelectorAll('button[data-elfloor]').forEach(btn => btn.addEventListener('click', () => {
+          closeFloorMenu();
+          moveShapeToFloor(sh, btn.dataset.elfloor);
+        }));
+        return;
+      case 'dragShape': closeFloorMenu(); return startShapeDrag(sh, screenToWorld(ev.clientX, ev.clientY));
+      case 'copyDrag': closeFloorMenu(); return startShapeDrag(sh, screenToWorld(ev.clientX, ev.clientY), true);
+    }
+    closeFloorMenu();
+    sidebarAction({ preventDefault() {}, currentTarget: { dataset: { act, id: String(sh.id) } } });
+  };
+  menu.innerHTML = title + elementMenuItems(kind).map(([act, text]) => '<button data-elmenu="' + act + '"><span>' + escapeHtml(text) + '</span></button>').join('');
+  document.body.appendChild(menu);
+  place();
+  menu.querySelectorAll('button[data-elmenu]').forEach(btn => btn.addEventListener('click', () => run(btn.dataset.elmenu)));
+  const away = e => { if (!menu.contains(e.target)) { closeFloorMenu(); window.removeEventListener('mousedown', away, true); } };
+  setTimeout(() => window.addEventListener('mousedown', away, true), 0);
+}
+// Walls, dimension text, dots and other drawing on top of a shape would otherwise show
+// the browser's menu: a right-click nothing above has handled opens the menu for the
+// active-floor area under the pointer (the smallest one containing it, else the one
+// whose wall is within a few pixels). openElementMenu still decides if the mode allows it.
+function shapeUnderPointer(w) {
+  const reach = 8 / viewTransform.scale;
+  let inside = null, near = null, nd = reach;
+  shapesOnFloor(state.activeFloor).forEach(sh => {
+    const pts = sh.points, n = pts.length - 1;
+    let odd = false;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const a = pts[i], b = pts[j];
+      if ((a.y > w.y) !== (b.y > w.y) && w.x < (b.x - a.x) * (w.y - a.y) / (b.y - a.y) + a.x) odd = !odd;
+      const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy;
+      const t = len2 ? Math.max(0, Math.min(1, ((w.x - a.x) * dx + (w.y - a.y) * dy) / len2)) : 0;
+      const d = Math.hypot(w.x - (a.x + t * dx), w.y - (a.y + t * dy));
+      if (d < nd) { nd = d; near = sh; }
+    }
+    if (odd && (!inside || shapeArea(sh) < shapeArea(inside))) inside = sh;
+  });
+  return inside || near;
+}
+svg.addEventListener('contextmenu', (ev) => {
+  if (ev.defaultPrevented || !viewTransform) return;
+  const sh = shapeUnderPointer(screenToWorld(ev.clientX, ev.clientY));
+  if (sh) openElementMenu(ev, 'shape', sh);
+});
+function moveShapeToFloor(sh, f) {
+  if (!state.floors.includes(f)) return;
+  if (f !== sh.floor) { pushUndo(); sh.floor = f; }
+  state.activeFloor = f;
+  state.selection = { kind: 'shape', shapeId: sh.id };
+  render();
+}
+// ----- Move a shape by dragging (from the element menu) -------------------------
+// The shape follows the pointer from where the menu was opened; a corner that comes
+// near the line of another area's corner (same x or same y) snaps onto it and a guide
+// shows the alignment, so the drop stays aligned. Click (or release a drag) drops it;
+// Esc puts it back.
+// With copy set, a duplicate is what follows the pointer; Esc (or dropping it in place) removes it.
+function startShapeDrag(sh, grab, copy) {
+  const before = snapshotState();   // history is touched only if the drop commits, so Esc leaves undo and redo as they were
+  if (copy) sh = duplicateShape(sh, 0, 0);
+  state.shapeDrag = { copy: !!copy, shapeId: sh.id, grab, orig: sh.points.map(p => ({ ...p })), guides: [], before, view: { ...viewTransform } };
+  state.selection = { kind: 'shape', shapeId: sh.id };
+  svg.classList.add('vertex-dragging');
+  render();
+}
+function shapeDragDelta(sd, raw) {
+  const others = visibleShapes().filter(o => o.id !== sd.shapeId).flatMap(o => o.points);
+  const reach = 10 / viewTransform.scale;
+  let dx = raw.x - sd.grab.x, dy = raw.y - sd.grab.y, bx = null, by = null;
+  sd.orig.forEach(p => others.forEach(q => {
+    const ex = Math.abs(p.x + dx - q.x), ey = Math.abs(p.y + dy - q.y);
+    if (ex < reach && (!bx || ex < bx.e)) bx = { e: ex, d: q.x - p.x, p, q };
+    if (ey < reach && (!by || ey < by.e)) by = { e: ey, d: q.y - p.y, p, q };
+  }));
+  dx = bx ? bx.d : Math.round(dx * 12) / 12;
+  dy = by ? by.d : Math.round(dy * 12) / 12;
+  sd.guides = [bx && { axis: 'x', p: bx.p, q: bx.q }, by && { axis: 'y', p: by.p, q: by.q }].filter(Boolean);
+  return { dx, dy };
+}
+function shapeDragMove(e) {
+  const sd = state.shapeDrag;
+  if (!sd) return;
+  const sh = state.shapes.find(s => s.id === sd.shapeId);
+  if (!sh) { state.shapeDrag = null; return; }
+  const d = shapeDragDelta(sd, screenToWorld(e.clientX, e.clientY));
+  sd.d = d;
+  sh.points = sd.orig.map(p => ({ x: p.x + d.dx, y: p.y + d.dy }));
+  render();
+}
+// A save or autosave during a drag must store the drawing as it was before the drag:
+// the dragged shape at its starting corners, and no half-placed copy. The drag itself
+// stays live; only what is written leaves it out.
+function preDragShapes() {
+  const sd = state.shapeDrag;
+  if (!sd) return state.shapes;
+  if (sd.copy) return state.shapes.filter(s => s.id !== sd.shapeId);
+  return state.shapes.map(s => s.id === sd.shapeId ? { ...s, points: sd.orig.map(p => ({ ...p })) } : s);
+}
+function withPreDragShapes(fn) {
+  const live = state.shapes;
+  state.shapes = preDragShapes();
+  try { return fn(); } finally { state.shapes = live; }
+}
+window.addEventListener('beforeprint', () => endShapeDrag(true));   // print draws the live canvas
+function endShapeDrag(cancel) {
+  const sd = state.shapeDrag;
+  if (!sd) return;
+  state.shapeDrag = null;
+  svg.classList.remove('vertex-dragging');
+  const sh = state.shapes.find(s => s.id === sd.shapeId);
+  if (cancel || !sd.d || (!sd.d.dx && !sd.d.dy)) {
+    if (sd.copy) state.shapes = state.shapes.filter(s => s.id !== sd.shapeId);
+    else if (sh) sh.points = sd.orig;
+  } else {
+    closeUnpinnedHelp();
+    editTick++;
+    state.undoStack.push(sd.before);
+    if (state.undoStack.length > HISTORY_LIMIT) state.undoStack.shift();
+    state.redoStack = [];
+  }
+  vertexDragEnded = Date.now();
+  render();
+}
+function renderShapeDrag(W) {
+  const sd = state.shapeDrag;
+  if (!sd || !sd.d) return;
+  const ov = { class: 'ui-overlay', 'pointer-events': 'none' };
+  sd.guides.forEach(g => {
+    const a = W({ x: g.p.x + sd.d.dx, y: g.p.y + sd.d.dy }), b = W(g.q);
+    const ext = 40, line = g.axis === 'x'
+      ? { x1: b.x, x2: b.x, y1: Math.min(a.y, b.y) - ext, y2: Math.max(a.y, b.y) + ext }
+      : { y1: b.y, y2: b.y, x1: Math.min(a.x, b.x) - ext, x2: Math.max(a.x, b.x) + ext };
+    addEl('line', { ...line, stroke: '#e6007a', 'stroke-width': 1.5, 'stroke-dasharray': '6,4', ...ov });
+    [a, b].forEach(c => addEl('rect', { x: c.x - 5, y: c.y - 5, width: 10, height: 10, fill: 'none', stroke: '#e6007a', 'stroke-width': 2, ...ov }));
+  });
+}
+window.addEventListener('mousemove', shapeDragMove);
+// Capture phase: the press that drops the shape must not also start a corner drag, a pan
+// or a fence; the release drops it (a click and a press-and-drag alike), and the click
+// that follows is swallowed like the one after a corner drag.
+svg.addEventListener('mousedown', (e) => {
+  if (!state.shapeDrag || e.button !== 0) return;
+  e.stopImmediatePropagation(); e.preventDefault();
+  state.shapeDrag.pressed = true;
+}, true);
+window.addEventListener('mouseup', (e) => { if (state.shapeDrag && state.shapeDrag.pressed && e.button === 0) endShapeDrag(false); });
 function setActiveFloor(f) {
   if (!state.floors.includes(f) || f === state.activeFloor) return;
   state.activeFloor = f;
@@ -4442,17 +4689,18 @@ svg.addEventListener('click', (e) => {
     addLabelAt(screenToWorld(e.clientX, e.clientY));
     return;
   }
+  if (state.shapeMovePick) {
+    // Blank spot as the move destination; before the anchor is picked, ignore it.
+    // Checked before the Walk branch, so a move started from Walk mode isn't hijacked.
+    if (state.shapeMovePick.anchor) finishShapeMove(screenToWorld(e.clientX, e.clientY));
+    return;
+  }
   if (state.mode === 'walk' && state.segments.length === 0) {
     // Blank-canvas click in Walk mode drops the start point here; Shift+Arrow then
     // steps it onto aligned active-floor vertices. Remember the previous start so a
     // double-click (floor menu) can put it back.
     if (e.detail <= 1) _startBeforeClick = state.startPoint ? { ...state.startPoint } : null;
     setStartPoint(screenToWorld(e.clientX, e.clientY));
-    return;
-  }
-  if (state.shapeMovePick) {
-    // Blank spot as the move destination; before the anchor is picked, ignore it.
-    if (state.shapeMovePick.anchor) finishShapeMove(screenToWorld(e.clientX, e.clientY));
     return;
   }
   // Edit mode: a blank click keeps the current selection (the panel stays put);
@@ -4465,7 +4713,7 @@ svg.addEventListener('click', (e) => {
 // Click corners: capture-phase, so a tracing click never also selects or snaps
 // through the ordinary Walk handlers.
 svg.addEventListener('click', (e) => {
-  if (!traceActive() || state.offsetPick) return;
+  if (!traceActive() || state.offsetPick || state.shapeMovePick) return;
   e.stopImmediatePropagation(); e.preventDefault();
   traceClickAt(screenToWorld(e.clientX, e.clientY), e.altKey, e.shiftKey);
 }, true);
@@ -4754,6 +5002,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.46.0', '2026-11-27', 'Right-click an area, wall or corner for a menu: move or copy an area by a typed offset or by dragging (it lines up with other areas), rename it, change its floor or delete it; move a wall or corner by an offset, insert or delete a corner.'],
   ['0.45.3', '2026-11-23', 'Measure no longer makes the pointer lag. Moving the mouse with Measure on used to redraw the whole sketch on every move; now only the measuring line and its length are redrawn, once per screen refresh. Measure also works in Fence mode now: measuring no longer wipes out what you fenced, and clicking a corner to measure can no longer drag that corner by accident. And with a fence selected, just type the move (e.g. 3 r for 3 ft right) and press Enter: no need to click into the box or press Move. Exports: wall lengths and area labels stay readable when the drawing is shrunk to fit a page, and each floor caption lists living area apart from carport, deck and other areas. The Label size slider now goes to 300%. Measurements: click one on the drawing to select it, then press Delete or its red × to remove it; pointing at a row in the Measurements list highlights it on the drawing, and Clear all now clears only the floor you are on. Export preview: a Text size slider updates the preview as you drag, and the preview window is bigger and resizable from its bottom-right corner. The preview also has a Subtitle box for the line under the title (empty prints the standard Not to scale note). Bigger labels no longer make area names overlap their square footage, and saved images use a sans-serif font. You can also drag wall lengths and area labels right on the preview page to tidy the layout before saving.'],
   ['0.45.2', '2026-11-23', 'Saving an image or sketch no longer leaves a blank file. If the file you picked could not be written (a synced folder such as OneDrive can hold a brand-new file for a moment), the app now tries again, and if it still fails it removes the empty file and tells you, instead of quietly downloading a second copy.'],
   ['0.45.1', '2026-10-13', 'The phone now keeps your sketch as you draw, open walk included, and brings it back after a reload or an update. When a newer version arrives while an older copy is showing (a slow connection), both pages offer to reload, and your sketch is kept.'],
@@ -5026,6 +5275,7 @@ function openHelp() {
     <h4>Edit</h4>
     <div class="help-do-row"><a href="#" class="help-do" data-do="edit">▶ Edit</a></div>
     <p>Click a <b>wall</b> to change its length, move it, bow it into a curve, or re-walk it (the shape reopens at that wall so you can type replacement legs). Click a <b>corner</b> to move or delete it, or <b>drag</b> it with the mouse: it snaps to other corners and to the inch, and hold <b>Ctrl</b> while dragging to square it up so its walls run exactly plumb or level. Click inside an <b>area</b> to change its label, type, floor, building or fill, copy it to a typed offset, or move it. Dimension and area labels drag to tidy spots.</p>
+    <p><b>Right-click</b> an area, a wall or a corner for a short menu of what you can do with it. An area offers move or copy (by a typed offset such as <code>10 6 r</code>, by dragging, which lines up with other areas, or by picking two points), Rename, Change floor, Edit and Delete. A wall offers Move by offset, Insert vertex and Remove; a corner, Move by offset and Delete. Esc closes the menu. Right-clicking an area also works in Walk mode between walks.</p>
     </section>
     <section data-topic="split">
     <h4>Split</h4>
@@ -5162,6 +5412,7 @@ function openAbout() {
 }
 
 function openExportPreview() {
+  endShapeDrag(true);   // an export draws the canvas, so a shape still on the move goes back first
   const m = createModal();
   const s = state.settings;
   const div = document.createElement('div');
@@ -5967,10 +6218,11 @@ function saveToRecents() {
   const subjRaw = (state.subject || '').trim();
   const subject = subjRaw || 'Untitled';
   const key = subject.replace(/[^\w\- ]/g, '_').slice(0, 60) + '_' + Date.now();
-  const data = { ...state };
+  const data = { ...state, shapes: preDragShapes() };
   delete data.undoStack; delete data.redoStack; delete data.selection;
   delete data.fenceSelection; delete data.fenceDraw; delete data.offsetPick;
   delete data.preview; delete data.splitSelection; delete data.splitPreview;
+  delete data.shapeDrag; delete data.shapeMovePick;   // an armed move belongs to this session, not the saved project
   // A traced-over scan is hundreds of KB; a few recents would fill the browser's
   // storage and starve the crash-recovery autosave. The sketch file keeps it.
   delete data.underlay; delete data.underlayDrag; delete data.underlayCal;
@@ -5997,7 +6249,9 @@ function loadFromRecents(key) {
   }
   try {
     const d = JSON.parse(raw);
+    endShapeDrag(true);   // a drag armed on the old project must not move shapes of the new one
     Object.assign(state, d);
+    state.shapeDrag = null; state.shapeMovePick = null;
     state.settings = { ...SETTINGS_DEFAULTS, ...(d.settings || {}) };
     state.undoStack = []; state.redoStack = [];
     state.selection = null; state.fenceSelection = null; state.fenceDraw = null;
@@ -6339,6 +6593,7 @@ function newProject() {
   if (hasWork) {
     if (!confirm('Discard the current sketch and start a new project?\n\n(Use Undo / Ctrl+Z to recover if you change your mind.)')) return;
   }
+  endShapeDrag(true);   // put a dragged shape back (or drop its copy) before the undo snapshot
   pushUndo();
   userView = null;
   state.shapes = [];
@@ -6374,8 +6629,10 @@ function newProject() {
 }
 function applyLoadedProject(text) {
   const d = JSON.parse(text);
+  endShapeDrag(true);
   userView = null;
   Object.assign(state, d);
+  state.shapeDrag = null;
   state.settings = { ...SETTINGS_DEFAULTS, ...(d.settings || {}) };   // older files lack newer keys
   state.selection = null; state.splitSelection = null;
   state.labels = d.labels || []; state.nextLabelId = d.nextLabelId || 1;
@@ -6493,7 +6750,7 @@ async function saveBlob(blob, filename, mime) {
         await navigator.share({ files: [file], title: state.subject || filename });
         return;
       }
-    } catch (e) { /* fall through */ }
+    } catch (e) { if (e && e.name === 'AbortError') return null; /* fall through */ }
   }
   triggerDownload(blob, filename);
   return null;
@@ -6511,8 +6768,10 @@ document.addEventListener('input', (e) => {
 
 window.addEventListener('keydown', (e) => {
   const t = e.target;
+  if (e.key === 'Escape' && document.getElementById('floor-menu')) { closeFloorMenu(); return; }   // the open menu wins even if a field kept focus
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   if (document.getElementById('modal-host')?.childElementCount) return;   // a dialog owns the keyboard; never pull typing into the walk box
+  if (state.shapeDrag) { if (e.key === 'Escape') endShapeDrag(true); return; }   // a shape on the move owns the keyboard until it drops
   const mod = e.ctrlKey || e.metaKey;
   if (!mod && !e.altKey && (e.key === 'm' || e.key === 'M') && !galleryActive()) { e.preventDefault(); toggleMeasure(); return; }
   if (e.key === 'F1' || (!mod && !e.altKey && e.key === '?')) { e.preventDefault(); openHelp(); return; }
