@@ -14,6 +14,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.46.0] — 2026-11-16
+
+### Added
+- **Right-click menu** on an area, a wall or a corner (Edit mode; areas also in Walk mode between walks). An area: Move or Copy by a typed offset (`10 6 r` is 10'6" right), by dragging (it lines up with other areas' corners and edges), or by picking two points; Rename; Change floor; Edit; Delete. A wall: Move by offset, Insert vertex, Remove. A corner: Move by offset, Delete. Every action can be undone. Built in the OSASI-Web copy of the app (its `feature/9`) and brought back here.
+
+### Fixed
+- Cancelling the phone share sheet when saving no longer falls through to a second download.
+
+---
+
 ## [0.45.2] — 2026-11-16
 
 ### Fixed
