@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.45.2] — 2026-11-23
+
+### Fixed
+- **No more blank file plus a second copy when saving.** Save As opens the save window, which creates the file straight away; if writing into it then failed (seen in OneDrive-synced folders, which can hold a brand-new file for a moment), the error was swallowed and the app downloaded a second copy, leaving a 0-byte file beside it. Now the write is retried once; if it still fails, the empty file is removed and a message says the save did not work. An empty image (the browser could not draw it) is reported instead of saved. Desktop and phone pages.
+
+---
+
 ## [0.45.1] — 2026-10-13
 
 ### Fixed
