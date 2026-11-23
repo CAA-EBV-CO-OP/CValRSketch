@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.45.1"></script>
-<script src="dictation.js?v=0.45.1"></script>
+<script src="core.js?v=0.45.2"></script>
+<script src="dictation.js?v=0.45.2"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -237,7 +237,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.45.1</span>
+  <span class="version-chip" id="app-version">v0.45.2</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -4637,6 +4637,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.45.2', '2026-11-23', 'Saving an image or sketch no longer leaves a blank file. If the file you picked could not be written (a synced folder such as OneDrive can hold a brand-new file for a moment), the app now tries again, and if it still fails it removes the empty file and tells you, instead of quietly downloading a second copy.'],
   ['0.45.1', '2026-10-13', 'The phone now keeps your sketch as you draw, open walk included, and brings it back after a reload or an update. When a newer version arrives while an older copy is showing (a slow connection), both pages offer to reload, and your sketch is kept.'],
   ['0.45.0', '2026-10-07', 'Area and dimension labels can now be dragged in Walk mode too (between walks), not only in Edit mode — so a label that lands in the wrong spot after closing an area can be moved straight away. In Fence mode, Set floor moves every shape the fence captured whole to another floor. On the phone, a walk continued from its start now describes its diagonal walls correctly.'],
   ['0.44.2', '2026-10-04', 'On the phone, tap the green start of an open walk to carry on from there, the other way round, when you can\'t walk back to the start. Tap it again to switch back.'],
@@ -6176,6 +6177,31 @@ document.getElementById('load-label').addEventListener('click', async (e) => {
   } catch (err) { alert('Load failed: ' + err.message); }
 });
 
+// Write a blob into a picked file, retrying once. Returns null on success, else the last error.
+async function writeBlobToHandle(handle, blob) {
+  let last = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return null;
+    } catch (e) {
+      last = e;
+      if (attempt === 0) await new Promise(r => setTimeout(r, 800));
+    }
+  }
+  return last;
+}
+async function removeEmptyHandle(handle) {
+  try {
+    if (!handle.remove) return false;
+    if ((await handle.getFile()).size) return false;   // something did land; never delete it
+    await handle.remove();
+    return true;
+  } catch (e) { return false; }
+}
+
 function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -6191,19 +6217,29 @@ function triggerDownload(blob, filename) {
 //   2) Web Share API with files (mobile) — share sheet incl. "Save to Files".
 //   3) Fallback: direct download to the browser's default Downloads folder.
 async function saveBlob(blob, filename, mime) {
+  if (!blob || !blob.size) { alert('Could not save "' + filename + '": the file came out empty. Please try again.'); return null; }
   if (window.showSaveFilePicker) {
+    let handle = null;
     try {
       const ext = '.' + (filename.split('.').pop() || 'bin');
-      const handle = await window.showSaveFilePicker({
+      handle = await window.showSaveFilePicker({
         suggestedName: filename,
         startIn: 'documents',
         types: [{ description: ext.slice(1).toUpperCase() + ' file', accept: { [mime]: [ext] } }],
       });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return handle;   // callers that want to keep writing here (file autosave) get the handle
-    } catch (e) { if (e && e.name === 'AbortError') return null; }
+    } catch (e) { if (e && e.name === 'AbortError') return null; }   // other errors: no picker here, use the fallbacks
+    if (handle) {
+      // The picker has already created the file, so a failed write must not fall through to a
+      // second download: that left an empty file beside a good copy. Retry once (a synced
+      // folder such as OneDrive can hold a brand-new file for a moment), then report it.
+      const err = await writeBlobToHandle(handle, blob);
+      if (!err) return handle;   // callers that want to keep writing here (file autosave) get the handle
+      const removed = await removeEmptyHandle(handle);
+      alert('Could not save "' + handle.name + '" (' + (err.message || err.name || 'write failed') + ').\n' +
+        (removed ? 'The empty file was removed. ' : 'An empty file named "' + handle.name + '" may be left behind; delete it. ') +
+        'Please try again.');
+      return null;
+    }
   }
   if (typeof File !== 'undefined') {
     try {

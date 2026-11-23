@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="../icon.svg">
 <link rel="apple-touch-icon" href="../icon-192.png">
 <title>CValRSketch — Mobile</title>
-<script src="../core.js?v=0.45.1"></script>
-<script src="../dictation.js?v=0.45.1"></script>
+<script src="../core.js?v=0.45.2"></script>
+<script src="../dictation.js?v=0.45.2"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -451,7 +451,7 @@
 // Uses ../core.js for parsing, geometry, and shape-edit ops.
 // =============================================================================
 
-const APP_VERSION = '0.45.1'; // bump on every mobile release; surfaced in header + drawer
+const APP_VERSION = '0.45.2'; // bump on every mobile release; surfaced in header + drawer
 const $ = (id) => document.getElementById(id);
 const svg = $('canvas');
 
@@ -2405,23 +2405,38 @@ function triggerDownload(blob, name) {
 //      including "Save to Files" so the user can navigate / create folders.
 //   3) Fallback: direct download to the browser's default Downloads folder.
 async function saveBlob(blob, filename, mime) {
+  if (!blob || !blob.size) { toast('Could not save ' + filename + ': the file came out empty. Try again.'); return; }
   // 1) File System Access
   if (window.showSaveFilePicker) {
+    let handle = null;
     try {
       const ext = '.' + (filename.split('.').pop() || 'bin');
-      const handle = await window.showSaveFilePicker({
+      handle = await window.showSaveFilePicker({
         suggestedName: filename,
         startIn: 'documents',
         types: [{ description: ext.slice(1).toUpperCase() + ' file', accept: { [mime]: [ext] } }],
       });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      toast('Saved to ' + handle.name);
-      return;
     } catch (e) {
       if (e && e.name === 'AbortError') return;  // user cancelled — don't fall through
-      // Other errors (browser doesn't fully support, etc.) → fall through to next path
+      // Other errors (no picker in this browser, etc.) → fall through to next path
+    }
+    if (handle) {
+      // The picker already created the file: a failed write must not fall through to a second
+      // download (that left an empty file beside a good copy). Retry once, then report it.
+      let err = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          err = null; break;
+        } catch (e) { err = e; if (attempt === 0) await new Promise(r => setTimeout(r, 800)); }
+      }
+      if (!err) { toast('Saved to ' + handle.name); return; }
+      let removed = false;
+      try { if (handle.remove && !(await handle.getFile()).size) { await handle.remove(); removed = true; } } catch (e) { /* leave it */ }
+      toast('Could not save ' + handle.name + (removed ? '' : ' (an empty file may be left; delete it)') + '. Try again.');
+      return;
     }
   }
   // 2) Web Share with files
