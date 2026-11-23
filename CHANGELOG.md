@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.45.3] — 2026-11-23
+
+### Fixed
+- **Measure no longer makes the pointer lag.** With Measure on, every mouse move that changed the snapped point redrew the whole sketch (every shape, fill pattern and label), rebuilt the sidebar and restarted autosave — about 5 ms each on a small sketch, and much more zoomed in or with a scan loaded, so the pointer could feel like it was wading through molasses. Mouse moves now redraw only the measuring line, its length and the snap cue, at most once per screen refresh (about 50× less work per move). Clicks still do a full redraw.
+
+---
+
 ## [0.45.2] — 2026-11-23
 
 ### Fixed

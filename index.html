@@ -25,8 +25,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>CValR-Sketch</title>
-<script src="core.js?v=0.45.2"></script>
-<script src="dictation.js?v=0.45.2"></script>
+<script src="core.js?v=0.45.3"></script>
+<script src="dictation.js?v=0.45.3"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background: #f0f0f0; color: #222; }
@@ -237,7 +237,7 @@
 <body>
 <header>
   <h1>CValR-Sketch</h1>
-  <span class="version-chip" id="app-version">v0.45.2</span>
+  <span class="version-chip" id="app-version">v0.45.3</span>
   <button onclick="openAbout()" title="About CValR-Sketch — licence, source, OSASI">ⓘ About</button>
   <button onclick="openWhatsNew()" title="What changed in recent releases">✨ What's new</button>
   <button onclick="openHelp()" title="Help for the tool you are using (F1 or ?) — follows you as you switch modes">❓ Help</button>
@@ -1797,21 +1797,24 @@ function annotationsOnFloor(floor) {
   return state.annotations.map((ann, i) => ({ ann, i })).filter(({ ann }) => !ann.floor || ann.floor === floor);
 }
 
+const MEASURE_MAG = '#d946ef';
+// A measurement's length, set just off the middle of its line. `parent` defaults to the sketch.
+function drawMeasureLabel(aS, bS, a, b, extra, parent) {
+  const sdx = bS.x - aS.x, sdy = bS.y - aS.y;
+  const slen = Math.hypot(sdx, sdy) || 1;
+  const nx = -sdy / slen, ny = sdx / slen;
+  const el = addEl('text', {
+    x: (aS.x + bS.x) / 2 + nx * 14, y: (aS.y + bS.y) / 2 + ny * 14,
+    'text-anchor': 'middle', 'dominant-baseline': 'middle',
+    'font-size': 12, 'font-weight': 'bold', fill: MEASURE_MAG,
+    stroke: 'white', 'stroke-width': 3, 'paint-order': 'stroke fill', ...extra
+  }, formatLength(Math.hypot(b.x - a.x, b.y - a.y)));
+  if (parent) parent.appendChild(el);
+  return el;
+}
+
 function renderAnnotations(W) {
-  const MAG = '#d946ef';
-  const drawLabel = (aS, bS, a, b, extra) => {
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const mx = (aS.x + bS.x) / 2, my = (aS.y + bS.y) / 2;
-    const sdx = bS.x - aS.x, sdy = bS.y - aS.y;
-    const slen = Math.hypot(sdx, sdy) || 1;
-    const nx = -sdy / slen, ny = sdx / slen;
-    addEl('text', {
-      x: mx + nx * 14, y: my + ny * 14,
-      'text-anchor': 'middle', 'dominant-baseline': 'middle',
-      'font-size': 12, 'font-weight': 'bold', fill: MAG,
-      stroke: 'white', 'stroke-width': 3, 'paint-order': 'stroke fill', ...extra
-    }, formatLength(Math.hypot(dx, dy)));
-  };
+  const MAG = MEASURE_MAG;
   annotationsOnFloor(state.activeFloor).forEach(({ ann }) => {
     const aS = W(ann.a), bS = W(ann.b);
     addEl('path', {
@@ -1820,29 +1823,55 @@ function renderAnnotations(W) {
     });
     addEl('circle', { cx: aS.x, cy: aS.y, r: 3, fill: MAG });
     addEl('circle', { cx: bS.x, cy: bS.y, r: 3, fill: MAG });
-    drawLabel(aS, bS, ann.a, ann.b, {});
+    drawMeasureLabel(aS, bS, ann.a, ann.b, {});
   });
-  // Measure tool in progress — all UI-only, stripped from exports.
+  // Measure tool in progress — all UI-only, stripped from exports. Its moving
+  // parts live in their own group so a mouse move can redraw just that.
+  if (!state.offsetPick) return;
+  drawMeasureLive(W, addEl('g', { id: 'measure-live', class: 'ui-overlay', 'pointer-events': 'none' }));
+}
+
+// The Measure tool's moving parts: first-point ring, rubber-band line + length,
+// and the snap cue, drawn into group `g`.
+function drawMeasureLive(W, g) {
+  const MAG = MEASURE_MAG;
   const pick = state.offsetPick;
   if (!pick) return;
+  const add = (tag, attrs) => g.appendChild(addEl(tag, attrs));
   if (pick.first) {
     const p = W(pick.first);
-    addEl('circle', { cx: p.x, cy: p.y, r: 9, fill: 'none', stroke: MAG, 'stroke-width': 2, 'stroke-dasharray': '3,2', class: 'ui-overlay' });
+    add('circle', { cx: p.x, cy: p.y, r: 9, fill: 'none', stroke: MAG, 'stroke-width': 2, 'stroke-dasharray': '3,2' });
   }
   if (pick.hover) {
     const h = W(pick.hover.p);
     if (pick.first) {
       const f = W(pick.first);
-      addEl('path', { d: `M${f.x} ${f.y} L${h.x} ${h.y}`, fill: 'none', stroke: MAG, 'stroke-width': 1.5, 'stroke-dasharray': '2,3', class: 'ui-overlay', 'pointer-events': 'none' });
-      drawLabel(f, h, pick.first, pick.hover.p, { class: 'ui-overlay', 'pointer-events': 'none' });
+      add('path', { d: `M${f.x} ${f.y} L${h.x} ${h.y}`, fill: 'none', stroke: MAG, 'stroke-width': 1.5, 'stroke-dasharray': '2,3' });
+      drawMeasureLabel(f, h, pick.first, pick.hover.p, {}, g);
     }
     // Snap cue: square = corner, diamond = on a wall, small ring = free point.
     const k = pick.hover.kind;
-    const cue = { fill: 'none', stroke: MAG, 'stroke-width': 2, class: 'ui-overlay', 'pointer-events': 'none' };
-    if (k === 'vertex') addEl('rect', { x: h.x - 6, y: h.y - 6, width: 12, height: 12, ...cue });
-    else if (k === 'wall') addEl('path', { d: `M${h.x} ${h.y-7} L${h.x+7} ${h.y} L${h.x} ${h.y+7} L${h.x-7} ${h.y} Z`, ...cue });
-    else addEl('circle', { cx: h.x, cy: h.y, r: 4, ...cue });
+    const cue = { fill: 'none', stroke: MAG, 'stroke-width': 2 };
+    if (k === 'vertex') add('rect', { x: h.x - 6, y: h.y - 6, width: 12, height: 12, ...cue });
+    else if (k === 'wall') add('path', { d: `M${h.x} ${h.y-7} L${h.x+7} ${h.y} L${h.x} ${h.y+7} L${h.x-7} ${h.y} Z`, ...cue });
+    else add('circle', { cx: h.x, cy: h.y, r: 4, ...cue });
   }
+}
+
+// Mouse moves with Measure armed redraw only the measure group, at most once per
+// frame — not the whole sketch, sidebar and autosave, which made the pointer lag.
+// Falls back to a full render if the group is missing.
+let _measureLiveRaf = 0;
+function scheduleMeasureLive() {
+  if (_measureLiveRaf) return;
+  _measureLiveRaf = requestAnimationFrame(() => {
+    _measureLiveRaf = 0;
+    const g = document.getElementById('measure-live');
+    if (!g || !viewTransform || !state.offsetPick) { render(); return; }
+    const v = viewTransform;
+    g.replaceChildren();
+    drawMeasureLive(p => ({ x: v.tx + p.x*v.scale, y: v.ty + p.y*v.scale }), g);
+  });
 }
 
 // Free-text labels (Text mode). Stored in world coords; rendered on top of shapes.
@@ -4389,10 +4418,10 @@ svg.addEventListener('mousemove', (e) => {
   const o = state.offsetPick.hover;
   if (o && o.kind === h.kind && Math.abs(o.p.x - h.p.x) < 1e-3 && Math.abs(o.p.y - h.p.y) < 1e-3) return;
   state.offsetPick.hover = h;
-  render();
+  scheduleMeasureLive();   // only the measure line moves — no full redraw per mouse move
 });
 svg.addEventListener('mouseleave', () => {
-  if (state.offsetPick && state.offsetPick.hover) { state.offsetPick.hover = null; render(); }
+  if (state.offsetPick && state.offsetPick.hover) { state.offsetPick.hover = null; scheduleMeasureLive(); }
 });
 svg.addEventListener('pointerdown', closeUnpinnedHelp, true);
 svg.addEventListener('mousedown', fenceMouseDown);
@@ -4637,6 +4666,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
+  ['0.45.3', '2026-11-23', 'Measure no longer makes the pointer lag. Moving the mouse with Measure on used to redraw the whole sketch on every move; now only the measuring line and its length are redrawn, once per screen refresh.'],
   ['0.45.2', '2026-11-23', 'Saving an image or sketch no longer leaves a blank file. If the file you picked could not be written (a synced folder such as OneDrive can hold a brand-new file for a moment), the app now tries again, and if it still fails it removes the empty file and tells you, instead of quietly downloading a second copy.'],
   ['0.45.1', '2026-10-13', 'The phone now keeps your sketch as you draw, open walk included, and brings it back after a reload or an update. When a newer version arrives while an older copy is showing (a slow connection), both pages offer to reload, and your sketch is kept.'],
   ['0.45.0', '2026-10-07', 'Area and dimension labels can now be dragged in Walk mode too (between walks), not only in Edit mode — so a label that lands in the wrong spot after closing an area can be moved straight away. In Fence mode, Set floor moves every shape the fence captured whole to another floor. On the phone, a walk continued from its start now describes its diagonal walls correctly.'],
