@@ -1368,7 +1368,7 @@ function renderShape(sh, W, isGhost) {
     const base = polygonCentroid(sh.points);
     const off = sh.labelOffset || { dx: 0, dy: 0 };
     const c = W({ x: base.x + off.dx, y: base.y + off.dy });
-    const box = () => ({ x0: c.x - Math.max(44, sh.label.length * 8) / 2, x1: c.x + Math.max(44, sh.label.length * 8) / 2, y0: c.y - 20, y1: c.y + 14 });
+    const box = () => ({ x0: c.x - Math.max(44, sh.label.length * 8) / 2, x1: c.x + Math.max(44, sh.label.length * 8) / 2, y0: c.y - skFont(20), y1: c.y + skFont(14) });
     const hits = b => drawnLabelBoxes.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
     if (isGhost) for (let k = 0; k < 4 && hits(box()); k++) c.y += 36;
     drawnLabelBoxes.push(box());
@@ -1380,11 +1380,11 @@ function renderShape(sh, W, isGhost) {
     const areaSize = isGhost ? skFont(9.5)  : skFont(11);
     const nameFill = isGhost ? '#5a6b80' : '#222';
     const areaFill = isGhost ? '#7c8a9c' : '#555';
-    addEl('text', { x: c.x, y: c.y-7, 'text-anchor':'middle', 'font-size':nameSize, 'font-weight':'bold', fill:nameFill, ...halo, class: cls }, sh.label);
-    addEl('text', { x: c.x, y: c.y+9, 'text-anchor':'middle', 'font-size':areaSize, fill:areaFill, ...halo, class: cls }, `${Math.round(area)} sq ft`);
+    addEl('text', { x: c.x, y: c.y - skFont(7), 'text-anchor':'middle', 'font-size':nameSize, 'font-weight':'bold', fill:nameFill, ...halo, class: cls }, sh.label);
+    addEl('text', { x: c.x, y: c.y + skFont(9), 'text-anchor':'middle', 'font-size':areaSize, fill:areaFill, ...halo, class: cls }, `${Math.round(area)} sq ft`);
     if (!isGhost && labelsDraggable()) {
       const hw = Math.max(44, sh.label.length * 8);
-      const hit = addEl('rect', { x: c.x - hw/2, y: c.y - 20, width: hw, height: 34, fill: 'rgba(0,0,0,0)', class: 'ui-overlay' });
+      const hit = addEl('rect', { x: c.x - hw/2, y: c.y - skFont(20), width: hw, height: skFont(34), fill: 'rgba(0,0,0,0)', class: 'ui-overlay' });
       hit.style.cursor = 'move';
       hit.addEventListener('mousedown', (ev) => startShapeLabelDrag(ev, sh.id));
     }
@@ -4745,7 +4745,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
-  ['0.45.3', '2026-11-23', 'Measure no longer makes the pointer lag. Moving the mouse with Measure on used to redraw the whole sketch on every move; now only the measuring line and its length are redrawn, once per screen refresh. Measure also works in Fence mode now: measuring no longer wipes out what you fenced, and clicking a corner to measure can no longer drag that corner by accident. And with a fence selected, just type the move (e.g. 3 r for 3 ft right) and press Enter: no need to click into the box or press Move. Exports: wall lengths and area labels stay readable when the drawing is shrunk to fit a page, and each floor caption lists living area apart from carport, deck and other areas. The Label size slider now goes to 300%. Measurements: click one on the drawing to select it, then press Delete or its red × to remove it; pointing at a row in the Measurements list highlights it on the drawing, and Clear all now clears only the floor you are on. Export preview: a Text size slider updates the preview as you drag, and the preview window is bigger and resizable from its bottom-right corner.'],
+  ['0.45.3', '2026-11-23', 'Measure no longer makes the pointer lag. Moving the mouse with Measure on used to redraw the whole sketch on every move; now only the measuring line and its length are redrawn, once per screen refresh. Measure also works in Fence mode now: measuring no longer wipes out what you fenced, and clicking a corner to measure can no longer drag that corner by accident. And with a fence selected, just type the move (e.g. 3 r for 3 ft right) and press Enter: no need to click into the box or press Move. Exports: wall lengths and area labels stay readable when the drawing is shrunk to fit a page, and each floor caption lists living area apart from carport, deck and other areas. The Label size slider now goes to 300%. Measurements: click one on the drawing to select it, then press Delete or its red × to remove it; pointing at a row in the Measurements list highlights it on the drawing, and Clear all now clears only the floor you are on. Export preview: a Text size slider updates the preview as you drag, and the preview window is bigger and resizable from its bottom-right corner. The preview also has a Subtitle box for the line under the title (empty prints the standard Not to scale note). Bigger labels no longer make area names overlap their square footage, and saved images use a sans-serif font.'],
   ['0.45.2', '2026-11-23', 'Saving an image or sketch no longer leaves a blank file. If the file you picked could not be written (a synced folder such as OneDrive can hold a brand-new file for a moment), the app now tries again, and if it still fails it removes the empty file and tells you, instead of quietly downloading a second copy.'],
   ['0.45.1', '2026-10-13', 'The phone now keeps your sketch as you draw, open walk included, and brings it back after a reload or an update. When a newer version arrives while an older copy is showing (a slow connection), both pages offer to reload, and your sketch is kept.'],
   ['0.45.0', '2026-10-07', 'Area and dimension labels can now be dragged in Walk mode too (between walks), not only in Edit mode — so a label that lands in the wrong spot after closing an area can be moved straight away. In Fence mode, Set floor moves every shape the fence captured whole to another floor. On the phone, a walk continued from its start now describes its diagonal walls correctly.'],
@@ -5192,6 +5192,8 @@ function openExportPreview() {
       <label style="display:flex; align-items:center; gap:6px;" title="Size of wall lengths and area labels on the sheet (same as Label size on the toolbar)">Text size
         <input type="range" id="prev-font" min="0.6" max="3" step="0.1" style="width:120px;">
         <span id="prev-font-val" style="min-width:34px;"></span></label>
+      <label style="display:flex; align-items:center; gap:6px; flex:1 1 260px;" title="Second line under the title. Leave empty for the standard note.">Subtitle
+        <input type="text" id="prev-subtitle" placeholder="Not to scale — dimensions as labeled" style="flex:1; min-width:160px; padding:3px 6px;"></label>
     </div>
     <div id="prev-dimrow" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; font-size:12px;">
       <span style="color:#555;">Show dimensions + notes for:</span>
@@ -5272,6 +5274,16 @@ function openExportPreview() {
   const fontIn = div.querySelector('#prev-font'), fontVal = div.querySelector('#prev-font-val');
   const showFont = () => { fontIn.value = s.sketchFontScale || 1; fontVal.textContent = Math.round((s.sketchFontScale || 1) * 100) + '%'; };
   showFont();
+  // Subtitle: the line under the title; empty prints the standard "Not to scale" note.
+  const subIn = div.querySelector('#prev-subtitle');
+  subIn.value = state.subtitle || '';
+  let subTimer = 0;
+  subIn.addEventListener('input', () => {
+    state.subtitle = subIn.value;
+    scheduleAutosave();
+    clearTimeout(subTimer);
+    subTimer = setTimeout(draw, 300);
+  });
   let fontTimer = 0;
   fontIn.addEventListener('input', () => {
     s.sketchFontScale = parseFloat(fontIn.value) || 1;
@@ -5724,6 +5736,7 @@ function svgForExport() {
   const liveDefs = svg.querySelector('defs');
   const out = document.createElementNS(ns, 'svg');
   out.setAttribute('xmlns', ns);
+  out.setAttribute('font-family', 'Arial, Helvetica, sans-serif');   // sketch text otherwise falls back to a serif font in saved images
   out.setAttribute('width', pageW);
   out.setAttribute('height', pageH);
   out.setAttribute('viewBox', `0 0 ${pageW} ${pageH}`);

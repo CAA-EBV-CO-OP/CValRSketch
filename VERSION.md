@@ -12,7 +12,7 @@ While the project is below 1.0, the public "API" (segment syntax, JSON save form
 
 | Version | Date       | Type   | Headline change                                                            |
 |---------|------------|--------|----------------------------------------------------------------------------|
-| 0.45.3  | 2026-11-23 | patch  | Measure no longer lags: mouse moves redraw only the measuring line, not the whole sketch; Measure works in Fence mode without losing the fence; type a move and press Enter to move a fence; exported labels stay readable and floor captions split living area from carport/decks; click a measurement to delete it; resizable export preview with a Text size slider. |
+| 0.45.3  | 2026-11-23 | patch  | Measure no longer lags: mouse moves redraw only the measuring line, not the whole sketch; Measure works in Fence mode without losing the fence; type a move and press Enter to move a fence; exported labels stay readable and floor captions split living area from carport/decks; click a measurement to delete it; resizable export preview with Text size and Subtitle. |
 | 0.45.2  | 2026-11-23 | patch  | Saving no longer leaves a blank file beside a second copy: a failed write retries once, then removes the empty file and says so. |
 | 0.45.1  | 2026-10-13 | patch  | Phone autosave (open walk included, restored on start-up); "new version ready" offer on both pages; phone header shows the full version. |
 | 0.45.0  | 2026-10-07 | minor  | Labels drag in Walk mode too; Fence can set the floor of the captured shapes. |
