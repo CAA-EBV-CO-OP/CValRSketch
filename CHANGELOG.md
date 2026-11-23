@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 - **Measure no longer makes the pointer lag.** With Measure on, every mouse move that changed the snapped point redrew the whole sketch (every shape, fill pattern and label), rebuilt the sidebar and restarted autosave — about 5 ms each on a small sketch, and much more zoomed in or with a scan loaded, so the pointer could feel like it was wading through molasses. Mouse moves now redraw only the measuring line, its length and the snap cue, at most once per screen refresh (about 50× less work per move). Clicks still do a full redraw.
+- **Measure works in Fence mode.** With Fence active, each Measure click also started a new fence, so the slightest mouse movement during the click replaced what you had fenced with a tiny, usually empty, selection. While Measure is on, clicks now only pick measure points; the fence selection stays, and fencing works again once you click Done measuring.
 
 ---
 
