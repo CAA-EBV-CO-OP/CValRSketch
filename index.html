@@ -289,7 +289,7 @@
   <button class="small-btn danger" id="btn-delete-marked" style="display:none;" onclick="deleteMarkedBuildings()">Delete marked</button>
   <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Size of the dimension, area, and note labels on the drawing">
     Label size:
-    <input type="range" id="sketch-font-bar" min="0.6" max="2" step="0.1" style="width:120px;">
+    <input type="range" id="sketch-font-bar" min="0.6" max="3" step="0.1" style="width:120px;">
     <span id="sketch-font-bar-val" style="font-family:monospace; min-width:34px; text-align:right;"></span>
   </label>
   <label style="display:flex; align-items:center; gap:6px; margin-left:16px; font-size:11px; color:#444;" title="Subject / project name — appears as the title on SVG/PNG exports">
@@ -4686,7 +4686,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
-  ['0.45.3', '2026-11-23', 'Measure no longer makes the pointer lag. Moving the mouse with Measure on used to redraw the whole sketch on every move; now only the measuring line and its length are redrawn, once per screen refresh. Measure also works in Fence mode now: measuring no longer wipes out what you fenced, and clicking a corner to measure can no longer drag that corner by accident. And with a fence selected, just type the move (e.g. 3 r for 3 ft right) and press Enter: no need to click into the box or press Move.'],
+  ['0.45.3', '2026-11-23', 'Measure no longer makes the pointer lag. Moving the mouse with Measure on used to redraw the whole sketch on every move; now only the measuring line and its length are redrawn, once per screen refresh. Measure also works in Fence mode now: measuring no longer wipes out what you fenced, and clicking a corner to measure can no longer drag that corner by accident. And with a fence selected, just type the move (e.g. 3 r for 3 ft right) and press Enter: no need to click into the box or press Move. Exports: wall lengths and area labels stay readable when the drawing is shrunk to fit a page, and each floor caption lists living area apart from carport, deck and other areas. The Label size slider now goes to 300%.'],
   ['0.45.2', '2026-11-23', 'Saving an image or sketch no longer leaves a blank file. If the file you picked could not be written (a synced folder such as OneDrive can hold a brand-new file for a moment), the app now tries again, and if it still fails it removes the empty file and tells you, instead of quietly downloading a second copy.'],
   ['0.45.1', '2026-10-13', 'The phone now keeps your sketch as you draw, open walk included, and brings it back after a reload or an update. When a newer version arrives while an older copy is showing (a slow connection), both pages offer to reload, and your sketch is kept.'],
   ['0.45.0', '2026-10-07', 'Area and dimension labels can now be dragged in Walk mode too (between walks), not only in Edit mode — so a label that lands in the wrong spot after closing an area can be moved straight away. In Fence mode, Set floor moves every shape the fence captured whole to another floor. On the phone, a walk continued from its start now describes its diagonal walls correctly.'],
@@ -5493,6 +5493,21 @@ function sidebarGallery() {
 
 const FLOOR_CAPTIONS = { basement: 'Basement', main: 'Main floor', upper: 'Upper floor', other: 'Other' };
 function floorCaption(f) { return FLOOR_CAPTIONS[f] || (f.charAt(0).toUpperCase() + f.slice(1)); }
+let _exportLabelBoost = false;   // svgForExport is re-running with enlarged labels
+// Export caption area text: each area type on the panel with its own total, interior
+// types first ("Enclosed living 1,251 sq ft · Open deck 353 sq ft"), so a carport or
+// deck is never read as part of a floor's living area.
+const CAPTION_TYPE_ORDER = ['living', 'upper', 'finished', 'unfinished'];
+function captionAreaText(shapes) {
+  const by = {};
+  shapes.forEach(sh => { by[sh.type] = (by[sh.type] || 0) + shapeArea(sh); });
+  const keys = Object.keys(by).filter(k => Math.round(by[k]) > 0)
+    .sort((a, b) => {
+      const ia = CAPTION_TYPE_ORDER.indexOf(a), ib = CAPTION_TYPE_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || Object.keys(TYPES).indexOf(a) - Object.keys(TYPES).indexOf(b);
+    });
+  return keys.map(k => `${(TYPES[k] || TYPES.living).name} ${Math.round(by[k]).toLocaleString()} sq ft`).join('  ·  ');
+}
 
 function svgForExport() {
   if (userView) return withFitView(() => svgForExport());
@@ -5594,6 +5609,17 @@ function svgForExport() {
   const canvasAvailW = pageW - sideMargin * 2;
   const canvasAvailH = pageH - titleH - legendH - sideMargin * 2;
   const fitScale = Math.min((canvasAvailW - fixedW) / contentW, (canvasAvailH - fixedH) / contentH);
+  // Fitting the drawing to a fixed page (or stacking floors) shrinks it, and its wall
+  // lengths and area labels shrink with it — they came out unreadably small. Redo the
+  // export once with the labels enlarged by the shrink factor (capped at 3×), so they
+  // print at about the size they have on screen. Live view is restored afterwards.
+  if (!_exportLabelBoost && fitScale < 0.95) {
+    const orig = state.settings.sketchFontScale || 1;
+    _exportLabelBoost = true;
+    state.settings.sketchFontScale = orig * Math.min(3, 1 / fitScale);
+    try { render(); return svgForExport(); }
+    finally { state.settings.sketchFontScale = orig; _exportLabelBoost = false; render(); }
+  }
   const blockW = contentW * fitScale + fixedW;
   const blockH = contentH * fitScale + fixedH;
   const blockX = sideMargin + (canvasAvailW - blockW) / 2;
@@ -5669,14 +5695,16 @@ function svgForExport() {
     while (p.content.firstChild) nested.appendChild(p.content.firstChild);
     out.appendChild(nested);
     if (multi) {
-      const area = p.building
-        ? state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === p.building && sh.floor === p.floor).reduce((a, sh) => a + shapeArea(sh), 0)
-        : shapesOnFloor(p.floor).reduce((a, sh) => a + shapeArea(sh), 0);
+      const panelShapes = p.building
+        ? state.shapes.filter(sh => (sh.building || DEFAULT_BUILDING) === p.building && sh.floor === p.floor)
+        : shapesOnFloor(p.floor);
+      const areaText = captionAreaText(panelShapes);
       if (!grid) capY = (horiz ? blockY + contentH * fitScale : py + fh) + 15;
+      const head = p.building ? `${p.building} — ${floorCaption(p.floor)}` : floorCaption(p.floor);
       out.appendChild(mk('text', {
         x: px + fw / 2, y: capY, 'text-anchor':'middle', 'font-family':'Arial, sans-serif',
-        'font-size': 12, 'font-weight':'bold', fill:'#222'
-      }, p.building ? `${p.building} — ${floorCaption(p.floor)} — ${Math.round(area)} sq ft` : `${floorCaption(p.floor)} — ${Math.round(area)} sq ft`));
+        'font-size': 12, fill:'#222'
+      }, areaText ? `${head} — ${areaText}` : head));
     }
   });
 
