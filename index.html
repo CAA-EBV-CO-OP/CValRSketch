@@ -87,6 +87,9 @@
   #canvas { display: block; width: 100%; height: 100%; cursor: default; }
   #canvas.split-mode { cursor: crosshair; }
   #canvas.measuring { cursor: crosshair; }
+  /* A measurement hovered in the Measurements list */
+  #canvas .ann-line.ann-hot { stroke: #f59e0b; stroke-width: 4; stroke-dasharray: none; }
+  #canvas .ann-label.ann-hot { fill: #b45309; }
   #canvas.pan-mode { cursor: grab; }
   #canvas.vertex-dragging, #canvas.vertex-dragging * { cursor: crosshair !important; }
   #zoom-bar { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,.92);
@@ -358,6 +361,7 @@ let state = {
   dimLabelDrag: null,   // transient: while dragging a wall's dimension label
   shapeMovePick: null,  // transient: { shapeId, anchor } while moving a shape by picking anchor -> destination
   rewalk: null,         // { original } while a shape is reopened as a walk (Re-walk this wall); closeShape re-applies its attributes
+  selectedAnnotation: null,   // index into state.annotations clicked on the drawing (screen-only)
   offsetPick: null,     // null | { first: {x,y}|null, hover: {p,kind}|null } — Measure tool armed; stays armed until Esc/Done
   fenceDraw: null,      // null | { start:{x,y}, end:{x,y} } in WORLD coords while dragging
   fenceSelection: null, // null | { shapeVerts:[{shapeId,idx}], inProgVerts:[idx], annEnds:[{idx,end}] }
@@ -467,7 +471,7 @@ const fileAutosave = { handle: null, name: '', status: 'off', lastAt: null, last
 function serializeProject() {
   const data = { ...state };
   ['undoStack', 'redoStack', 'selection', 'splitSelection', 'preview', 'splitPreview', 'underlayDrag', 'underlayCal',
-   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'dimLabelDrag', 'shapeMovePick', 'rewalk', 'offsetPick', 'fenceDraw', 'fenceSelection']
+   'selectedLabel', 'labelDrag', 'shapeLabelDrag', 'dimLabelDrag', 'shapeMovePick', 'rewalk', 'offsetPick', 'fenceDraw', 'fenceSelection', 'selectedAnnotation']
     .forEach(k => delete data[k]);
   return JSON.stringify(data, null, 2);
 }
@@ -1769,7 +1773,7 @@ function sidebarOffsets() {
     ? (state.offsetPick.first
         ? 'Click the <b>second point</b>. Esc drops the first point.'
         : 'Click the <b>first point</b>. Corners and walls snap; hold <b>Alt</b> for a free point, <b>Shift</b> to keep the line level or plumb. Esc when done.')
-    : 'Click <b>📏 Measure</b> (or press <b>M</b>), then click any two points to drop a measurement.';
+    : 'Click <b>📏 Measure</b> (or press <b>M</b>), then click any two points to drop a measurement. To remove one, click it on the drawing and press <b>Delete</b> (or its red ×).';
   const button = picking
     ? '<button data-act="cancelOffsetPick" class="danger">Done measuring</button>'
     : '<button data-act="startOffsetPick" class="primary">📏 Measure</button>';
@@ -1779,7 +1783,8 @@ function sidebarOffsets() {
     : here.map(({ ann, i }, n) => {
         const dx = ann.b.x - ann.a.x, dy = ann.b.y - ann.a.y;
         const len = Math.hypot(dx, dy);
-        return `<div class="seg-item"><span>${n+1}. ${formatLength(len)} (${formatGapBreakdown(dx, dy)})</span><button data-act="removeAnnotation" data-i="${i}" title="Remove">×</button></div>`;
+        const sel = state.selectedAnnotation === i ? ' style="background:#fff3d6; outline:1px solid #f59e0b;"' : '';
+        return `<div class="seg-item ann-row" data-ann-row="${i}"${sel}><span data-act="selectAnnotation" data-i="${i}" style="cursor:pointer; flex:1;" title="Show it on the drawing">${n+1}. ${formatLength(len)} (${formatGapBreakdown(dx, dy)})</span><button data-act="removeAnnotation" data-i="${i}" title="Remove">×</button></div>`;
       }).join('');
   const clearBtn = here.length
     ? '<div class="row-buttons" style="margin-top:6px;"><button data-act="clearAnnotations" class="danger">Clear all</button></div>'
@@ -1818,15 +1823,39 @@ function drawMeasureLabel(aS, bS, a, b, extra, parent) {
 
 function renderAnnotations(W) {
   const MAG = MEASURE_MAG;
-  annotationsOnFloor(state.activeFloor).forEach(({ ann }) => {
+  const sel = state.selectedAnnotation;
+  annotationsOnFloor(state.activeFloor).forEach(({ ann, i }) => {
     const aS = W(ann.a), bS = W(ann.b);
+    const isSel = sel === i;
+    // Selected: a soft orange band behind the line (screen only).
+    if (isSel) addEl('path', { d: `M${aS.x} ${aS.y} L${bS.x} ${bS.y}`, fill: 'none', stroke: '#f59e0b', 'stroke-width': 8, 'stroke-linecap': 'round', opacity: 0.45, class: 'ui-overlay', 'pointer-events': 'none' });
     addEl('path', {
       d: `M${aS.x} ${aS.y} L${bS.x} ${bS.y}`,
-      fill: 'none', stroke: MAG, 'stroke-width': 1.5, 'stroke-dasharray': '4,4'
+      fill: 'none', stroke: MAG, 'stroke-width': 1.5, 'stroke-dasharray': '4,4', 'data-ann': i, class: 'ann-line'
     });
     addEl('circle', { cx: aS.x, cy: aS.y, r: 3, fill: MAG });
     addEl('circle', { cx: bS.x, cy: bS.y, r: 3, fill: MAG });
-    drawMeasureLabel(aS, bS, ann.a, ann.b, {});
+    const lbl = drawMeasureLabel(aS, bS, ann.a, ann.b, { 'data-ann': i, class: 'ann-label' });
+    // Click target: a wide invisible stroke over the line, plus the length label.
+    // Measure armed → its capture-phase click handler takes the click first.
+    const hit = addEl('path', { d: `M${aS.x} ${aS.y} L${bS.x} ${bS.y}`, fill: 'none', stroke: 'transparent', 'stroke-width': 12, 'pointer-events': 'stroke', class: 'ui-overlay ann-hit', 'data-ann': i });
+    [hit, lbl].forEach(el => {
+      el.style.cursor = 'pointer';
+      el.addEventListener('mousedown', ev => ev.stopPropagation());   // never starts a fence / drag
+      el.addEventListener('click', ev => { ev.stopPropagation(); selectAnnotation(i); });
+    });
+    if (isSel) {
+      // Remove button beside the length label (screen only).
+      const lx = parseFloat(lbl.getAttribute('x')), ly = parseFloat(lbl.getAttribute('y'));
+      const bx = lx + (lbl.textContent.length * 3.6) + 14, by = ly;
+      const g = addEl('g', { class: 'ui-overlay ann-del', 'data-ann': i });
+      g.appendChild(addEl('circle', { cx: bx, cy: by, r: 9, fill: '#dc2626', stroke: '#fff', 'stroke-width': 2 }));
+      g.appendChild(addEl('text', { x: bx, y: by + 0.5, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-size': 13, 'font-weight': 'bold', fill: '#fff', 'pointer-events': 'none' }, '×'));
+      g.style.cursor = 'pointer';
+      g.addEventListener('mousedown', ev => ev.stopPropagation());
+      g.addEventListener('click', ev => { ev.stopPropagation(); deleteSelectedAnnotation(); });
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'title'); t.textContent = 'Remove this measurement (Delete)'; g.appendChild(t);
+    }
   });
   // Measure tool in progress — all UI-only, stripped from exports. Its moving
   // parts live in their own group so a mouse move can redraw just that.
@@ -2575,13 +2604,33 @@ function measureSnap(raw, free, ortho) {
 function removeAnnotation(i) {
   pushUndo();
   state.annotations.splice(i, 1);
+  state.selectedAnnotation = null;   // indices shift after a removal
   render();
 }
+// "Clear all" sits under this floor's list, so it clears this floor's measurements only.
 function clearAnnotations() {
-  if (!state.annotations.length) return;
+  const here = new Set(annotationsOnFloor(state.activeFloor).map(({ i }) => i));
+  if (!here.size) return;
   pushUndo();
-  state.annotations = [];
+  state.annotations = state.annotations.filter((_, i) => !here.has(i));
+  state.selectedAnnotation = null;
   render();
+}
+// Click a measurement on the drawing (or its row in the list) to select it; Delete or
+// its red × removes it. Selection is screen-only state, never saved.
+function selectAnnotation(i) {
+  state.selectedAnnotation = state.selectedAnnotation === i ? null : i;
+  render();
+}
+function deleteSelectedAnnotation() {
+  const i = state.selectedAnnotation;
+  if (i == null || !state.annotations[i]) { state.selectedAnnotation = null; return; }
+  removeAnnotation(i);
+}
+// Hovering a row in the Measurements list lights up that measurement on the drawing
+// (class toggle only — no re-render, so the list under the pointer stays put).
+function hotAnnotation(i, on) {
+  svg.querySelectorAll(`.ann-line[data-ann="${i}"], .ann-label[data-ann="${i}"]`).forEach(el => el.classList.toggle('ann-hot', on));
 }
 
 function sidebarWalk() {
@@ -3098,6 +3147,11 @@ function attachSidebarHandlers() {
   document.querySelectorAll('#sidebar [data-act]').forEach(el => {
     el.addEventListener('click', sidebarAction);
   });
+  document.querySelectorAll('#sidebar [data-ann-row]').forEach(row => {
+    const i = row.dataset.annRow;
+    row.addEventListener('mouseenter', () => hotAnnotation(i, true));
+    row.addEventListener('mouseleave', () => hotAnnotation(i, false));
+  });
   const cmd = document.getElementById('cmd');
   const ARROW_DIR = { ArrowRight: 'r', ArrowLeft: 'l', ArrowUp: 'u', ArrowDown: 'd' };
   if (cmd) cmd.addEventListener('keydown', e => {
@@ -3189,6 +3243,7 @@ function sidebarAction(e) {
     case 'startOffsetPick': startOffsetPick(); break;
     case 'cancelOffsetPick': cancelOffsetPick(); break;
     case 'removeAnnotation': removeAnnotation(parseInt(i)); break;
+    case 'selectAnnotation': selectAnnotation(parseInt(i)); break;
     case 'matchBasement': matchBasementToMain(e.currentTarget.dataset.b); break;
     case 'traceToggle': toggleTraceClick(e.currentTarget.checked); break;
     case 'traceStart': state.traceClick = true; state.traceStarted = false; document.querySelector('#mode-tabs button[data-mode="walk"]').click(); break;
@@ -4414,6 +4469,10 @@ svg.addEventListener('click', (e) => {
   e.stopImmediatePropagation(); e.preventDefault();
   traceClickAt(screenToWorld(e.clientX, e.clientY), e.altKey, e.shiftKey);
 }, true);
+// A click anywhere else on the drawing drops a selected measurement.
+svg.addEventListener('click', () => {
+  if (state.selectedAnnotation != null) { state.selectedAnnotation = null; render(); }
+});
 svg.addEventListener('mousemove', (e) => {
   if (!traceActive() || state.offsetPick) { if (state.traceHover) { state.traceHover = null; hideTraceLoupe(); render(); } return; }
   const w = screenToWorld(e.clientX, e.clientY);
@@ -4488,7 +4547,7 @@ window.addEventListener('mouseup', dimLabelDragUp);
 // =============================================================================
 function createModal() {
   const host = document.getElementById('modal-host');
-  host.innerHTML = '<div class="modal-bg" onclick="if(event.target===this) closeModal()"></div>';
+  host.innerHTML = '<div class="modal-bg" onmousedown="this._downOnBg = event.target===this" onclick="if(event.target===this && this._downOnBg) closeModal()"></div>';
   return host.querySelector('.modal-bg');
 }
 function closeModal() { document.getElementById('modal-host').innerHTML = ''; }
@@ -4686,7 +4745,7 @@ function exportFilename(ext) {
 // included, and exports PNG/SVG from there. Page size is chosen here at export time.
 // Short, hand-kept list of recent releases (newest first). CHANGELOG.md has the detail.
 const WHATS_NEW = [
-  ['0.45.3', '2026-11-23', 'Measure no longer makes the pointer lag. Moving the mouse with Measure on used to redraw the whole sketch on every move; now only the measuring line and its length are redrawn, once per screen refresh. Measure also works in Fence mode now: measuring no longer wipes out what you fenced, and clicking a corner to measure can no longer drag that corner by accident. And with a fence selected, just type the move (e.g. 3 r for 3 ft right) and press Enter: no need to click into the box or press Move. Exports: wall lengths and area labels stay readable when the drawing is shrunk to fit a page, and each floor caption lists living area apart from carport, deck and other areas. The Label size slider now goes to 300%.'],
+  ['0.45.3', '2026-11-23', 'Measure no longer makes the pointer lag. Moving the mouse with Measure on used to redraw the whole sketch on every move; now only the measuring line and its length are redrawn, once per screen refresh. Measure also works in Fence mode now: measuring no longer wipes out what you fenced, and clicking a corner to measure can no longer drag that corner by accident. And with a fence selected, just type the move (e.g. 3 r for 3 ft right) and press Enter: no need to click into the box or press Move. Exports: wall lengths and area labels stay readable when the drawing is shrunk to fit a page, and each floor caption lists living area apart from carport, deck and other areas. The Label size slider now goes to 300%. Measurements: click one on the drawing to select it, then press Delete or its red × to remove it; pointing at a row in the Measurements list highlights it on the drawing, and Clear all now clears only the floor you are on. Export preview: a Text size slider updates the preview as you drag, and the preview window is bigger and resizable from its bottom-right corner.'],
   ['0.45.2', '2026-11-23', 'Saving an image or sketch no longer leaves a blank file. If the file you picked could not be written (a synced folder such as OneDrive can hold a brand-new file for a moment), the app now tries again, and if it still fails it removes the empty file and tells you, instead of quietly downloading a second copy.'],
   ['0.45.1', '2026-10-13', 'The phone now keeps your sketch as you draw, open walk included, and brings it back after a reload or an update. When a newer version arrives while an older copy is showing (a slow connection), both pages offer to reload, and your sketch is kept.'],
   ['0.45.0', '2026-10-07', 'Area and dimension labels can now be dragged in Walk mode too (between walks), not only in Edit mode — so a label that lands in the wrong spot after closing an area can be moved straight away. In Fence mode, Set floor moves every shape the fence captured whole to another floor. On the phone, a walk continued from its start now describes its diagonal walls correctly.'],
@@ -5098,10 +5157,14 @@ function openExportPreview() {
   const s = state.settings;
   const div = document.createElement('div');
   div.className = 'modal';
-  div.style.maxWidth = '760px';
-  div.style.width = '94%';
+  // Big and resizable (drag the bottom-right corner); the page preview refits to it.
+  Object.assign(div.style, {
+    maxWidth: 'none', width: 'min(1100px, 96vw)', height: '88vh', maxHeight: '96vh',
+    minWidth: '520px', minHeight: '420px', resize: 'both', overflow: 'hidden',
+    display: 'flex', flexDirection: 'column',
+  });
   div.innerHTML = `
-    <h3>Export / Print preview</h3>
+    <h3>Export / Print preview <span style="font-weight:normal; font-size:11px; color:#777;">— drag the bottom-right corner to resize</span></h3>
     <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:10px; font-size:12px;">
       <label>Page:
         <select id="prev-page-size" style="margin-left:6px;">
@@ -5126,6 +5189,9 @@ function openExportPreview() {
       </label>
       <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="prev-title" ${s.exportIncludeTitle?'checked':''}> Title</label>
       <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="prev-legend" ${s.exportIncludeLegend?'checked':''}> Legend</label>
+      <label style="display:flex; align-items:center; gap:6px;" title="Size of wall lengths and area labels on the sheet (same as Label size on the toolbar)">Text size
+        <input type="range" id="prev-font" min="0.6" max="3" step="0.1" style="width:120px;">
+        <span id="prev-font-val" style="min-width:34px;"></span></label>
     </div>
     <div id="prev-dimrow" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; font-size:12px;">
       <span style="color:#555;">Show dimensions + notes for:</span>
@@ -5135,7 +5201,7 @@ function openExportPreview() {
         return `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" data-dimfloor="${f}" ${on?'checked':''} ${isActive?'disabled':''}> ${escapeHtml(f)}${isActive?' (active)':''}</label>`;
       }).join('')}
     </div>
-    <div id="prev-area" style="background:#e9edf1; padding:14px; display:flex; justify-content:center; align-items:flex-start; max-height:60vh; overflow:auto; border:1px solid #ccc; border-radius:4px; min-height:200px;"></div>
+    <div id="prev-area" style="background:#e9edf1; padding:14px; display:flex; flex-direction:column; align-items:center; flex:1 1 auto; overflow:auto; border:1px solid #ccc; border-radius:4px; min-height:200px;"></div>
     <div class="modal-buttons">
       <button onclick="closeModal()">Cancel</button>
       <button id="prev-save-svg">Save SVG</button>
@@ -5179,13 +5245,41 @@ function openExportPreview() {
       note.textContent = 'Preview shows ' + targets[0] + '. Save writes ' + targets.length + ' files, one per building.';
       area.appendChild(note);
     }
-    const w = parseFloat(svgEl.getAttribute('width')), h = parseFloat(svgEl.getAttribute('height'));
-    const scale = Math.min(680 / w, (window.innerHeight * 0.55) / h, 1);
+    svgEl.dataset.pageW = svgEl.getAttribute('width');
+    svgEl.dataset.pageH = svgEl.getAttribute('height');
+    svgEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)';
+    svgEl.style.flex = '0 0 auto';
+    area.appendChild(svgEl);
+    fitPreview();
+  };
+  // Scale the previewed page to fill the preview area (re-run when the window is resized).
+  const fitPreview = () => {
+    const area = div.querySelector('#prev-area');
+    const svgEl = area && area.querySelector(':scope > svg');
+    if (!svgEl) return;
+    const w = parseFloat(svgEl.dataset.pageW), h = parseFloat(svgEl.dataset.pageH);
+    const note = area.querySelector(':scope > div');
+    const availW = area.clientWidth - 28, availH = area.clientHeight - 28 - (note ? note.offsetHeight + 6 : 0);
+    const scale = Math.max(0.1, Math.min(availW / w, availH / h));
     svgEl.setAttribute('width', Math.round(w * scale));
     svgEl.setAttribute('height', Math.round(h * scale));
-    svgEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)';
-    area.appendChild(svgEl);
   };
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => { if (!div.isConnected) { ro.disconnect(); return; } fitPreview(); });
+    ro.observe(div.querySelector('#prev-area'));
+  }
+  // Text size: same setting as the toolbar's Label size; the preview rebuilds as it moves.
+  const fontIn = div.querySelector('#prev-font'), fontVal = div.querySelector('#prev-font-val');
+  const showFont = () => { fontIn.value = s.sketchFontScale || 1; fontVal.textContent = Math.round((s.sketchFontScale || 1) * 100) + '%'; };
+  showFont();
+  let fontTimer = 0;
+  fontIn.addEventListener('input', () => {
+    s.sketchFontScale = parseFloat(fontIn.value) || 1;
+    showFont();
+    if (window.__syncSketchFontBar) window.__syncSketchFontBar();
+    clearTimeout(fontTimer);
+    fontTimer = setTimeout(draw, 120);
+  });
   sel.addEventListener('change', draw);
   laySel.addEventListener('change', draw);
   div.querySelector('#prev-title').addEventListener('change', draw);
@@ -6366,6 +6460,8 @@ window.addEventListener('keydown', (e) => {
   else if (mod && !e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); saveJSON(); }
   else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redoHistory(); }
   else if (e.key === 'Escape' && state.underlayCal) { cancelUnderlayCal(); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedAnnotation != null) { e.preventDefault(); deleteSelectedAnnotation(); }
+  else if (e.key === 'Escape' && state.selectedAnnotation != null && !state.offsetPick) { state.selectedAnnotation = null; render(); }
   else if (e.key === 'Escape' && state.offsetPick) { if (state.offsetPick.first) { state.offsetPick.first = null; render(); } else cancelOffsetPick(); }
   else if (e.key === 'Escape' && state.shapeMovePick) { cancelShapeMovePick(); }
   else if (currentWallRemoval() && (e.key === 'Tab' || e.key === 'n' || e.key === 'N')) { e.preventDefault(); nextWallRemoval(e.shiftKey ? -1 : 1); }
