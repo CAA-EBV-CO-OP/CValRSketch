@@ -3125,6 +3125,13 @@ function attachSidebarHandlers() {
   if (gmove) gmove.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); applyGroupMove(); }
     else if (e.key === 'Escape') { e.preventDefault(); gmove.value = ''; gmove.blur(); }
+    // The cursor stays here after a move, so with the box empty Ctrl+Z / Ctrl+Y act on
+    // the sketch (undo the move) rather than the box's own text undo.
+    else if ((e.ctrlKey || e.metaKey) && !gmove.value) {
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); undoHistory(); }
+      else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redoHistory(); }
+    }
   });
   const sdir = document.getElementById('split-dir');
   if (sdir) sdir.addEventListener('keydown', e => {

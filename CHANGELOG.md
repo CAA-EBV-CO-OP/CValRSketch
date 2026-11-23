@@ -21,7 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Measure works in Fence mode.** With Fence active, each Measure click also started a new fence, so the slightest mouse movement during the click replaced what you had fenced with a tiny, usually empty, selection. While Measure is on, clicks now only pick measure points; the fence selection stays, and fencing works again once you click Done measuring.
 - **Measure clicks on a corner no longer drag the corner.** In Edit mode, pressing on a corner with Measure on also started a corner drag, so a mouse wobble of 4 px during the click moved (and selected) that corner. With Measure on, corners and labels no longer drag; the click only picks the measure point.
 ### Changed
-- **Move a fence by typing.** With a fence selected, typing an offset (e.g. `3'6 r`) goes straight into the move box, and Enter moves the selection — no clicking into the box or pressing Move. The cursor stays in the box for the next move; Esc there clears the box and leaves it, so Delete and Esc act on the fence again.
+- **Move a fence by typing.** With a fence selected, typing an offset (e.g. `3'6 r`) goes straight into the move box, and Enter moves the selection — no clicking into the box or pressing Move. The cursor stays in the box for the next move; Esc there clears the box and leaves it, so Delete and Esc act on the fence again. With the box empty, Ctrl+Z / Ctrl+Y undo and redo the move (not just the box's text).
 
 ---
 
