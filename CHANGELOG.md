@@ -14,6 +14,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.45.3] — 2026-11-23
+
+### Fixed
+- **Measure no longer makes the pointer lag.** With Measure on, every mouse move that changed the snapped point redrew the whole sketch (every shape, fill pattern and label), rebuilt the sidebar and restarted autosave — about 5 ms each on a small sketch, and much more zoomed in or with a scan loaded, so the pointer could feel like it was wading through molasses. Mouse moves now redraw only the measuring line, its length and the snap cue, at most once per screen refresh (about 50× less work per move). Clicks still do a full redraw.
+- **Measure works in Fence mode.** With Fence active, each Measure click also started a new fence, so the slightest mouse movement during the click replaced what you had fenced with a tiny, usually empty, selection. While Measure is on, clicks now only pick measure points; the fence selection stays, and fencing works again once you click Done measuring. Clicks on a corner or wall now take the point in Fence mode too (a press used to reach the fence drag, whose redraw removed the clicked element before the click arrived), and the same holds for click-tracing a scan in Walk mode. This folds in the fix from PR #49, which is closed in favour of this release.
+- **Measure clicks on a corner no longer drag the corner.** In Edit mode, pressing on a corner with Measure on also started a corner drag, so a mouse wobble of 4 px during the click moved (and selected) that corner. With Measure on, corners and labels no longer drag; the click only picks the measure point.
+### Changed
+- **Readable labels on exports.** The drawing is captured at screen size and then shrunk to fit the page, and its wall lengths and area labels shrank with it: on a Letter page with two floors stacked, captured from a wide screen, they printed at about 4 px. When the drawing has to shrink, the export now re-runs with the labels enlarged by the shrink factor (up to 3x), so they print at about their on-screen size (about 11 px in the same test). The on-screen label size is unchanged.
+- **Floor captions no longer mix living area with carports and decks.** A floor's caption on a multi-floor export showed one total of every shape on it (e.g. "Main floor — 1500 sq ft" was finished area + carport + storage). It now lists each area type with its own total, interior areas first: "Basement — Finished basement 981 sq ft · Carport 320 sq ft · Misc / other 44 sq ft".
+- **Label size slider goes to 300%** (was 200%).
+- **Remove a measurement by clicking it.** Click a pink measurement (its line or its length) on the drawing to select it; it gets an orange highlight and a red ×. Press Delete or click the × to remove it (Undo brings it back); Esc or a click elsewhere deselects. Pointing at a row in the Measurements list lights that measurement up on the drawing, and clicking the row selects it. None of this appears on exports.
+- **Subtitle can be edited.** The line under the title on exports came from the saved file and had no box to change it. The Export preview now has a Subtitle box; leave it empty for the standard "Not to scale — dimensions as labeled" note. It is saved with the sketch.
+- **Area names no longer overlap their square footage at larger label sizes.** The gap between an area's name and its "sq ft" line was fixed in pixels; it now grows with the label size.
+- **Saved images use a sans-serif font.** The sketch's labels had no font set, so a saved PNG fell back to a serif font; exports now set Arial / Helvetica / sans-serif.
+- **Drag labels on the export preview.** Wall lengths and area labels can be dragged right on the previewed page; on release the move is stored exactly as a drag on the canvas would store it (per-wall nudge / area-label offset, in feet), so the canvas and every later export match. Undo (after closing the preview) reverses it. A label dragged outside the drawing makes the page refit around it, so it can land slightly off the drop point.
+- **Clear all clears only the floor you are on.** It sits under that floor's list but used to wipe the measurements on every floor.
+- **Export preview: Text size slider and a resizable window.** The preview has its own Text size slider (the same setting as Label size on the toolbar) that rebuilds the preview as you drag. The window opens larger, can be resized from its bottom-right corner, and the page refits to it. Releasing a drag outside a dialog no longer closes it.
+- **Move a fence by typing.** With a fence selected, typing an offset (e.g. `3'6 r`) goes straight into the move box, and Enter moves the selection — no clicking into the box or pressing Move. The cursor stays in the box for the next move; Esc there clears the box and leaves it, so Delete and Esc act on the fence again. With the box empty, Ctrl+Z / Ctrl+Y undo and redo the move (not just the box's text).
+
+---
+
+## [0.45.2] — 2026-11-23
+
+### Fixed
+- **No more blank file plus a second copy when saving.** Save As opens the save window, which creates the file straight away; if writing into it then failed (seen in OneDrive-synced folders, which can hold a brand-new file for a moment), the error was swallowed and the app downloaded a second copy, leaving a 0-byte file beside it. Now the write is retried once; if it still fails, the empty file is removed and a message says the save did not work. An empty image (the browser could not draw it) is reported instead of saved. Desktop and phone pages.
+
+---
+
 ## [0.45.1] — 2026-10-13
 
 ### Fixed
