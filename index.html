@@ -4503,6 +4503,15 @@ svg.addEventListener('mouseleave', () => {
   if (state.offsetPick && state.offsetPick.hover) { state.offsetPick.hover = null; scheduleMeasureLive(); }
 });
 svg.addEventListener('pointerdown', closeUnpinnedHelp, true);
+// Measure and click-tracing take their point from the click event. A press that
+// reaches a drag handler (fence, corner, label) re-renders on release, which
+// removes the pressed element, and the browser then never sends the click.
+// (From PR #49; the per-handler offsetPick checks stay as a second guard.)
+svg.addEventListener('mousedown', (e) => {
+  if (e.button !== 0 || panMode || galleryActive()) return;
+  if (!state.offsetPick && !traceActive()) return;
+  e.stopImmediatePropagation(); e.preventDefault();
+}, true);
 svg.addEventListener('mousedown', fenceMouseDown);
 window.addEventListener('mousemove', fenceMouseMove);
 window.addEventListener('mouseup', fenceMouseUp);
